@@ -1,0 +1,4 @@
+# YouTube video URLs
+# Only videos with permission for reuse
+
+# Add one video URL per line
