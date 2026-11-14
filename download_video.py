@@ -1,5 +1,7 @@
 
 import json
+import time
+import urllib.error
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -7,15 +9,44 @@ from pathlib import Path
 CANDIDATES_FILE = Path("source_candidates.json")
 OUTPUT_FILE = Path("input.mp4")
 METADATA_FILE = Path("source_metadata.json")
-
 MAX_SIZE = 500 * 1024 * 1024
 
-USER_AGENT = "ViralNovaLabsShortsFactory/1.0"
+USER_AGENT = (
+    "ViralNovaLabsShortsFactory/1.1 "
+    "(https://github.com/negahdarfar/-ai-shorts-factory)"
+)
+
+
+def open_with_backoff(request, timeout, attempts=4):
+    delay = 10
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 503):
+                raise
+
+            retry_after = error.headers.get("Retry-After")
+            try:
+                wait_seconds = max(delay, int(retry_after)) if retry_after else delay
+            except ValueError:
+                wait_seconds = delay
+
+            if attempt == attempts:
+                raise RuntimeError(
+                    f"Wikimedia rate-limited this download after {attempts} attempts. "
+                    f"Last HTTP status: {error.code}. Stop and retry later."
+                ) from error
+
+            print(f"Rate limited. Waiting {wait_seconds}s...")
+            error.close()
+            time.sleep(wait_seconds)
+            delay = min(delay * 2, 120)
 
 
 def download_candidate(item):
     url = item.get("download_url", "")
-
     parsed = urllib.parse.urlparse(url)
 
     if parsed.scheme != "https":
@@ -37,23 +68,20 @@ def download_candidate(item):
     try:
         print("Downloading:", item.get("title", "Unknown"))
 
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with open_with_backoff(request, timeout=120) as response:
             content_type = response.headers.get("Content-Type", "")
 
             if not (
                 content_type.startswith("video/")
                 or "octet-stream" in content_type
             ):
-                raise ValueError(
-                    "Unexpected content type: " + content_type
-                )
+                raise ValueError("Unexpected content type: " + content_type)
 
             total = 0
 
             with temporary_file.open("wb") as output:
                 while True:
                     chunk = response.read(1024 * 1024)
-
                     if not chunk:
                         break
 
@@ -98,7 +126,7 @@ def download_candidate(item):
 def main():
     if not CANDIDATES_FILE.exists():
         raise FileNotFoundError(
-            "source_candidates.json not found. Run source_discovery.py first."
+            "source_candidates.json not found."
         )
 
     candidates = json.loads(
@@ -108,15 +136,26 @@ def main():
     if not candidates:
         raise RuntimeError("No video candidates available.")
 
-    for item in candidates:
+    candidates = sorted(
+        candidates,
+        key=lambda item: item.get("size", 0)
+    )
+
+    for item in candidates[:10]:
         try:
             if download_candidate(item):
                 print("SOURCE READY")
                 return
+
+        except RuntimeError as error:
+            if "rate-limited" in str(error):
+                raise
+            print("Candidate skipped:", error)
+
         except Exception as error:
             print("Candidate skipped:", error)
 
-    raise RuntimeError("Could not download any eligible video.")
+    raise RuntimeError("Could not download an eligible video.")
 
 
 if __name__ == "__main__":
