@@ -9,16 +9,16 @@ from pathlib import Path
 API = "https://commons.wikimedia.org/w/api.php"
 
 SEARCH_TERMS = [
-    "space",
-    "astronomy",
-    "underwater ocean",
-    "wildlife nature",
-    "futuristic city",
-    "earth landscape",
-    "science technology",
-    "mountains waterfall",
-    "animals ocean",
-    "documentary nature",
+    "space video",
+    "astronomy video",
+    "ocean video",
+    "wildlife video",
+    "nature video",
+    "city video",
+    "landscape video",
+    "science video",
+    "mountain video",
+    "waterfall video",
 ]
 
 MIN_SIZE = 1 * 1024 * 1024
@@ -26,7 +26,7 @@ MAX_SIZE = 500 * 1024 * 1024
 MIN_DURATION = 120
 
 USER_AGENT = (
-    "ViralNovaLabsShortsFactory/1.3 "
+    "ViralNovaLabsShortsFactory/1.4 "
     "(https://github.com/negahdarfar/-ai-shorts-factory)"
 )
 
@@ -40,7 +40,7 @@ def api_request(params):
         headers={"User-Agent": USER_AGENT}
     )
 
-    with urllib.request.urlopen(request, timeout=40) as response:
+    with urllib.request.urlopen(request, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -53,28 +53,20 @@ def clean_text(value):
 def allowed_license(value):
     text = clean_text(value).lower()
     text = text.replace("_", " ").replace("-", " ")
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text)
 
-    if any(term in text for term in [
-        "noncommercial",
-        "non commercial",
-        "no derivatives",
-        "no derivative",
-        "cc nc",
-        "cc nd",
-    ]):
+    if re.search(
+        r"\b(nc|nd)\b|non.?commercial|no.?derivatives",
+        text
+    ):
         return False
 
     if "public domain" in text or "cc0" in text:
         return True
 
-    if re.search(r"\bcc\s*by\s*sa\b", text):
-        return True
-
-    if re.search(r"\bcc\s*by\b", text):
-        return True
-
-    return False
+    return bool(
+        re.search(r"\bcc\s*by(?:\s*sa)?\b", text)
+    )
 
 
 def parse_duration(value):
@@ -89,20 +81,22 @@ def parse_duration(value):
 
         if ":" in value:
             parts = [float(x) for x in value.split(":")]
-            seconds = 0
+            total = 0
 
             for part in parts:
-                seconds = seconds * 60 + part
+                total = total * 60 + part
 
-            return seconds
+            return total
 
-        total = 0
         matches = re.findall(
-            r"(\d+(?:\.\d+)?)\s*(h|hr|hour|hours|m|min|minute|minutes|s|sec|second|seconds)",
+            r"(\d+(?:\.\d+)?)\s*"
+            r"(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)",
             value
         )
 
         if matches:
+            total = 0
+
             for number, unit in matches:
                 number = float(number)
 
@@ -169,12 +163,15 @@ def search_videos(term):
             get_meta("Length") or get_meta("Duration")
         )
 
-        if duration is None or duration < MIN_DURATION:
+        # مدت نامشخص را فعلاً رد نمی‌کنیم.
+        if duration is not None and duration < MIN_DURATION:
             continue
 
         url = info.get("url", "")
 
-        if not url.startswith("https://upload.wikimedia.org/"):
+        if not url.startswith(
+            "https://upload.wikimedia.org/"
+        ):
             continue
 
         title = page.get("title", "")
@@ -230,8 +227,7 @@ def discover_sources():
 
     if not results:
         raise RuntimeError(
-            "No eligible Wikimedia videos found. "
-            "Try again later or expand search terms."
+            "No eligible Wikimedia videos found."
         )
 
     return results
