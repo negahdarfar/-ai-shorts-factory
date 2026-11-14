@@ -1,6 +1,7 @@
 
 import json
 import re
+import html
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -16,7 +17,14 @@ SEARCH_TERMS = [
     "science technology video",
 ]
 
-USER_AGENT = "ViralNovaLabsShortsFactory/1.0 (automated media discovery)"
+MIN_SIZE = 5 * 1024 * 1024
+MAX_SIZE = 500 * 1024 * 1024
+MIN_DURATION = 120
+
+USER_AGENT = (
+    "ViralNovaLabsShortsFactory/1.2 "
+    "(https://github.com/negahdarfar/-ai-shorts-factory)"
+)
 
 
 def api_request(params):
@@ -32,24 +40,59 @@ def api_request(params):
         return json.loads(response.read().decode("utf-8"))
 
 
+def clean_text(value):
+    value = html.unescape(str(value or ""))
+    value = re.sub(r"<[^>]+>", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
 def allowed_license(value):
-    text = str(value or "").lower()
+    text = clean_text(value).lower()
     text = text.replace("_", " ").replace("-", " ")
     text = re.sub(r"\s+", " ", text).strip()
 
-    if any(x in text for x in ["noncommercial", "non commercial", " nc", " no derivatives", " nd"]):
+    if any(term in text for term in [
+        "noncommercial",
+        "non commercial",
+        "no derivatives",
+        "no derivative",
+        " nc",
+        " nd"
+    ]):
         return False
 
     if "public domain" in text or "cc0" in text:
         return True
 
-    if re.search(r"\bcc by sa\b", text):
+    if re.search(r"\bcc\s*by\s*sa\b", text):
         return True
 
-    if re.search(r"\bcc by\b", text):
+    if re.search(r"\bcc\s*by\b", text):
         return True
 
     return False
+
+
+def parse_duration(value):
+    value = clean_text(value)
+
+    if not value:
+        return None
+
+    try:
+        if ":" not in value:
+            return float(value)
+
+        parts = [float(part) for part in value.split(":")]
+
+        seconds = 0
+        for part in parts:
+            seconds = seconds * 60 + part
+
+        return seconds
+
+    except (ValueError, TypeError):
+        return None
 
 
 def search_videos(term):
@@ -68,6 +111,7 @@ def search_videos(term):
 
     for page in pages.values():
         info_list = page.get("imageinfo", [])
+
         if not info_list:
             continue
 
@@ -77,10 +121,17 @@ def search_videos(term):
         if not mime.startswith("video/"):
             continue
 
+        size = int(info.get("size", 0) or 0)
+
+        if size < MIN_SIZE or size > MAX_SIZE:
+            continue
+
         metadata = info.get("extmetadata", {})
 
         def get_meta(key):
-            return metadata.get(key, {}).get("value", "")
+            return clean_text(
+                metadata.get(key, {}).get("value", "")
+            )
 
         license_name = get_meta("LicenseShortName")
         license_url = get_meta("LicenseUrl")
@@ -88,16 +139,28 @@ def search_videos(term):
         if not allowed_license(license_name):
             continue
 
+        duration = parse_duration(
+            get_meta("Length") or get_meta("Duration")
+        )
+
+        if duration is None or duration < MIN_DURATION:
+            continue
+
         if not info.get("url"):
             continue
 
+        title = page.get("title", "")
+
         results.append({
-            "title": page.get("title", ""),
+            "title": title,
             "download_url": info["url"],
-            "source_page": "https://commons.wikimedia.org/wiki/"
-                           + urllib.parse.quote(page.get("title", "").replace(" ", "_")),
+            "source_page": (
+                "https://commons.wikimedia.org/wiki/"
+                + urllib.parse.quote(title.replace(" ", "_"))
+            ),
             "mime": mime,
-            "size": info.get("size", 0),
+            "size": size,
+            "duration": duration,
             "license": license_name,
             "license_url": license_url,
             "artist": get_meta("Artist"),
@@ -110,20 +173,20 @@ def search_videos(term):
 
 def discover_sources():
     found = {}
-    
+
     for term in SEARCH_TERMS:
         print("Searching:", term)
 
         try:
             for item in search_videos(term):
                 found[item["download_url"]] = item
+
         except Exception as error:
             print("Search warning:", error)
 
     results = sorted(
         found.values(),
-        key=lambda item: item["size"],
-        reverse=True
+        key=lambda item: item["size"]
     )
 
     Path("source_candidates.json").write_text(
@@ -131,10 +194,13 @@ def discover_sources():
         encoding="utf-8"
     )
 
-    if not results:
-        raise RuntimeError("No eligible videos found.")
-
     print("Eligible video candidates:", len(results))
+
+    if not results:
+        raise RuntimeError(
+            "No videos passed the license, size and duration filters."
+        )
+
     return results
 
 
