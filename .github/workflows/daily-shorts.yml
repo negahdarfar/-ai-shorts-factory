@@ -1,0 +1,46 @@
+
+name: AI Shorts Factory
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-shorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Get project
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Download authorized video
+        run: |
+          python -c "from pathlib import Path; from download_video import download_video; urls=[x.strip() for x in Path('video_sources.txt').read_text().splitlines() if x.strip().startswith('https://')]; download_video(urls[0])"
+
+      - name: Generate shorts
+        run: python main.py
+
+      - name: Save generated shorts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-shorts
+          path: output/*.mp4
+          if-no-files-found: error
+          retention-days: 3
