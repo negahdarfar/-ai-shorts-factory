@@ -3,6 +3,8 @@ name: AI Shorts Factory
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *"
 
 permissions:
   contents: read
@@ -28,19 +30,25 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download authorized video
-        run: |
-          python -c "from pathlib import Path; from download_video import download_video; urls=[x.strip() for x in Path('video_sources.txt').read_text().splitlines() if x.strip().startswith('https://')]; download_video(urls[0])"
+      - name: Discover reusable videos
+        run: python source_discovery.py
 
-      - name: Generate shorts
+      - name: Download selected video
+        run: python download_video.py
+
+      - name: Generate four Shorts
         run: python main.py
 
-      - name: Save generated shorts
+      - name: Save generated Shorts
         uses: actions/upload-artifact@v4
         with:
-          name: generated-shorts
-          path: output/*.mp4
+          name: viralnovalabs-shorts
+          path: |
+            output/*.mp4
+            source_metadata.json
+            best_clips.json
           if-no-files-found: error
           retention-days: 3
