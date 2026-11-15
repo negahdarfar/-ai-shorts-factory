@@ -25,14 +25,16 @@ if missing:
     raise SystemExit(0)
 
 config = toml.load(str(template))
-config["llm_provider"] = "gemini"
-config["gemini_api_key"] = gemini
-config["video_source"] = "pexels" if pexels else "pixabay"
-config["pexels_api_keys"] = [pexels] if pexels else []
-config["pixabay_api_keys"] = [pixabay] if pixabay else []
-config["match_materials_to_script"] = True
-config["upload_post_enabled"] = False
-config["upload_post_auto_upload"] = False
+app = config.setdefault("app", {})
+# MoneyPrinterTurbo v1.3.10 reads LLM and provider credentials from [app].
+app["llm_provider"] = "gemini"
+app["gemini_api_key"] = gemini
+app["video_source"] = "pexels" if pexels else "pixabay"
+app["pexels_api_keys"] = [pexels] if pexels else []
+app["pixabay_api_keys"] = [pixabay] if pixabay else []
+app["match_materials_to_script"] = True
+app["upload_post_enabled"] = False
+app["upload_post_auto_upload"] = False
 
 ui = config.setdefault("ui", {})
 ui.update({
@@ -55,7 +57,7 @@ target = home / "config.toml"
 target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
-print(f"LLM: Gemini | footage: {config['video_source']} | TTS: Edge Neural | upload: disabled")
+print(f"LLM: {app['llm_provider']} | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
-    output.write("video_source=" + config["video_source"] + "\n")
+    output.write("video_source=" + app["video_source"] + "\n")
