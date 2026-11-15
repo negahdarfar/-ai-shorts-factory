@@ -17,7 +17,11 @@ report = []
 for path in files:
     if path.stat().st_size < 500_000:
         raise SystemExit(f"Output is suspiciously small: {path}")
-    hasher = hashlib.sha256()\n    with path.open("rb") as video_file:\n        for chunk in iter(lambda: video_file.read(1024 * 1024), b""):\n            hasher.update(chunk)\n    digest = hasher.hexdigest()
+    hasher = hashlib.sha256()
+    with path.open("rb") as video_file:
+        for chunk in iter(lambda: video_file.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
     if digest in hashes:
         raise SystemExit(f"Duplicate video output detected: {path}")
     hashes.add(digest)
@@ -43,5 +47,5 @@ for path in files:
 
 Path("mpt_quality_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 for row in report:
-    print(f"PASS {row['file']} | {row['resolution']} | {row['duration_seconds']}s | {row['size_mb']} MB")
+    print("PASS {} | {} | {}s | {} MB".format(row["file"], row["resolution"], row["duration_seconds"], row["size_mb"]))
 print(f"Validated {len(report)} distinct vertical videos. Topic relevance and visual quality still require human review.")
