@@ -12,13 +12,13 @@ def score_clip(text):
     lower = text.lower()
     score = 0
     for word in HOOK_WORDS:
-        if re.search(r"\\b" + re.escape(word) + r"\\b", lower):
+        if re.search(r"\b" + re.escape(word) + r"\b", lower):
             score += 3
     if "?" in text:
         score += 3
     if "!" in text:
         score += 2
-    if re.search(r"\\d+", text):
+    if re.search(r"\d+", text):
         score += 2
     words = len(text.split())
     if 20 <= words <= 100:
