@@ -42,6 +42,9 @@ jobs:
       - name: Generate four Shorts
         run: python main.py
 
+      - name: Create source attribution
+        run: python attribution.py
+
       - name: Save generated Shorts
         uses: actions/upload-artifact@v4
         with:
@@ -50,5 +53,6 @@ jobs:
             output/*.mp4
             source_metadata.json
             best_clips.json
+            output/attribution.txt
           if-no-files-found: error
           retention-days: 3
