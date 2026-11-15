@@ -1,0 +1,105 @@
+name: Purffle Shorts Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "How many Shorts to generate for this quality test"
+        required: true
+        default: "4"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: purffle-shorts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      UPLOAD: "false"
+      TTS_ENGINE: edge
+      LANGUAGE: en
+      ASPECT: "9:16"
+      RESOLUTION: "1080x1920"
+      FPS: "30"
+      TARGET_SECONDS: "40"
+      SCRIPT_REVIEW: score
+      VISUAL_SOURCES: pexels,pixabay
+      TOPIC_SOURCES: search,trending,wikipedia,reddit
+      NICHES: "science facts, space and the universe, strange history, wildlife and nature, psychology"
+      CAPTION_STYLE: bold
+      CAPTION_POSITION: lower
+      CAPTION_MAX_WORDS: "3"
+      CAPTION_EMPHASIS: "true"
+      CAPTION_EMOJI: "false"
+      KEN_BURNS: "true"
+      COLOR_GRADE: vivid
+      HOOK_OVERLAY: "true"
+      SOUND_EFFECTS: "true"
+      SYNTHETIC_MEDIA: "true"
+      CREDIT_FOOTAGE: "true"
+      KEEP_VIDEOS: "true"
+      OUTPUT_DIR: output_videos
+      DATA_DIR: data
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Restore channel history and topic memory
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: purffle-state-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            purffle-state-${{ runner.os }}-
+      - name: Install FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - name: Install PurffleShorts engine
+        run: |
+          python -m pip install --upgrade pip
+          pip install "git+https://github.com/Chamanrajragu/purffle-shorts.git@514fd2547227b98d951dfc1489fc8c7ce72f1b68"
+      - name: Check required free-tier keys
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          test -n "$GEMINI_API_KEY" || (echo "Missing GitHub Secret: GEMINI_API_KEY" && exit 1)
+          if [ -z "$PEXELS_API_KEY" ] && [ -z "$PIXABAY_API_KEY" ]; then
+            echo "Add at least one free footage key: PEXELS_API_KEY or PIXABAY_API_KEY"
+            exit 1
+          fi
+      - name: Generate Shorts (no upload)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          LLM_PROVIDER: gemini
+        run: |
+          python -m purffle_shorts run --count ${{ inputs.count }} --once --no-upload --verbose
+      - name: Save generated videos and review files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: purffle-shorts-quality-test
+          path: |
+            output_videos/
+            data/logs/
+          if-no-files-found: warn
+          retention-days: 7
