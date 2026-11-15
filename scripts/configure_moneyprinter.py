@@ -13,10 +13,16 @@ if not template.is_file():
 gemini = os.environ.get("GEMINI_API_KEY", "").strip()
 pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
+missing = []
 if not gemini:
-    raise SystemExit("Missing GEMINI_API_KEY GitHub Secret.")
+    missing.append("GEMINI_API_KEY")
 if not pexels and not pixabay:
-    raise SystemExit("Add PEXELS_API_KEY or PIXABAY_API_KEY (free stock-footage API).")
+    missing.append("PEXELS_API_KEY or PIXABAY_API_KEY")
+if missing:
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+        output.write("ready=false\n")
+    print("Quality test skipped. Add GitHub Actions secrets: " + ", ".join(missing))
+    raise SystemExit(0)
 
 config = toml.load(str(template))
 config["llm_provider"] = "gemini"
@@ -50,5 +56,6 @@ target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
 print(f"LLM: Gemini | footage: {config['video_source']} | TTS: Edge Neural | upload: disabled")
+    output.write("ready=true\n")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("video_source=" + config["video_source"] + "\n")
