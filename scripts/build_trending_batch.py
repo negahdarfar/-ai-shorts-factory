@@ -21,12 +21,20 @@ FALLBACK = [
 ]
 PROMPT = (
     "Create an original, highly engaging English YouTube Short for a general audience. "
-    "Open with a specific curiosity hook in the first 1-2 seconds. Keep every scene tightly "
-    "connected to the topic and its narration; choose literal, visually searchable footage terms, "
-    "not generic filler. Use accurate, checkable facts; never invent statistics, quotes, dates, "
-    "or sources. If a claim is uncertain, qualify it or omit it. Build curiosity, explain one "
-    "clear idea, deliver a satisfying payoff, and finish naturally. Avoid repeated phrases, "
-    "generic introductions, and clickbait claims the video does not support."
+    "Open with a specific curiosity hook in the first 1-2 seconds. Keep the script concise "
+    "for a roughly 35-55 second video. Explain one clear idea, build curiosity, deliver a "
+    "satisfying payoff, and finish naturally. Use accurate, checkable facts; never invent "
+    "statistics, quotes, dates, or sources. If a claim is uncertain, qualify it or omit it. "
+    "VISUAL MATCHING IS CRITICAL: write narration in short, concrete sentences that can each "
+    "be illustrated by an obvious real-world shot. For every sentence, make the visual subject "
+    "and action unmistakable using literal stock-footage search terms (specific object, place, "
+    "person, process, or action). Keep every shot directly relevant to the exact sentence being "
+    "spoken. Prefer close-ups, demonstrations, diagrams, landmarks, and authentic topic-specific "
+    "footage over generic scenery, random people, unrelated city shots, or decorative b-roll. "
+    "Do not repeat the same visual idea or recycle a generic establishing shot. If a topic is "
+    "abstract, explain it through a concrete example or a clearly named scientific process. "
+    "Avoid vague pronouns, filler transitions, repeated phrases, generic introductions, and "
+    "clickbait claims the video does not support."
 )
 
 def clean(value):
