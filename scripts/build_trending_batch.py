@@ -30,7 +30,7 @@ PROMPT = (
 )
 
 def clean(value):
-    return re.sub(r"\\s+", " ", (value or "").strip())
+    return re.sub(r"\s+", " ", (value or "").strip())
 
 def load_trends(geo):
     request = urllib.request.Request(
@@ -71,7 +71,7 @@ def main():
 
     fresh = [t for t in topics if t.lower() not in {x.lower() for x in seen}]
     if len(fresh) < count:
-        fresh.extend(t for t in FALLBACK if t.lower() not in {x.lower() for x in seen + set(fresh)})
+        fresh.extend(t for t in FALLBACK if t.lower() not in {x.lower() for x in seen | set(fresh)})
     chosen = fresh[:count]
     if len(chosen) < count:
         raise SystemExit(f"Could only find {len(chosen)} non-repeated topics; refusing to duplicate videos.")
