@@ -46,7 +46,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install .
+      - name: Restore previously used topic list
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mpt-runtime/state
+          key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mpt-topics-${{ runner.os }}-
       - name: Configure free-tier providers
+        id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -57,16 +65,25 @@ jobs:
       - name: Generate vertical videos (no upload)
         working-directory: vendor/MoneyPrinterTurbo
         run: |
-          mpt cli --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source pexels --video-aspect 9:16 --video-language en-US --voice-name en-US-GuyNeural --subtitle-enabled --subtitle-display-mode word_by_word --subtitle-animation pop_spring --subtitle-position bottom --video-fit-mode cover --bgm-volume 0.12 --stop-at video
+          mpt cli --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source ${{ steps.configure.outputs.video_source }} --video-aspect 9:16 --video-language en-US --voice-name en-US-GuyNeural --subtitle-enabled --subtitle-display-mode word_by_word --subtitle-animation pop_spring --subtitle-position bottom --video-fit-mode cover --bgm-volume 0.12 --stop-at video
+      - name: Validate generated vertical videos
+        env:
+          EXPECTED_COUNT: ${{ inputs.count }}
+        run: python scripts/validate_mpt_outputs.py
+      - name: Collect output files
+        if: always()
+        run: |
+          mkdir -p artifacts
+          if [ -d "$MPT_HOME/storage/tasks" ]; then cp -R "$MPT_HOME/storage/tasks" artifacts/; fi
+          if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
+          cp trending_batch.json selected_trends.json 2>/dev/null artifacts/ || true
+          cp mpt_quality_report.json artifacts/ 2>/dev/null || true
       - name: Save videos, selected topics and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: moneyprinterturbo-quality-test
           path: |
-            mpt-runtime/storage/tasks/
-            mpt-runtime/logs/
-            trending_batch.json
-            selected_trends.json
+            artifacts/
           if-no-files-found: warn
           retention-days: 7
