@@ -2,21 +2,12 @@ name: MoneyPrinterTurbo Shorts Factory
 
 "on":
   push:
-    branches: [moneyprinterturbo-engine]
+    branches:
+      - moneyprinterturbo-engine
   pull_request:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      count:
-        description: Number of Shorts for the quality test
-        required: true
-        default: "4"
-        type: choice
-        options:
-          - "1"
-          - "2"
-          - "4"
-
 permissions:
   contents: read
 
@@ -66,7 +57,7 @@ jobs:
         run: python scripts/configure_moneyprinter.py
       - name: Discover fresh trending topics
         if: steps.configure.outputs.ready == 'true'
-        run: python scripts/build_trending_batch.py --count ${{ inputs.count || '4' }} --geo US --state-dir "$MPT_HOME/state"
+        run: python scripts/build_trending_batch.py --count 4 --geo US --state-dir "$MPT_HOME/state"
       - name: Generate vertical videos (no upload)
         if: steps.configure.outputs.ready == 'true'
         working-directory: vendor/MoneyPrinterTurbo
@@ -75,7 +66,7 @@ jobs:
       - name: Validate generated vertical videos
         if: steps.configure.outputs.ready == 'true'
         env:
-          EXPECTED_COUNT: ${{ inputs.count || '4' }}
+          EXPECTED_COUNT: "4"
         run: python scripts/validate_mpt_outputs.py
       - name: Collect output files
         if: always()
