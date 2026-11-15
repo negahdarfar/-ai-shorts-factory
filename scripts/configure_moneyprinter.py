@@ -48,3 +48,5 @@ target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
 print(f"LLM: Gemini | footage: {config['video_source']} | TTS: Edge Neural | upload: disabled")
+with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+    output.write("video_source=" + config["video_source"] + "\n")
