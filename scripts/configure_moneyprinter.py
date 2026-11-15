@@ -29,8 +29,8 @@ app = config.setdefault("app", {})
 # MoneyPrinterTurbo v1.3.10 reads LLM and provider credentials from [app].
 app["llm_provider"] = "gemini"
 app["gemini_api_key"] = gemini
-# Use the lightweight Flash model instead of the Pro default, whose free-tier quota is zero.
-app["gemini_model_name"] = "gemini-2.5-flash"
+# Use the currently supported Flash model recommended by the Gemini API for new users.
+app["gemini_model_name"] = "gemini-3.8-flash"
 app["video_source"] = "pexels" if pexels else "pixabay"
 app["pexels_api_keys"] = [pexels] if pexels else []
 app["pixabay_api_keys"] = [pixabay] if pixabay else []
