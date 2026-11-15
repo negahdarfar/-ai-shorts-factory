@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      MPT_HOME: ${{ runner.temp }}/mpt-runtime
+      MPT_HOME: ${{ github.workspace }}/mpt-runtime
       MPT_SOURCE_DIR: ${{ github.workspace }}/vendor/MoneyPrinterTurbo
     steps:
       - name: Checkout this factory
@@ -44,7 +44,7 @@ jobs:
       - name: Restore previously used topic list
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/mpt-runtime/state
+          path: ${{ github.workspace }}/mpt-runtime/state
           key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mpt-topics-${{ runner.os }}-
