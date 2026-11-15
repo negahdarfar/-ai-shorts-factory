@@ -1,7 +1,4 @@
-
-import json
 import re
-from pathlib import Path
 
 HOOK_WORDS = [
     "secret", "shocking", "amazing", "never",
@@ -10,98 +7,120 @@ HOOK_WORDS = [
     "why", "how", "finally", "unexpected"
 ]
 
+
 def score_clip(text):
     lower = text.lower()
     score = 0
-
     for word in HOOK_WORDS:
-        if word in lower:
+        if re.search(r"\\b" + re.escape(word) + r"\\b", lower):
             score += 3
-
     if "?" in text:
         score += 3
-
     if "!" in text:
         score += 2
-
-    if re.search(r"\d+", text):
+    if re.search(r"\\d+", text):
         score += 2
-
-    if 35 <= len(text.split()) <= 120:
+    words = len(text.split())
+    if 20 <= words <= 100:
         score += 3
-
     return score
 
 
-def select_clips(transcript, count=4):
+def _build_candidates(transcript, min_duration, max_duration):
+    items = sorted(
+        (
+            {
+                "start": float(item["start"]),
+                "end": float(item["end"]),
+                "text": str(item.get("text", "")).strip()
+            }
+            for item in transcript
+            if str(item.get("text", "")).strip()
+            and float(item["end"]) > float(item["start"])
+        ),
+        key=lambda item: item["start"]
+    )
+
     candidates = []
-    items = transcript
-
-    for i in range(len(items)):
-        start = items[i]["start"]
-        end = start
+    for i, first in enumerate(items):
+        start = first["start"]
         texts = []
+        last_end = start
 
-        for j in range(i, len(items)):
-            if items[j]["end"] - start > 55:
+        for item in items[i:]:
+            if item["start"] - start > max_duration:
+                break
+            if item["start"] > last_end + 8:
+                # Avoid joining widely separated speech into one narration.
+                if last_end - start >= min_duration:
+                    break
+            if item["end"] - start > max_duration:
                 break
 
-            end = items[j]["end"]
-            texts.append(items[j]["text"])
+            texts.append(item["text"])
+            last_end = max(last_end, item["end"])
+            duration = last_end - start
 
-            duration = end - start
-
-            if duration >= 30:
-                full_text = " ".join(texts)
-
+            if min_duration <= duration <= max_duration:
+                full_text = " ".join(texts).strip()
                 candidates.append({
                     "start": round(start, 2),
-                    "end": round(end, 2),
+                    "end": round(last_end, 2),
                     "duration": round(duration, 2),
                     "text": full_text,
                     "score": score_clip(full_text)
                 })
 
-    candidates.sort(
-        key=lambda x: x["score"],
+    # Remove exact duplicates while preserving the best score.
+    unique = {}
+    for candidate in candidates:
+        key = (candidate["start"], candidate["end"])
+        if key not in unique or candidate["score"] > unique[key]["score"]:
+            unique[key] = candidate
+    return list(unique.values())
+
+
+def _choose_non_overlapping(candidates, count):
+    candidates = sorted(
+        candidates,
+        key=lambda item: (
+            item["score"],
+            len(item["text"].split()),
+            item["duration"]
+        ),
         reverse=True
     )
-
     selected = []
-
     for candidate in candidates:
         overlaps = any(
-            not (
-                candidate["end"] <= clip["start"]
-                or candidate["start"] >= clip["end"]
-            )
-            for clip in selected
+            candidate["start"] < chosen["end"]
+            and candidate["end"] > chosen["start"]
+            for chosen in selected
         )
-
         if not overlaps:
             selected.append(candidate)
-
         if len(selected) == count:
             break
+    return sorted(selected, key=lambda item: item["start"])
 
-    return selected
 
+def select_clips(transcript, count=4):
+    # Prefer useful 20-40 second spoken segments. If the source has
+    # sparse speech, progressively relax the minimum duration rather
+    # than failing immediately.
+    for minimum in (20, 15, 10, 6):
+        candidates = _build_candidates(
+            transcript,
+            min_duration=minimum,
+            max_duration=40
+        )
+        selected = _choose_non_overlapping(candidates, count)
+        if len(selected) == count:
+            print(
+                f"Selected {count} transcript clips "
+                f"with minimum duration {minimum}s."
+            )
+            return selected
 
-if __name__ == "__main__":
-    source = Path("transcript.json")
-
-    if not source.exists():
-        raise FileNotFoundError("transcript.json not found")
-
-    transcript = json.loads(
-        source.read_text(encoding="utf-8")
-    )
-
-    result = select_clips(transcript)
-
-    Path("best_clips.json").write_text(
-        json.dumps(result, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
-
-    print(f"Selected {len(result)} candidate clips.")
+    print("Not enough non-overlapping transcript segments for four Shorts.")
+    return []
