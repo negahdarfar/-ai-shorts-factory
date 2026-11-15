@@ -25,6 +25,8 @@ config["video_source"] = "pexels" if pexels else "pixabay"
 config["pexels_api_keys"] = [pexels] if pexels else []
 config["pixabay_api_keys"] = [pixabay] if pixabay else []
 config["match_materials_to_script"] = True
+config["upload_post_enabled"] = False
+config["upload_post_auto_upload"] = False
 
 ui = config.setdefault("ui", {})
 ui.update({
