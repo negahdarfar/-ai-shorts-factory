@@ -17,7 +17,7 @@ report = []
 for path in files:
     if path.stat().st_size < 500_000:
         raise SystemExit(f"Output is suspiciously small: {path}")
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    hasher = hashlib.sha256()\n    with path.open("rb") as video_file:\n        for chunk in iter(lambda: video_file.read(1024 * 1024), b""):\n            hasher.update(chunk)\n    digest = hasher.hexdigest()
     if digest in hashes:
         raise SystemExit(f"Duplicate video output detected: {path}")
     hashes.add(digest)
