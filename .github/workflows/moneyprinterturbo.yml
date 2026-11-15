@@ -1,6 +1,8 @@
 name: MoneyPrinterTurbo Shorts Factory
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       count:
@@ -61,14 +63,17 @@ jobs:
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/configure_moneyprinter.py
       - name: Discover fresh trending topics
-        run: python scripts/build_trending_batch.py --count ${{ inputs.count }} --geo US --state-dir "$MPT_HOME/state"
+        if: steps.configure.outputs.ready == 'true'
+        run: python scripts/build_trending_batch.py --count ${{ inputs.count || '4' }} --geo US --state-dir "$MPT_HOME/state"
       - name: Generate vertical videos (no upload)
+        if: steps.configure.outputs.ready == 'true'
         working-directory: vendor/MoneyPrinterTurbo
         run: |
           mpt cli --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source ${{ steps.configure.outputs.video_source }} --video-aspect 9:16 --video-language en-US --voice-name en-US-GuyNeural --subtitle-enabled --subtitle-display-mode word_by_word --subtitle-animation pop_spring --subtitle-position bottom --video-fit-mode cover --bgm-volume 0.12 --stop-at video
       - name: Validate generated vertical videos
+        if: steps.configure.outputs.ready == 'true'
         env:
-          EXPECTED_COUNT: ${{ inputs.count }}
+          EXPECTED_COUNT: ${{ inputs.count || '4' }}
         run: python scripts/validate_mpt_outputs.py
       - name: Collect output files
         if: always()
