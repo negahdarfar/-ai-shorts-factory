@@ -54,6 +54,7 @@ jobs:
           name: viralnovalabs-shorts
           path: |
             output/*.mp4
+            output/*.srt
             source_metadata.json
             best_clips.json
             output/attribution.txt
