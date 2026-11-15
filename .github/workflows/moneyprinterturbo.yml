@@ -1,9 +1,6 @@
 name: MoneyPrinterTurbo Shorts Factory
 
 "on":
-  push:
-    branches:
-      - moneyprinterturbo-engine
   pull_request:
     branches:
       - main
