@@ -8,7 +8,8 @@ from pathlib import Path
 
 home = Path(os.environ["MPT_HOME"])
 expected = int(os.environ.get("EXPECTED_COUNT", "4"))
-files = sorted((home / "storage" / "tasks").glob("**/final-*.mp4"))
+tasks_root = home / "storage" / "tasks"
+files = sorted(tasks_root.glob("**/final-*.mp4"))
 if len(files) != expected:
     raise SystemExit(f"Expected {expected} finished MP4 files, found {len(files)}.")
 
@@ -41,11 +42,23 @@ for path in files:
     if not 10 <= duration <= 180:
         raise SystemExit(f"Unexpected Shorts duration ({duration:.1f}s): {path}")
     report.append({
-        "file": path.name, "duration_seconds": round(duration, 1),
-        "resolution": f"{width}x{height}", "size_mb": round(path.stat().st_size / 1_000_000, 2)
+        "file": path.name,
+        "relative_path": path.relative_to(tasks_root).as_posix(),
+        "duration_seconds": round(duration, 1),
+        "resolution": f"{width}x{height}",
+        "size_mb": round(path.stat().st_size / 1_000_000, 2),
     })
 
-Path("mpt_quality_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+Path("mpt_quality_report.json").write_text(
+    json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+)
 for row in report:
-    print("PASS {} | {} | {}s | {} MB".format(row["file"], row["resolution"], row["duration_seconds"], row["size_mb"]))
-print(f"Validated {len(report)} distinct vertical videos. Topic relevance and visual quality still require human review.")
+    print(
+        "PASS {} | {} | {}s | {} MB".format(
+            row["relative_path"], row["resolution"], row["duration_seconds"], row["size_mb"]
+        )
+    )
+print(
+    f"Validated {len(report)} distinct vertical videos. "
+    "Topic relevance and visual quality still require human review."
+)
