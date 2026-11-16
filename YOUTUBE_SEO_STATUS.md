@@ -21,7 +21,7 @@ The generator deliberately uses topic-only input at this stage. It does not pret
 
 These are separate features and must not be described as already active:
 - Live YouTube search-volume or keyword-difficulty research
-- YouTube competitor/channel/video analysis and topic-gap scoring
+- Broader competitor/channel analysis and systematic topic-gap scoring (a basic recent-Shorts sample is implemented; full channel/topic-gap analysis remains pending)
 - Google Search keyword/SERP research
 - Automatic thumbnail image rendering and YouTube thumbnail upload
 - Applying the SEO manifest to a public YouTube upload (the current uploader remains private QA only)
@@ -52,3 +52,18 @@ Interpretation safeguards:
 - Public view/like/comment counts do not reveal impressions, CTR, retention, watch time, or keyword search volume.
 - This research is not a keyword difficulty score and does not predict rankings.
 - The workflow stores the report as an artifact for review.
+
+
+## Platform-aligned SEO priorities
+
+- Prioritize relevance between the viewer query, title, description, and actual video content.
+- Treat tags as supporting metadata, not the primary discovery lever; avoid stuffing.
+- Prioritize a truthful title/thumbnail promise and an immediate opening hook, then measure whether viewers stay.
+- For long-form videos, generate accurate timestamps/chapters from the final edited timeline.
+- Google video search optimization is strongest when a creator has an independently crawlable watch page with unique title/description, stable thumbnail, and (where applicable) VideoObject structured data. Uploading to YouTube alone does not let this repository control a separate website's indexing.
+
+Official references:
+- YouTube Search & Discovery: https://support.google.com/youtube/answer/11914225
+- YouTube performance FAQ: https://support.google.com/youtube/answer/141805
+- Google Video SEO best practices: https://developers.google.com/search/docs/appearance/video
+- Google VideoObject structured data: https://developers.google.com/search/docs/appearance/structured-data/video
