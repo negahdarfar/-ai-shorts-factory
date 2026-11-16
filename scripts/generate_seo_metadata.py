@@ -33,7 +33,7 @@ def extract_json(text):
     return json.loads(text[start:end + 1])
 
 
-def request_metadata(topic, language, model, api_key):
+def request_metadata(topic, language, model, api_key, competitor_context=None):
     prompt = f"""
 You are a meticulous YouTube Shorts SEO editor. Create metadata for one short-form
 video based ONLY on the topic below. Audience/language: {language}.
@@ -109,7 +109,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="trending_batch.json")
     parser.add_argument("--output", default="seo_metadata.json")
-    parser.add_argument("--language", default="English")
+    parser.add_argument("--language", default="English")\n    parser.add_argument("--research", default="youtube_competitor_research.json")
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", DEFAULT_MODEL))
     args = parser.parse_args()
 
@@ -127,7 +127,7 @@ def main():
         if not topic:
             raise SystemExit(f"Input item {index} has no video_subject.")
         print(f"Generating SEO metadata {index}/{len(source)}: {topic}")
-        metadata = request_metadata(topic, args.language, args.model, api_key)
+        metadata = request_metadata(topic, args.language, args.model, api_key, research_by_topic.get(topic.lower()))
         output.append({
             "index": index,
             "topic": topic,
