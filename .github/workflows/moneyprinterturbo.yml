@@ -88,7 +88,7 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SEO_GEMINI_MODEL: gemini-2.5-flash
+          SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/generate_seo_metadata.py --input trending_batch.json --output seo_metadata.json --language English
       - name: Validate generated SEO metadata
         if: ${{ steps.configure.outputs.ready == 'true' }}
