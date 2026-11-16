@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class SeoPipelineTests(unittest.TestCase):
     def test_valid_manifest_passes(self):
-        data=[{"topic":"Solar storms","video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar storms explained","description":"Learn about solar storms.","primary_keyword":"solar storms","tags":["space","science"],"hashtags":["space"]}}]
+        data=[{"topic":"Solar storms","video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar storms explained","description":"Learn about solar storms.","primary_keyword":"solar storms","tags":["space","science"],"hashtags":["space"]}}]
         with tempfile.TemporaryDirectory() as d:
             f=Path(d)/"seo.json"; f.write_text(json.dumps(data),encoding="utf-8")
             result=subprocess.run([sys.executable,str(ROOT/"scripts/validate_seo_metadata.py"),"--input",str(f),"--expected-count","1"],capture_output=True,text=True)
@@ -30,7 +30,7 @@ class SeoPipelineTests(unittest.TestCase):
             "search_intent":"Understand solar storms"
         }
         response_data = {"candidates":[{"content":{"parts":[{"text":json.dumps({
-            "items":[{"index":i,"metadata":dict(fields),"video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"]} for i in range(1,5)]
+            "items":[{"index":i,"metadata":dict(fields),"video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"]} for i in range(1,5)]
         })}]}}]}
         mocked = patch("urllib.request.urlopen")
         with mocked as urlopen:
@@ -76,7 +76,7 @@ class SeoPipelineTests(unittest.TestCase):
             root = Path(d)
             records = [{
                 "topic": "Solar storms",
-                "video_script": "This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully.",
+                "video_script": "This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context.",
                 "video_terms": ["solar storms", "solar flare", "Sun surface", "space weather", "solar activity"],
                 "content_source": "gemini_batch"
             }]
