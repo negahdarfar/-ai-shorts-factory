@@ -36,6 +36,16 @@ def main():
         primary = str(meta.get("primary_keyword", "")).strip()
         tags = meta.get("tags", [])
         hashtags = meta.get("hashtags", [])
+        script = str(record.get("video_script", "")).strip()
+        video_terms = record.get("video_terms", [])
+
+        script_words = len(script.split())
+        if script_words < 55 or script_words > 160:
+            errors.append(f"Item {index}: narration script must contain 55-160 words.")
+        if not isinstance(video_terms, list) or len(video_terms) < 5 or len(video_terms) > 8:
+            errors.append(f"Item {index}: video_terms must contain 5-8 stock-footage search phrases.")
+        elif any(not str(term).strip() for term in video_terms):
+            errors.append(f"Item {index}: video_terms contains an empty phrase.")
 
         if not title:
             errors.append(f"Item {index}: missing title.")
