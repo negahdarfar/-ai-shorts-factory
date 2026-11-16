@@ -55,6 +55,20 @@ def load_validated_videos(home: Path) -> list[Path]:
     return videos
 
 
+def load_seo_manifest() -> list[dict]:
+    path = Path("seo_metadata.json")
+    if not path.is_file():
+        raise SystemExit("Missing seo_metadata.json; refusing upload without SEO metadata.")
+    records = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(records, list) or len(records) != EXPECTED_COUNT:
+        raise SystemExit("SEO manifest must contain exactly four records.")
+    for index, record in enumerate(records, 1):
+        meta = record.get("metadata", {}) if isinstance(record, dict) else {}
+        if not record.get("topic") or not meta.get("title") or not meta.get("description"):
+            raise SystemExit(f"SEO manifest record {index} is incomplete; refusing upload.")
+    return records
+
+
 def main() -> None:
     required = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     missing = [key for key in required if not os.environ.get(key, "").strip()]
@@ -63,6 +77,7 @@ def main() -> None:
 
     home = Path(os.environ.get("MPT_HOME", "mpt-runtime"))
     videos = load_validated_videos(home)
+    seo_records = load_seo_manifest()
 
     credentials = Credentials(
         token=None,
@@ -78,15 +93,19 @@ def main() -> None:
 
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     results = []
-    for index, video_path in enumerate(videos, start=1):
+    for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
+        metadata = record["metadata"]
+        description = metadata["description"].strip()
+        hashtags = [str(tag).strip().lstrip("#") for tag in metadata.get("hashtags", []) if str(tag).strip()]
+        if hashtags:
+            description += "\n\n" + " ".join("#" + tag for tag in hashtags[:3])
+        tags = [str(tag).strip() for tag in metadata.get("tags", []) if str(tag).strip()][:15]
         body = {
             "snippet": {
-                "title": f"PRIVATE QA TEST {index}/4 — Shorts Factory",
-                "description": (
-                    "Private technical connection test from the YouTube Shorts Factory. "
-                    "This video is private and is not intended for public viewing."
-                ),
-                "categoryId": "22",
+                "title": metadata["title"][:100],
+                "description": description[:5000],
+                "tags": tags,
+                "categoryId": "27",
                 "defaultLanguage": "en",
             },
             "status": {
@@ -121,6 +140,7 @@ def main() -> None:
             "file": video_path.name,
             "video_id": video_id,
             "privacy": "private",
+            "seo_source": record.get("metadata_source", "unknown"),
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
         results.append(result)
