@@ -7,18 +7,18 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 FIELDS = ("primary_keyword","secondary_keywords","title","description","hashtags","tags","pinned_comment","thumbnail_concept","search_intent")
 
 def clean(value, limit=None):
-    value = re.sub(r"\\s+", " ", str(value or "")).strip()
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
     return value[:limit] if limit else value
 
 def extract_json(raw):
-    raw = re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$", "", raw.strip(), flags=re.I)
+    raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
     left, right = raw.find("{"), raw.rfind("}")
     if left < 0 or right <= left:
         raise ValueError("No JSON object in Gemini response")
     return json.loads(raw[left:right+1])
 
 def fallback(topic):
-    keyword = clean(re.sub(r"[^\\w\\s'-]", " ", topic), 80) or "interesting facts"
+    keyword = clean(re.sub(r"[^\w\s'-]", " ", topic), 80) or "interesting facts"
     title = (keyword + ": Explained")[:100]
     return {
         "primary_keyword": keyword,
@@ -51,9 +51,9 @@ def normalize(meta, topic):
     return out
 
 def generate_batch(topics, language, model, key):
-    topic_text = "\\n".join(f"{i}. {t}" for i,t in enumerate(topics,1))
+    topic_text = "\n".join(f"{i}. {t}" for i,t in enumerate(topics,1))
     prompt = f"""Create SEO metadata for all topics in one response. Language: {language}.
-Topics:\\n{topic_text}
+Topics:\n{topic_text}
 Return ONLY JSON: {{"items":[{{"index":1,"metadata":{{"primary_keyword":"phrase","secondary_keywords":["phrases"],"title":"accurate title","description":"2-4 useful sentences","hashtags":["up to 3"],"tags":["8-15 tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
 Return one indexed item per topic. No fabricated facts, misleading clickbait, keyword stuffing, or ranking/volume claims. Review against final video."""
     payload = {"contents":[{"parts":[{"text":prompt}]}],"generationConfig":{"responseMimeType":"application/json"}}
@@ -63,7 +63,7 @@ Return one indexed item per topic. No fabricated facts, misleading clickbait, ke
             with urllib.request.urlopen(req, timeout=120) as response:
                 data=json.loads(response.read().decode())
             parts=data.get("candidates",[{}])[0].get("content",{}).get("parts",[])
-            parsed=extract_json("\\n".join(p.get("text","") for p in parts))
+            parsed=extract_json("\n".join(p.get("text","") for p in parts))
             result={}
             for item in parsed.get("items",[]):
                 try:
