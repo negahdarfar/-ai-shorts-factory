@@ -21,13 +21,17 @@ At least one footage key is required. The workflow uses Pexels when available, o
 
 Free API tiers have quotas and can change; this is not unlimited free AI video generation. The free pipeline uses licensed stock footage matched to the script, not newly synthesized photorealistic footage.
 
-## Run the quality test
-1. Open Actions → MoneyPrinterTurbo Shorts Factory → Run workflow.
-2. Choose `4` videos.
-3. Wait for the run to finish, then download `moneyprinterturbo-quality-test`.
-4. Inspect all four MP4s and their selected topics. The test does not upload anything.
+## YouTube connection test (manual and private only)
+Add these repository Actions secrets after completing OAuth authorization:
+- `YOUTUBE_CLIENT_ID`
+- `YOUTUBE_CLIENT_SECRET`
+- `YOUTUBE_REFRESH_TOKEN`
 
-Only after the four outputs pass visual/topic review should we configure publishing credentials and enable a daily schedule.
+The workflow has a manual `upload_private_test` switch. It defaults to `false`; normal quality runs and pull-request runs never upload. Only when explicitly enabled on a manual workflow run, the uploader sends exactly one validated MP4 to YouTube with `privacyStatus=private`. It does not publish publicly and does not upload all four videos.
+
+To run a generation-only quality test, open Actions → MoneyPrinterTurbo Shorts Factory → Run workflow and leave `upload_private_test` unchecked. Download `moneyprinterturbo-quality-test` and inspect all four MP4s and their selected topics.
+
+Only after the four outputs pass visual/topic review and the private connection test is confirmed should we discuss any broader publishing workflow or daily schedule.
 
 ## Publishing and monetization
-Auto-publishing requires a separate publishing setup and valid account authorization. AI-generated/altered content must be disclosed where applicable. YouTube may reject monetization for repetitive or mass-produced low-value videos, so review and add original value before enabling automatic public uploads.
+Google OAuth projects left in External / Testing mode generally issue refresh tokens that expire after 7 days. Move beyond Testing only after reviewing Google's verification and publishing requirements; do not assume the current test token is permanent. Auto-publishing requires a separate publishing setup and valid account authorization. AI-generated/altered content must be disclosed where applicable. YouTube may reject monetization for repetitive or mass-produced low-value videos, so review and add original value before enabling automatic public uploads.
