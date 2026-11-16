@@ -10,6 +10,8 @@ from pathlib import Path
 
 RETRYABLE_MARKERS = (
     "503 unavailable",
+    "503 service unavailable",
+    "service temporarily overloaded",
     "500 internal",
     "502 bad gateway",
     "504 gateway timeout",
