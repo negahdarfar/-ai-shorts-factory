@@ -41,9 +41,11 @@ def fallback_content(topic):
         "and follow the evidence. That's how to understand the story more carefully."
     )
     words = [w.lower() for w in re.findall(r"[A-Za-z0-9][A-Za-z0-9'-]*", topic) if len(w) > 2]
+    lead = words[0] if words else "topic"
     terms = list(dict.fromkeys([
         topic[:70], " ".join(words[:3]), " ".join(words[-3:]),
-        *words, "documentary footage", "real world example"
+        *words, f"{lead} background", f"{lead} explained",
+        "documentary footage", "real world example"
     ]))
     terms = [clean(x, 80) for x in terms if clean(x)]
     return script, terms[:8]
