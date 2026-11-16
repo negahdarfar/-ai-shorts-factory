@@ -15,14 +15,14 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 def clean_text(value, limit=None):
-    value = re.sub(r"\\s+", " ", str(value or "")).strip()
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
     return value[:limit] if limit else value
 
 
 def extract_json(text):
     text = (text or "").strip()
-    text = re.sub(r"^\\s*```(?:json)?\\s*", "", text, flags=re.I)
-    text = re.sub(r"\\s*```\\s*$", "", text)
+    text = re.sub(r"^\s*```(?:json)?\s*", "", text, flags=re.I)
+    text = re.sub(r"\s*```\s*$", "", text)
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
         raise ValueError("Gemini response did not contain a JSON object.")
@@ -73,7 +73,7 @@ This is a Short: do not create chapters or timestamps. Keep metadata in {languag
         raise RuntimeError(f"Gemini API HTTP {exc.code}: {detail}") from exc
 
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-    result = extract_json("\\n".join(p.get("text", "") for p in parts))
+    result = extract_json("\n".join(p.get("text", "") for p in parts))
     required = ("primary_keyword", "secondary_keywords", "title", "description",
                 "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent")
     missing = [key for key in required if key not in result]
