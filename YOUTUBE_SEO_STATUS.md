@@ -7,7 +7,7 @@
 - Drafts English metadata per topic with Gemini: primary/secondary keywords, title, description, hashtags, tags, pinned-comment prompt, search intent and thumbnail concept.
 - Optionally researches a limited sample of recent public YouTube Shorts with YouTube Data API v3.
 - Validates metadata fields, title/description limits, primary keyword presence, tags, hashtags and record count.
-- Renders reviewable 1280x720 thumbnail draft images from the generated metadata using Pillow. These are typographic concept drafts, not finished topic-specific photographic artwork.
+- Renders reviewable 1280x720 thumbnail draft images from the generated metadata using Pillow. These are typographic concept drafts, not finished topic-specific photographic artwork.\n- `upload_youtube_thumbnails.py` uploads thumbnails only for explicit video IDs in a reviewed manifest; it has a dry-run mode.
 
 ### YouTube publishing and channel data tools
 - Existing uploader remains strictly PRIVATE QA and uploads exactly four videos only when the manual workflow input is selected.
@@ -17,7 +17,7 @@
 - Public publishing, scheduled publishing and automatic SEO writes are not enabled.
 
 ### Long-form assembly utilities
-- `assemble_documentary.py` joins an ordered JSON list of video clips, normalizes them to 1080p landscape MP4, can replace clip audio with a narration track, and can burn an externally prepared UTF-8 Persian SRT file.
+- `translate_srt_to_persian.py` translates an English SRT into Persian while preserving cue count, indices and timestamps. It does not perform speech recognition or automatic alignment; start with an accurately timed source SRT.\n- `assemble_documentary.py` joins an ordered JSON list of video clips, normalizes them to 1080p landscape MP4, can replace clip audio with a narration track, and can burn an externally prepared UTF-8 Persian SRT file.
 - `validate_chapters.py` checks that chapter timestamps start at 00:00, contain at least three chapters and increase strictly.
 - These are assembly utilities, not yet a complete autonomous documentary creator. Clip generation, story continuity, fact-checking, Persian translation/timing, music licensing, chapter generation from the final timeline and final editorial approval still require integration and testing.
 
@@ -54,7 +54,7 @@ Analytics:
 - Full competitor channel/topic-gap analysis and Google Search SERP research.
 - Real keyword search-volume/difficulty data; the public YouTube Data API does not expose these metrics.
 - Applying metadata automatically to the four QA uploads (requires a trusted stable mapping from each output file to its topic and video ID).
-- Automatic thumbnail upload through `thumbnails.set`; current thumbnails are local draft images only.
+- Automatic thumbnail selection/upload in the main Shorts workflow; a separate explicit-manifest thumbnail uploader is available, but it is not auto-run.
 - Analytics-driven recommendation/optimization loop and channel dashboard.
 - Public upload and scheduled publishing.
 
