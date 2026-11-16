@@ -39,7 +39,9 @@ def main():
         srt=Path(a.subtitles).resolve()
         if not srt.is_file(): raise SystemExit("Subtitle file not found.")
         # Soft-burn uses FFmpeg subtitles filter; input SRT is UTF-8.
-        run(["ffmpeg","-y","-i",str(current),"-vf",f"subtitles={str(srt).replace(':','\\:')}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'","-c:v","libx264","-preset","veryfast","-crf","20","-c:a","copy","-movflags","+faststart",str(out)])
+        escaped_srt = str(srt).replace("\\\\", "\\\\\\\\").replace(":", "\\\\:").replace("'", "\\\\'")
+        subtitle_filter = f"subtitles='{escaped_srt}':force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'"
+        run(["ffmpeg","-y","-i",str(current),"-vf",subtitle_filter,"-c:v","libx264","-preset","veryfast","-crf","20","-c:a","copy","-movflags","+faststart",str(out)])
       else:
         run(["ffmpeg","-y","-i",str(current),"-c","copy",str(out)])
     print(f"DOCUMENTARY_ASSEMBLED {out}")
