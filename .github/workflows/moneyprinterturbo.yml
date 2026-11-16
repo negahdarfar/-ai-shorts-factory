@@ -39,14 +39,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install FFmpeg
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
       - name: Get MoneyPrinterTurbo v1.3.10
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: git clone --depth 1 --branch v1.3.10 https://github.com/harry0703/MoneyPrinterTurbo.git vendor/MoneyPrinterTurbo
       - name: Install small config helper
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: python -m pip install toml
       - name: Restore previously used topic list
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/mpt-runtime/state
@@ -54,6 +58,7 @@ jobs:
           restore-keys: |
             mpt-topics-${{ runner.os }}-
       - name: Configure free-tier providers
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -88,6 +93,12 @@ jobs:
       - name: Validate generated SEO metadata
         if: ${{ steps.configure.outputs.ready == 'true' }}
         run: python scripts/validate_seo_metadata.py --input seo_metadata.json --expected-count 4
+      - name: Install Pillow for thumbnail drafts
+        if: ${{ steps.configure.outputs.ready == 'true' }}
+        run: python -m pip install Pillow
+      - name: Render reviewable thumbnail drafts
+        if: ${{ steps.configure.outputs.ready == 'true' }}
+        run: python scripts/render_seo_thumbnails.py --input seo_metadata.json --output-dir seo_thumbnails
       - name: Generate four vertical videos with transient-error retries (no upload)
         if: ${{ steps.configure.outputs.ready == 'true' }}
         working-directory: vendor/MoneyPrinterTurbo
@@ -130,6 +141,7 @@ jobs:
           if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
           cp trending_batch.json selected_trends.json batch_retry_report.json seo_metadata.json youtube_competitor_research.json 2>/dev/null artifacts/ || true
           cp mpt_quality_report.json youtube_private_upload_results.json artifacts/ 2>/dev/null || true
+          if [ -d seo_thumbnails ]; then cp -R seo_thumbnails artifacts/; fi
       - name: Save videos, selected topics and logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
