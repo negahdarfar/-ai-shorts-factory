@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.8-flash"
 
 
 def clean_text(value, limit=None):
@@ -58,7 +58,7 @@ This is a Short: do not create chapters or timestamps. Keep metadata in {languag
     url = f"{API_ROOT}/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.35, "responseMimeType": "application/json"}
+        "generationConfig": {"responseMimeType": "application/json"}
     }
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode("utf-8"),
