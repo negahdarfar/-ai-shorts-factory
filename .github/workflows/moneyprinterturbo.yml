@@ -11,6 +11,11 @@ name: MoneyPrinterTurbo Shorts Factory
         required: false
         type: boolean
         default: false
+      upload_four_private_tests:
+        description: 'Upload all four validated Shorts as PRIVATE QA tests (no public publishing)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -84,8 +89,15 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/check_youtube_auth.py
+      - name: Upload all four PRIVATE YouTube QA videos
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && steps.configure.outputs.ready == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python scripts/upload_four_private_youtube_tests.py
       - name: Upload one PRIVATE YouTube connection test
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_private_test == true && steps.configure.outputs.ready == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_private_test == true && inputs.upload_four_private_tests != true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -98,7 +110,7 @@ jobs:
           if [ -d "$MPT_HOME/storage/tasks" ]; then cp -R "$MPT_HOME/storage/tasks" artifacts/; fi
           if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
           cp trending_batch.json selected_trends.json batch_retry_report.json 2>/dev/null artifacts/ || true
-          cp mpt_quality_report.json artifacts/ 2>/dev/null || true
+          cp mpt_quality_report.json youtube_private_upload_results.json artifacts/ 2>/dev/null || true
       - name: Save videos, selected topics and logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
