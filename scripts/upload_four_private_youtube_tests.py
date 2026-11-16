@@ -29,19 +29,23 @@ def load_validated_videos(home: Path) -> list[Path]:
     if not isinstance(report, list) or len(report) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} validated report entries.")
 
+    tasks_root = home / "storage" / "tasks"
     available = {
-        path.name: path
-        for path in (home / "storage" / "tasks").glob("**/final-*.mp4")
+        path.relative_to(tasks_root).as_posix(): path
+        for path in tasks_root.glob("**/final-*.mp4")
         if path.is_file()
     }
     videos = []
     for item in report:
-        name = item.get("file") if isinstance(item, dict) else None
-        path = available.get(name)
+        relative_path = item.get("relative_path") if isinstance(item, dict) else None
+        path = available.get(relative_path)
         if path is None:
-            raise SystemExit(f"Validated video is missing from storage: {name!r}")
+            raise SystemExit(
+                f"Validated video path is missing from storage: {relative_path!r}. "
+                "The quality report must include relative_path."
+            )
         if path.stat().st_size < 500_000:
-            raise SystemExit(f"Video is unexpectedly small; refusing upload: {path.name}")
+            raise SystemExit(f"Video is unexpectedly small; refusing upload: {relative_path}")
         videos.append(path)
 
     if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
