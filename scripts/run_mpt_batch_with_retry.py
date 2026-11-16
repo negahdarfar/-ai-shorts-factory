@@ -27,6 +27,40 @@ def is_retryable(output):
     return any(marker in lowered for marker in RETRYABLE_MARKERS)
 
 
+def attach_prebuilt_content(batch, seo_path):
+    """Inject prebuilt narration and footage terms so MPT never calls an LLM."""
+    if not seo_path.is_file():
+        raise SystemExit(f"Missing content manifest: {seo_path}")
+    records = json.loads(seo_path.read_text(encoding="utf-8"))
+    if not isinstance(records, list) or len(records) != len(batch):
+        raise SystemExit("Content manifest must contain one record per batch topic.")
+    by_topic = {
+        str(row.get("topic", "")).strip().casefold(): row
+        for row in records if isinstance(row, dict)
+    }
+    enriched = []
+    for index, item in enumerate(batch, 1):
+        topic = str(item.get("video_subject", "")).strip()
+        record = by_topic.get(topic.casefold())
+        if not record:
+            raise SystemExit(f"No prebuilt content record found for topic {index}: {topic}")
+        script = str(record.get("video_script", "")).strip()
+        terms = record.get("video_terms")
+        if len(script.split()) < 55 or not isinstance(terms, list) or len(terms) < 5:
+            raise SystemExit(f"Prebuilt narration/search terms are incomplete for topic {index}.")
+        prepared = dict(item)
+        prepared["video_script"] = script
+        prepared["video_terms"] = terms
+        enriched.append(prepared)
+        print(
+            f"PREBUILT_CONTENT_ATTACHED {index}/{len(batch)} | "
+            f"script_words={len(script.split())} | terms={len(terms)} | "
+            f"source={record.get('content_source', 'unknown')}",
+            flush=True,
+        )
+    return enriched
+
+
 def run_one(item, index, total, video_source, attempts, delay, temp_dir):
     topic = item.get("video_subject", f"item-{index}")
     result = {"index": index, "topic": topic, "status": "failed", "attempts": 0, "last_error": ""}
@@ -106,6 +140,7 @@ def main():
     batch = json.loads(batch_path.read_text(encoding="utf-8"))
     if not isinstance(batch, list) or not batch:
         raise SystemExit("Batch manifest must be a non-empty JSON array.")
+    batch = attach_prebuilt_content(batch, batch_path.parent / "seo_metadata.json")
 
     attempts = max(1, min(5, args.max_attempts))
     delay = max(1, args.retry_delay_seconds)
