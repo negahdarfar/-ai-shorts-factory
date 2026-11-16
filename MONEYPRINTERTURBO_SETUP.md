@@ -27,9 +27,9 @@ Add these repository Actions secrets after completing OAuth authorization:
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
 
-The workflow has a manual `upload_private_test` switch. It defaults to `false`; normal quality runs and pull-request runs never upload. Only when explicitly enabled on a manual workflow run, the uploader sends exactly one validated MP4 to YouTube with `privacyStatus=private`. It does not publish publicly and does not upload all four videos.
+The workflow validates the OAuth refresh token on manual runs without uploading anything. It also has a manual `upload_private_test` switch, which defaults to `false`; normal quality runs and pull-request runs never upload. Only when explicitly enabled on a manual workflow run, the uploader sends exactly one validated MP4 to YouTube with `privacyStatus=private`. It does not publish publicly and does not upload all four videos.
 
-To run a generation-only quality test, open Actions → MoneyPrinterTurbo Shorts Factory → Run workflow and leave `upload_private_test` unchecked. Download `moneyprinterturbo-quality-test` and inspect all four MP4s and their selected topics.
+To run a generation-only quality test and safely validate OAuth, open Actions → MoneyPrinterTurbo Shorts Factory → Run workflow and leave `upload_private_test` unchecked. Download `moneyprinterturbo-quality-test` and inspect all four MP4s and their selected topics.
 
 Only after the four outputs pass visual/topic review and the private connection test is confirmed should we discuss any broader publishing workflow or daily schedule.
 
