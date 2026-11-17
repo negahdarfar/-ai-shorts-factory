@@ -94,7 +94,7 @@ def run_one(item, index, total, video_source, attempts, delay, temp_dir):
         "--voice-name", "en-US-GuyNeural",
         "--subtitle-enabled",
         "--subtitle-display-mode", "sentence",
-        "--subtitle-animation", "fade",
+        "--subtitle-animation", "pop_spring",
         "--subtitle-position", "bottom",
         "--video-fit-mode", "cover",
         "--bgm-volume", "0.12",
