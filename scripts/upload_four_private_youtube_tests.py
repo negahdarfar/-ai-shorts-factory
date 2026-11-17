@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Upload exactly four validated Shorts as PRIVATE YouTube QA videos.
+"""Upload exactly four validated Shorts to YouTube.
 
-This is deliberately a private-only connection test. It never publishes publicly.
+Privacy is PRIVATE by default. PUBLIC publishing is possible only when the
+workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public.
 """
 import json
 import os
@@ -40,10 +41,7 @@ def load_validated_videos(home: Path) -> list[Path]:
         relative_path = item.get("relative_path") if isinstance(item, dict) else None
         path = available.get(relative_path)
         if path is None:
-            raise SystemExit(
-                f"Validated video path is missing from storage: {relative_path!r}. "
-                "The quality report must include relative_path."
-            )
+            raise SystemExit(f"Validated video path is missing from storage: {relative_path!r}.")
         if path.stat().st_size < 500_000:
             raise SystemExit(f"Video is unexpectedly small; refusing upload: {relative_path}")
         videos.append(path)
@@ -73,6 +71,12 @@ def load_seo_manifest() -> list[dict]:
 
 
 def main() -> None:
+    privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", "private").strip().lower()
+    if privacy not in {"private", "public"}:
+        raise SystemExit("YOUTUBE_PRIVACY_STATUS must be either private or public.")
+    if privacy == "public" and os.environ.get("CONFIRM_PUBLIC_PUBLISHING") != "YES":
+        raise SystemExit("Public upload blocked: explicit workflow confirmation is missing.")
+
     required = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     missing = [key for key in required if not os.environ.get(key, "").strip()]
     if missing:
@@ -96,6 +100,7 @@ def main() -> None:
 
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     results = []
+    output_path = Path(f"youtube_{privacy}_upload_results.json")
     for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
         metadata = record["metadata"]
         description = metadata["description"].strip()
@@ -112,50 +117,38 @@ def main() -> None:
                 "defaultLanguage": "en",
             },
             "status": {
-                "privacyStatus": "private",
+                "privacyStatus": privacy,
                 "selfDeclaredMadeForKids": False,
             },
         }
-        media = MediaFileUpload(
-            str(video_path), mimetype="video/mp4",
-            chunksize=8 * 1024 * 1024, resumable=True
-        )
-        request = youtube.videos().insert(
-            part="snippet,status", body=body, media_body=media
-        )
+        media = MediaFileUpload(str(video_path), mimetype="video/mp4",
+                                chunksize=8 * 1024 * 1024, resumable=True)
+        request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
         response = None
         while response is None:
             status, response = request.next_chunk()
             if status:
-                print(
-                    f"Private QA upload {index}/{EXPECTED_COUNT}: "
-                    f"{int(status.progress() * 100)}%"
-                )
+                print(f"{privacy.upper()} upload {index}/{EXPECTED_COUNT}: {int(status.progress() * 100)}%")
 
         video_id = response.get("id")
         if not video_id:
-            raise SystemExit(
-                f"YouTube returned no video ID for upload {index}; "
-                "the upload cannot be confirmed."
-            )
+            raise SystemExit(f"YouTube returned no video ID for upload {index}; upload cannot be confirmed.")
         result = {
             "index": index,
             "file": video_path.name,
             "video_id": video_id,
-            "privacy": "private",
+            "privacy": privacy,
             "seo_source": record.get("metadata_source", "unknown"),
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
         results.append(result)
-        Path("youtube_private_upload_results.json").write_text(
-            json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        print(f"PRIVATE_UPLOAD_SUCCEEDED {index}/{EXPECTED_COUNT}: {video_id}")
+        output_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"{privacy.upper()}_UPLOAD_SUCCEEDED {index}/{EXPECTED_COUNT}: {video_id}")
 
     if len(results) != EXPECTED_COUNT:
-        raise SystemExit(f"Only {len(results)} of {EXPECTED_COUNT} private uploads completed.")
-    print("ALL_FOUR_PRIVATE_UPLOADS_SUCCEEDED")
-    print("All four videos were uploaded as PRIVATE. No public video was published.")
+        raise SystemExit(f"Only {len(results)} of {EXPECTED_COUNT} uploads completed.")
+    print(f"ALL_FOUR_{privacy.upper()}_UPLOADS_SUCCEEDED")
+    print(f"All four videos were uploaded with privacy={privacy}.")
 
 
 if __name__ == "__main__":
