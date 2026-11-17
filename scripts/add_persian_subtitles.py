@@ -340,8 +340,8 @@ def main():
         escaped = str(persian.resolve()).replace("\\", "/").replace(":", "\\:")
         vf = (
             f"subtitles='{escaped}':force_style='FontName=Noto Naskh Arabic,"
-            "FontSize=18,Alignment=8,MarginV=42,Outline=2,Shadow=0,"
-            "BorderStyle=3,BackColour=&H90000000'"
+            "FontSize=14,Alignment=2,MarginV=105,Outline=1,Shadow=0,"
+            "BorderStyle=1,BackColour=&HFF000000'"
         )
         command = [
             "ffmpeg", "-y", "-i", str(video), "-vf", vf,

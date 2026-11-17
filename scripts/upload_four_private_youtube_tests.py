@@ -66,7 +66,7 @@ def load_seo_manifest() -> list[dict]:
         script = str(record.get("video_script", "")).strip()
         terms = record.get("video_terms")
         if (not record.get("topic") or not meta.get("title") or not meta.get("description")
-                or len(script.split()) < 55 or not isinstance(terms, list) or len(terms) < 5):
+                or not 120 <= len(script.split()) <= 145 or not isinstance(terms, list) or len(terms) < 5):
             raise SystemExit(f"SEO/content manifest record {index} is incomplete; refusing upload.")
     return records
 

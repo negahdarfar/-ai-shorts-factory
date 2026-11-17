@@ -22,7 +22,7 @@ FALLBACK = [
 PROMPT = (
     "Create an original, highly engaging English YouTube Short for a general audience. "
     "Open with a specific curiosity hook in the first 1-2 seconds. Keep the script concise "
-    "for a roughly 35-55 second video. Explain one clear idea, build curiosity, deliver a "
+    "for a 45-60 second video. Explain one clear idea, build curiosity, deliver a "
     "satisfying payoff, and finish naturally. Use accurate, checkable facts; never invent "
     "statistics, quotes, dates, or sources. If a claim is uncertain, qualify it or omit it. "
     "VISUAL MATCHING IS CRITICAL: write narration in short, concrete sentences that can each "
