@@ -25,11 +25,11 @@ def main():
         if not topic: errors.append(f"Item {index}: missing topic.")
         if topic.casefold() in seen_topics: errors.append(f"Item {index}: duplicate topic.")
         seen_topics.add(topic.casefold())
-        approved_sources = {"gemini_batch", "freellmapi_batch", "cloudflare_batch"}
+        approved_sources = {"gemini_batch", "gemini_free_batch", "freellmapi_batch", "cloudflare_batch", "openrouter_batch"}
         metadata_source = record.get("metadata_source")
         content_source = record.get("content_source")
         if metadata_source not in approved_sources or content_source not in approved_sources or metadata_source != content_source:
-            errors.append(f"Item {index}: content must come from one approved AI batch provider (Gemini, verified-free FreeLLMAPI, or the pinned free Cloudflare Workers AI model); local templates and mixed providers are blocked.")
+            errors.append(f"Item {index}: content must come from one approved AI batch provider (Gemini Free Tier, verified-free FreeLLMAPI/OpenRouter, or the pinned free Cloudflare Workers AI model); local templates and mixed providers are blocked.")
         title = str(meta.get("title", "")).strip()
         description = str(meta.get("description", "")).strip()
         primary = str(meta.get("primary_keyword", "")).strip()
