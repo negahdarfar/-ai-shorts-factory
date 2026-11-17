@@ -1,8 +1,5 @@
 name: Resume Existing Shorts and Publish
 on:
-  push:
-    paths:
-      - ".github/recovery-queue-guard.txt"
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -25,7 +22,6 @@ concurrency:
 
 jobs:
   resume:
-    if: ${{ github.event_name != 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
