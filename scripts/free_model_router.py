@@ -5,7 +5,6 @@ Discovery only calls GET /models (no inference). A model is eligible only when
 its public ID explicitly advertises a free tier; unknown pricing is never assumed free.
 """
 import json
-import os
 import urllib.error
 import urllib.request
 
@@ -84,7 +83,3 @@ def discover_free_models(base_url, api_key, task="general", preferred="auto", ti
         ordered = [preferred] + [item for item in ordered if item != preferred]
     return ordered
 
-
-def free_only_enabled():
-    """Paid/unpriced routes remain blocked unless a future explicit opt-in is added."""
-    return os.getenv("FREELLMAPI_ALLOW_UNPRICED_MODELS", "false").strip().lower() == "true"
