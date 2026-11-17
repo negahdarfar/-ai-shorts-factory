@@ -1,0 +1,30 @@
+name: YouTube Agent orchestration hand-off
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-agent-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate skills and factory tool map
+        run: |
+          python scripts/youtube_agent_dispatch.py --output-dir youtube-agent-plan --check
+          python -m unittest tests/test_youtube_agent_dispatch.py -v
+      - name: Upload agent hand-off plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-agent-handoff
+          path: youtube-agent-plan/
+          if-no-files-found: error
+          retention-days: 7
