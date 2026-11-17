@@ -1,10 +1,10 @@
 
-name: AI Shorts Factory
+name: Legacy Shorts Draft Generator (manual only)
 
+# Retained for deliberate manual experiments. Daily production and YouTube scheduling
+# are handled by moneyprinterturbo.yml; do not run a second scheduled generator.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "30 2 * * *"
 
 permissions:
   contents: read
