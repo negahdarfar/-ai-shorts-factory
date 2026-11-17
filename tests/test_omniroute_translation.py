@@ -46,8 +46,8 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
 
     @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
     @patch("add_persian_subtitles.translate_freellmapi")
-    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     @patch("add_persian_subtitles.translate_gemini")
+    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     def test_falls_back_to_freellmapi_before_gemini(self, discovery, gemini, free, omni):
         free.return_value = {1: "سلام", 2: "خداحافظ"}
         result, provider = translate_with_fallback(
