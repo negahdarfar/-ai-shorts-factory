@@ -244,7 +244,8 @@ def translate_freellmapi(rows, base_url, key, model):
     return parse_translation_json(raw, rows, "FreeLLMAPI")
 
 
-def translate_with_fallback(rows, omni, free, cloudflare, gemini):
+def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
+    cloudflare = cloudflare or (\"\", \"\", \"\")
     failures = []
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     if omni[0] and omni[1] and allow_nonfree_fallback:
@@ -325,8 +326,8 @@ def main():
             cues,
             (omniroute_base_url, omniroute_key, omniroute_model),
             (freellmapi_base_url, freellmapi_key, freellmapi_model),
-            cloudflare,
             (gemini_key, args.model),
+            cloudflare,
         )
         print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
