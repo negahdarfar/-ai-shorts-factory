@@ -151,7 +151,18 @@ jobs:
           if any(row.get("video_aspect") != "9:16" or row.get("video_count") != 1 for row in topics):
               raise SystemExit("Preserved batch must contain four single 9:16 videos.")
           Path("trending_batch.json").write_text(json.dumps(topics, ensure_ascii=False, indent=2), encoding="utf-8")
-          print("PRESERVED_FOUR_TOPICS_LOADED")
+          state_dir = Path(os.environ["MPT_HOME"]) / "state"
+          state_dir.mkdir(parents=True, exist_ok=True)
+          seen_file = state_dir / "seen_topics.json"
+          try:
+              seen = set(json.loads(seen_file.read_text(encoding="utf-8")))
+          except FileNotFoundError:
+              seen = set()
+          except (OSError, ValueError) as exc:
+              raise SystemExit(f"Could not read topic history safely: {exc}")
+          seen.update(row["video_subject"].strip() for row in topics)
+          seen_file.write_text(json.dumps(sorted(seen), ensure_ascii=False, indent=2), encoding="utf-8")
+          print("PRESERVED_FOUR_TOPICS_LOADED_AND_RECORDED")
           PY
       - name: Discover fresh trending topics
         if: ${{ steps.configure.outputs.ready == 'true' && inputs.use_previous_four_topics != true }}
@@ -265,6 +276,12 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/upload_private_youtube_test.py
+      - name: Persist topic and publication history
+        if: ${{ always() && steps.configure.outputs.ready == 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/mpt-runtime/state
+          key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
       - name: Collect output files
         if: ${{ always() }}
         run: |
