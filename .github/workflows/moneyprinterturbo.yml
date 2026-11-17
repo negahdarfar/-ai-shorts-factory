@@ -123,8 +123,11 @@ jobs:
           CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/zai-org/glm-4.7-flash' }}
           ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
-          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
-          FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
+          FREELLMAPI_CLOUD_BASE_URL: ${{ secrets.FREELLMAPI_CLOUD_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || secrets.FREELLMAPI_CLOUD_API_KEY || '' }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
           OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
@@ -187,8 +190,11 @@ jobs:
           CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/zai-org/glm-4.7-flash' }}
           ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
-          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
-          FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
+          FREELLMAPI_CLOUD_BASE_URL: ${{ secrets.FREELLMAPI_CLOUD_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || secrets.FREELLMAPI_CLOUD_API_KEY || '' }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
           OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
