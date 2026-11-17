@@ -97,4 +97,4 @@ Do not paste any of these keys into source files, issues, pull requests, or chat
 - If the phone gateway is unavailable, the workflow's no-inference health check marks it unavailable; MoneyPrinterTurbo uses Gemini if its key is configured.
 - The workflows use Tailscale only when both the FreeLLMAPI URL and Tailscale auth key are configured.
 
-The gateway health check calls only `GET /v1/models`; it does not generate text or consume inference tokens.
+After adding the secrets, run **Actions → FreeLLMAPI Gateway Check → Run workflow** to test the private connection without producing videos. The gateway health check calls only `GET /v1/models`; it does not generate text or consume inference tokens.
