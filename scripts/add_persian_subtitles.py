@@ -6,11 +6,13 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
+RETRYABLE_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
 SRT_BLOCK = re.compile(r"(?ms)^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n(.*?)(?=\n\s*\n|\Z)")
 
 
@@ -35,18 +37,51 @@ def translate(rows, model, key):
         + json.dumps(rows, ensure_ascii=False)
     )
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}
-    req = urllib.request.Request(
-        f"{API_ROOT}/{model}:generateContent?key={key}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as response:
-            response_data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:1200]
-        raise RuntimeError(f"Gemini translation failed: HTTP {exc.code}: {detail}") from exc
+    request_data = json.dumps(payload).encode("utf-8")
+    request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
+    max_attempts = max(1, int(os.getenv("GEMINI_SUBTITLE_MAX_ATTEMPTS", "6")))
+    base_delay = max(1.0, float(os.getenv("GEMINI_SUBTITLE_RETRY_BASE_SECONDS", "15")))
+
+    response_data = None
+    for attempt in range(1, max_attempts + 1):
+        req = urllib.request.Request(
+            request_url,
+            data=request_data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as response:
+                response_data = json.loads(response.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:1200]
+            if exc.code not in RETRYABLE_HTTP_STATUSES or attempt >= max_attempts:
+                raise RuntimeError(f"Gemini translation failed after {attempt} attempt(s): HTTP {exc.code}: {detail}") from exc
+            retry_after = 0.0
+            try:
+                retry_after = float(exc.headers.get("Retry-After", "0"))
+            except (TypeError, ValueError):
+                pass
+            delay = min(180.0, max(base_delay * (2 ** (attempt - 1)), retry_after))
+            print(
+                f"GEMINI_TEMPORARY_HTTP_{exc.code}; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
+                flush=True,
+            )
+            time.sleep(delay)
+        except urllib.error.URLError as exc:
+            if attempt >= max_attempts:
+                raise RuntimeError(f"Gemini connection failed after {attempt} attempt(s): {exc}") from exc
+            delay = min(180.0, base_delay * (2 ** (attempt - 1)))
+            print(
+                f"GEMINI_TEMPORARY_CONNECTION_ERROR; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
+                flush=True,
+            )
+            time.sleep(delay)
+
+    if response_data is None:
+        raise RuntimeError("Gemini translation ended without a response.")
+
     parts = response_data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     raw = "\n".join(part.get("text", "") for part in parts)
     raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
