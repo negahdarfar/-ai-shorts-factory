@@ -245,7 +245,7 @@ def translate_freellmapi(rows, base_url, key, model):
 
 
 def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
-    cloudflare = cloudflare or (\"\", \"\", \"\")
+    cloudflare = cloudflare or ("", "", "")
     failures = []
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     if omni[0] and omni[1] and allow_nonfree_fallback:
