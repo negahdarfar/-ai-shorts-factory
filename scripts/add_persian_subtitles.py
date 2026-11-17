@@ -171,6 +171,63 @@ def translate_omniroute(rows, base_url, key, model):
         raw = str(content)
     return parse_translation_json(raw, rows, "OmniRoute")
 
+
+def translate_freellmapi(rows, base_url, key, model):
+    prompt = (
+        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
+        'Return ONLY valid JSON with this exact shape: {"translations":[{"index":1,"text":"..."}]}. '
+        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
+        "Keep each Persian cue short enough to read on a phone. Input cues: "
+        + json.dumps(rows, ensure_ascii=False)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You are a professional English-to-Persian subtitle translator. Output only the requested JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+    }
+    response_data = post_json_with_retry(
+        base_url.rstrip("/") + "/chat/completions",
+        payload,
+        {"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+        "FreeLLMAPI",
+        max(1, int(os.getenv("FREELLMAPI_MAX_ATTEMPTS", "3"))),
+        max(30, int(os.getenv("FREELLMAPI_TIMEOUT_SECONDS", "180"))),
+        max(1.0, float(os.getenv("FREELLMAPI_RETRY_BASE_SECONDS", "15"))),
+    )
+    choices = response_data.get("choices", [])
+    if not choices:
+        raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
+    content = choices[0].get("message", {}).get("content", "")
+    if isinstance(content, list):
+        raw = "\n".join(part.get("text", "") for part in content if isinstance(part, dict))
+    else:
+        raw = str(content)
+    return parse_translation_json(raw, rows, "FreeLLMAPI")
+
+
+def translate_with_fallback(rows, omni, free, gemini):
+    failures = []
+    if omni[0] and omni[1]:
+        try:
+            return translate_omniroute(rows, *omni), "OmniRoute"
+        except Exception as exc:
+            failures.append(f"OmniRoute: {exc}")
+            print(f"OMNIROUTE_FAILED_NEXT_PROVIDER | {exc}", flush=True)
+    if free[0] and free[1]:
+        try:
+            return translate_freellmapi(rows, *free), "FreeLLMAPI"
+        except Exception as exc:
+            failures.append(f"FreeLLMAPI: {exc}")
+            print(f"FREELLMAPI_FAILED_NEXT_PROVIDER | {exc}", flush=True)
+    if gemini[0]:
+        return translate_gemini(rows, gemini[1], gemini[0]), "Gemini"
+    detail = "; ".join(failures) if failures else "No complete provider credentials configured."
+    raise RuntimeError(f"All configured subtitle providers failed. {detail}")
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
@@ -180,12 +237,19 @@ def main():
     omniroute_base_url = os.getenv("OMNIROUTE_BASE_URL", "").strip()
     omniroute_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
     omniroute_model = os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto"
-    if not ((omniroute_base_url and omniroute_key) or gemini_key):
-        raise SystemExit(
-            "Configure OMNIROUTE_BASE_URL + OMNIROUTE_API_KEY, or keep GEMINI_API_KEY as fallback."
-        )
+    freellmapi_base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
+    freellmapi_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
+    freellmapi_model = os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto"
+    if not (
+        (omniroute_base_url and omniroute_key)
+        or (freellmapi_base_url and freellmapi_key)
+        or gemini_key
+    ):
+        raise SystemExit("Configure an OmniRoute pair, a FreeLLMAPI pair, or GEMINI_API_KEY.")
     if bool(omniroute_base_url) != bool(omniroute_key):
-        print("OMNIROUTE_INCOMPLETE_CONFIGURATION; Gemini fallback will be used if available.", flush=True)
+        print("OMNIROUTE_INCOMPLETE_CONFIGURATION; skipping OmniRoute.", flush=True)
+    if bool(freellmapi_base_url) != bool(freellmapi_key):
+        print("FREELLMAPI_INCOMPLETE_CONFIGURATION; skipping FreeLLMAPI.", flush=True)
     root = Path(args.home) / "storage" / "tasks"
     videos = sorted(root.glob("**/final-*.mp4"))
     if len(videos) != 4:
@@ -195,25 +259,13 @@ def main():
         if not english.is_file():
             raise SystemExit(f"English subtitle source missing for video {index}: {english}")
         cues = parse_srt(english)
-        translations = None
-        if omniroute_base_url and omniroute_key:
-            try:
-                translations = translate_omniroute(
-                    cues, omniroute_base_url, omniroute_key, omniroute_model
-                )
-                print(f"OMNIROUTE_TRANSLATION_SUCCEEDED {index}/4 | model={omniroute_model}", flush=True)
-            except Exception as exc:
-                if not gemini_key:
-                    raise
-                print(
-                    f"OMNIROUTE_FAILED_GEMINI_FALLBACK {index}/4 | {exc}",
-                    flush=True,
-                )
-        if translations is None:
-            if not gemini_key:
-                raise RuntimeError("OmniRoute failed and GEMINI_API_KEY fallback is not configured.")
-            translations = translate_gemini(cues, args.model, gemini_key)
-            print(f"GEMINI_TRANSLATION_SUCCEEDED {index}/4", flush=True)
+        translations, provider_used = translate_with_fallback(
+            cues,
+            (omniroute_base_url, omniroute_key, omniroute_model),
+            (freellmapi_base_url, freellmapi_key, freellmapi_model),
+            (gemini_key, args.model),
+        )
+        print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
         blocks = [
             f"{cue['index']}\n{cue['timing']}\n{translations[cue['index']]}\n"
