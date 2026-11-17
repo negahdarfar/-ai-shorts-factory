@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from free_model_router import discover_free_models
+
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 SEO_FIELDS = ("primary_keyword", "secondary_keywords", "title", "description", "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent")
 
@@ -269,18 +271,43 @@ def main():
         for provider, base_url, api_key, api_model in gateways:
             if not (base_url and api_key):
                 continue
-            try:
-                generated = generate_batch(
-                    topics, args.language, args.model, "", research=research,
-                    api_base_url=base_url, api_key=api_key,
-                    api_model=api_model, api_provider=provider,
-                )
-                print(f"SEO_GENERATION_PROVIDER={provider} | model={api_model}", flush=True)
-                generated_source = provider.lower() + "_batch"
-                gateway_succeeded = True
+            if provider == "FreeLLMAPI":
+                try:
+                    candidate_models = discover_free_models(
+                        base_url, api_key, task="seo", preferred=api_model
+                    )
+                except Exception as discovery_error:
+                    candidate_models = []
+                    print(f"FREELLMAPI_MODEL_DISCOVERY_FAILED: {discovery_error}", file=sys.stderr)
+                if not candidate_models:
+                    print(
+                        "FREELLMAPI_NO_EXPLICITLY_FREE_MODELS; skipping this gateway to prevent paid or unknown-price routing.",
+                        file=sys.stderr,
+                    )
+                    continue
+            else:
+                candidate_models = [api_model]
+            for selected_model in candidate_models:
+                try:
+                    generated = generate_batch(
+                        topics, args.language, args.model, "", research=research,
+                        api_base_url=base_url, api_key=api_key,
+                        api_model=selected_model, api_provider=provider,
+                    )
+                    print(
+                        f"SEO_GENERATION_PROVIDER={provider} | model={selected_model}",
+                        flush=True,
+                    )
+                    generated_source = provider.lower() + "_batch"
+                    gateway_succeeded = True
+                    break
+                except (RuntimeError, ValueError, OSError) as gateway_error:
+                    print(
+                        f"{provider.upper()}_MODEL_FAILED_NEXT_MODEL | model={selected_model} | {gateway_error}",
+                        file=sys.stderr,
+                    )
+            if gateway_succeeded:
                 break
-            except (RuntimeError, ValueError, OSError) as gateway_error:
-                print(f"{provider.upper()}_SEO_FAILED_NEXT_PROVIDER: {gateway_error}", file=sys.stderr)
         if not gateway_succeeded:
             if gemini_key:
                 generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)

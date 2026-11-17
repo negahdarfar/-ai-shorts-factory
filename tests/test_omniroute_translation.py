@@ -32,7 +32,8 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
     @patch("add_persian_subtitles.translate_omniroute")
     @patch("add_persian_subtitles.translate_freellmapi")
     @patch("add_persian_subtitles.translate_gemini")
-    def test_prefers_omniroute(self, gemini, free, omni):
+    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
+    def test_prefers_omniroute(self, discovery, gemini, free, omni):
         omni.return_value = {1: "سلام", 2: "خداحافظ"}
         result, provider = translate_with_fallback(
             self.rows, ("http://omni/v1", "key", "auto"),
@@ -46,7 +47,8 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
     @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
     @patch("add_persian_subtitles.translate_freellmapi")
     @patch("add_persian_subtitles.translate_gemini")
-    def test_falls_back_to_freellmapi_before_gemini(self, gemini, free, omni):
+    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
+    def test_falls_back_to_freellmapi_before_gemini(self, discovery, gemini, free, omni):
         free.return_value = {1: "سلام", 2: "خداحافظ"}
         result, provider = translate_with_fallback(
             self.rows, ("http://omni/v1", "key", "auto"),
@@ -59,7 +61,8 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
     @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
     @patch("add_persian_subtitles.translate_freellmapi", side_effect=RuntimeError("offline"))
     @patch("add_persian_subtitles.translate_gemini")
-    def test_uses_gemini_as_last_fallback(self, gemini, free, omni):
+    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
+    def test_uses_gemini_as_last_fallback(self, discovery, gemini, free, omni):
         gemini.return_value = {1: "سلام", 2: "خداحافظ"}
         result, provider = translate_with_fallback(
             self.rows, ("http://omni/v1", "key", "auto"),

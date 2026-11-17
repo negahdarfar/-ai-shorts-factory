@@ -13,6 +13,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from free_model_router import discover_free_models
+
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 RETRYABLE_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
 SRT_BLOCK = re.compile(r"(?ms)^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n(.*?)(?=\n\s*\n|\Z)")
@@ -219,10 +221,22 @@ def translate_with_fallback(rows, omni, free, gemini):
             print(f"OMNIROUTE_FAILED_NEXT_PROVIDER | {exc}", flush=True)
     if free[0] and free[1]:
         try:
-            return translate_freellmapi(rows, *free), "FreeLLMAPI"
+            candidates = discover_free_models(
+                free[0], free[1], task="translation", preferred=free[2]
+            )
         except Exception as exc:
-            failures.append(f"FreeLLMAPI: {exc}")
-            print(f"FREELLMAPI_FAILED_NEXT_PROVIDER | {exc}", flush=True)
+            candidates = []
+            failures.append(f"FreeLLMAPI discovery: {exc}")
+            print(f"FREELLMAPI_DISCOVERY_FAILED_NEXT_PROVIDER | {exc}", flush=True)
+        if not candidates:
+            print("FREELLMAPI_NO_EXPLICITLY_FREE_MODELS; skipping gateway to prevent paid or unknown-price routing.", flush=True)
+        for model_id in candidates:
+            try:
+                print(f"FREELLMAPI_AUTO_SELECTED_MODEL={model_id} | task=translation", flush=True)
+                return translate_freellmapi(rows, free[0], free[1], model_id), "FreeLLMAPI"
+            except Exception as exc:
+                failures.append(f"FreeLLMAPI/{model_id}: {exc}")
+                print(f"FREELLMAPI_MODEL_FAILED_NEXT_MODEL | model={model_id} | {exc}", flush=True)
     if gemini[0]:
         return translate_gemini(rows, gemini[1], gemini[0]), "Gemini"
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
