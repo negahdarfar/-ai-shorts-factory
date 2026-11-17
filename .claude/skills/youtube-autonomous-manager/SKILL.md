@@ -38,6 +38,14 @@ All eleven upstream skills are vendored under `.claude/skills/yt-*`, with their 
 
 The six helper scripts are standard-library Python tools. Keep their original paths and relative layout because chapter generation imports the edit parser and other skills call sibling helpers. Do not flatten or move the folders.
 
+## Free-model Agent runtime
+
+For an explicit editorial execution request, use `scripts/youtube_agent_runtime.py` through the manual **YouTube Agent free-model runtime** GitHub Actions workflow. Select one skill and provide a repository JSON context file. The runtime loads that skill's actual `SKILL.md`, the local voice profile, and task data; it discovers explicitly free models through `scripts/free_model_router.py`; and writes a Markdown artifact plus execution metadata.
+
+Required endpoint credentials are GitHub Actions Secrets: either `FREELLMAPI_CLOUD_BASE_URL` + `FREELLMAPI_CLOUD_API_KEY`, or `FREELLMAPI_BASE_URL` + `FREELLMAPI_API_KEY`. The endpoint must implement OpenAI-compatible `GET /models` and `POST /chat/completions`. Never ask the user to paste credentials into chat. If no explicitly free model is discoverable, stop without inference.
+
+The runtime executes one selected editorial skill per workflow run. It does not call shell tools, invoke factory scripts, render media, upload videos, publish, or post comments. Use the existing production workflow separately for those operations and preserve its QA/publication gates. A successful runtime run proves only that the selected editorial skill generated an artifact.
+
 ## Workflow integration rules
 
 1. Use `yt-viral` and the repository's `scripts/research_youtube_competitors.py` for topic/competitor research. The existing YouTube Data API research remains the source for live metrics. If metrics are unavailable, state that clearly.
