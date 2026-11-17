@@ -156,7 +156,8 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                 },
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.35,
+            "temperature": 0.25,
+            "max_tokens": 2400,
             "response_format": {"type": "json_object"},
         }
         request_url = api_base_url.rstrip("/") + "/chat/completions"
@@ -352,73 +353,60 @@ def main():
         ))
     elif os.getenv("OMNIROUTE_API_KEY", "").strip():
         print("NON_FREE_LLM_FALLBACK_DISABLED; OmniRoute will not be called.", flush=True)
-    try:
-        gateway_succeeded = False
-        for provider, base_url, api_key, api_model in gateways:
-            if not (base_url and api_key):
+    # Run each topic as its own request: free models often truncate four-item batches.
+    provider_routes = []
+    for provider, base_url, api_key, api_model in gateways:
+        if not (base_url and api_key):
+            continue
+        if provider in ("FreeLLMAPI", "OpenRouter"):
+            try:
+                candidate_models = discover_free_models(base_url, api_key, task="seo", preferred=api_model)
+            except Exception as discovery_error:
+                candidate_models = []
+                print(f"{provider.upper()}_MODEL_DISCOVERY_FAILED: {discovery_error}", file=sys.stderr)
+            if not candidate_models:
+                print(f"{provider.upper()}_NO_EXPLICITLY_FREE_MODELS; skipping unknown-price routing.", file=sys.stderr)
                 continue
-            if provider in ("FreeLLMAPI", "OpenRouter"):
-                try:
-                    candidate_models = discover_free_models(
-                        base_url, api_key, task="seo", preferred=api_model
-                    )
-                except Exception as discovery_error:
-                    candidate_models = []
-                    print(f"{provider.upper()}_MODEL_DISCOVERY_FAILED: {discovery_error}", file=sys.stderr)
-                if not candidate_models:
-                    print(
-                        f"{provider.upper()}_NO_EXPLICITLY_FREE_MODELS; skipping to prevent paid or unknown-price routing.",
-                        file=sys.stderr,
-                    )
-                    continue
-            elif provider == "Cloudflare":
-                candidate_models = [api_model]
-            else:
-                candidate_models = [api_model]
-            for selected_model in candidate_models:
-                try:
-                    generated = generate_batch(
-                        topics, args.language, args.model, "", research=research,
-                        api_base_url=base_url, api_key=api_key,
-                        api_model=selected_model, api_provider=provider,
-                    )
-                    print(
-                        f"SEO_GENERATION_PROVIDER={provider} | model={selected_model}",
-                        flush=True,
-                    )
-                    generated_source = provider.lower() + "_batch"
-                    gateway_succeeded = True
-                    break
-                except (RuntimeError, ValueError, OSError) as gateway_error:
-                    print(
-                        f"{provider.upper()}_MODEL_FAILED_NEXT_MODEL | model={selected_model} | {gateway_error}",
-                        file=sys.stderr,
-                    )
-            if gateway_succeeded:
+        else:
+            candidate_models = [api_model]
+        for selected_model in candidate_models:
+            provider_routes.append((provider, base_url, api_key, selected_model))
+
+    # Prefer the private FreeLLMAPI gateway when configured; Cloudflare remains the
+    # unattended fallback if the phone/Tailscale gateway cannot be reached.
+    provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1)
+    gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
+    for topic_index, topic in enumerate(topics, 1):
+        topic_succeeded = False
+        for provider, base_url, api_key, selected_model in provider_routes:
+            try:
+                one = generate_batch([topic], args.language, args.model, "", research=research,
+                    api_base_url=base_url, api_key=api_key, api_model=selected_model,
+                    api_provider=provider, max_attempts=2, repair_missing=False)
+                if 1 not in one:
+                    raise RuntimeError("Provider returned no validated item.")
+                generated[topic_index] = one[1]
+                print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider={provider} | model={selected_model}", flush=True)
+                topic_succeeded = True
                 break
-        # Gemini API's published Free Tier is a distinct zero-cost quota. Use it as
-        # an automatic fallback; do not enable paid Gemini/OmniRoute routing here.
-        if not gateway_succeeded and gemini_key and gemini_free_tier_enabled:
-            gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
-            generated = generate_batch(
-                topics, args.language, gemini_free_model, gemini_key, research=research
-            )
-            print(
-                f"SEO_GENERATION_PROVIDER=Gemini_Free_Tier | model={gemini_free_model}",
-                flush=True,
-            )
-            generated_source = "gemini_free_batch"
-            gateway_succeeded = True
-        if not gateway_succeeded and gemini_key and not gemini_free_tier_enabled:
-            print("GEMINI_FALLBACK_SKIPPED: set GEMINI_FREE_TIER_ENABLED=true only after confirming this key belongs to a Google AI Studio Free Tier project.", file=sys.stderr)
-        if not gateway_succeeded:
-            raise RuntimeError(
-                "No explicitly free model succeeded. Local templates are not publishable; "
-                "add an eligible FreeLLMAPI/OpenRouter key or restore free-tier provider quota. "
-                "Paid Gemini/OmniRoute routing remains disabled."
-            )
-    except (RuntimeError, ValueError, OSError) as exc:
-        print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
+            except (RuntimeError, ValueError, OSError) as gateway_error:
+                print(f"{provider.upper()}_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={selected_model} | {gateway_error}", file=sys.stderr, flush=True)
+        if not topic_succeeded and gemini_key and gemini_free_tier_enabled:
+            try:
+                one = generate_batch([topic], args.language, gemini_free_model, gemini_key, research=research, max_attempts=2, repair_missing=False)
+                if 1 not in one:
+                    raise RuntimeError("Gemini returned no validated item.")
+                generated[topic_index] = one[1]
+                print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider=Gemini_Free_Tier | model={gemini_free_model}", flush=True)
+                topic_succeeded = True
+            except (RuntimeError, ValueError, OSError) as gemini_error:
+                print(f"GEMINI_FREE_TIER_ITEM_FAILED | item={topic_index} | {gemini_error}", file=sys.stderr, flush=True)
+        if not topic_succeeded:
+            print(f"SEO_ITEM_UNAVAILABLE | item={topic_index}/{len(topics)} | no approved free provider produced a valid item.", file=sys.stderr, flush=True)
+    if gemini_key and not gemini_free_tier_enabled:
+        print("GEMINI_FALLBACK_SKIPPED: enable only after confirming Google AI Studio Free Tier.", file=sys.stderr)
+    generated_source = "multi_provider_individual"
+    gateway_succeeded = len(generated) == len(topics)
 
     output = []
     for index, topic in enumerate(topics, 1):
