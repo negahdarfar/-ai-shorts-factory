@@ -183,9 +183,9 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare") else 150) as response:
+            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if provider in ("FreeLLMAPI", "Cloudflare"):
+            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
                 choices = data.get("choices", [])
                 if not choices:
                     raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
@@ -280,6 +280,7 @@ def main():
     generated = {}
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
@@ -294,12 +295,31 @@ def main():
         ))
     elif cloudflare_account_id or cloudflare_api_token:
         print("CLOUDFLARE_CONFIGURATION_INCOMPLETE_OR_MODEL_NOT_ALLOWLISTED; refusing unknown-price routing.", file=sys.stderr)
-    gateways.append((
-        "FreeLLMAPI",
-        os.getenv("FREELLMAPI_BASE_URL", "").strip(),
-        os.getenv("FREELLMAPI_API_KEY", "").strip(),
-        os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
-    ))
+    # Optional always-on hosted FreeLLMAPI endpoint (not the phone/Tailscale gateway).
+    freellmapi_cloud_url = os.getenv("FREELLMAPI_CLOUD_BASE_URL", "").strip()
+    if freellmapi_cloud_url:
+        gateways.append((
+            "FreeLLMAPI",
+            freellmapi_cloud_url,
+            os.getenv("FREELLMAPI_API_KEY", "").strip(),
+            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
+        ))
+    else:
+        gateways.append((
+            "FreeLLMAPI",
+            os.getenv("FREELLMAPI_BASE_URL", "").strip(),
+            os.getenv("FREELLMAPI_API_KEY", "").strip(),
+            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
+        ))
+    # OpenRouter exposes rotating explicitly-free models through one OpenAI-compatible API.
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if openrouter_key:
+        gateways.append((
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            openrouter_key,
+            os.getenv("OPENROUTER_MODEL", "auto").strip() or "auto",
+        ))
     if allow_nonfree_fallback:
         gateways.append((
             "OmniRoute",
@@ -314,17 +334,17 @@ def main():
         for provider, base_url, api_key, api_model in gateways:
             if not (base_url and api_key):
                 continue
-            if provider == "FreeLLMAPI":
+            if provider in ("FreeLLMAPI", "OpenRouter"):
                 try:
                     candidate_models = discover_free_models(
                         base_url, api_key, task="seo", preferred=api_model
                     )
                 except Exception as discovery_error:
                     candidate_models = []
-                    print(f"FREELLMAPI_MODEL_DISCOVERY_FAILED: {discovery_error}", file=sys.stderr)
+                    print(f"{provider.upper()}_MODEL_DISCOVERY_FAILED: {discovery_error}", file=sys.stderr)
                 if not candidate_models:
                     print(
-                        "FREELLMAPI_NO_EXPLICITLY_FREE_MODELS; skipping this gateway to prevent paid or unknown-price routing.",
+                        f"{provider.upper()}_NO_EXPLICITLY_FREE_MODELS; skipping to prevent paid or unknown-price routing.",
                         file=sys.stderr,
                     )
                     continue
@@ -353,16 +373,27 @@ def main():
                     )
             if gateway_succeeded:
                 break
+        # Gemini API's published Free Tier is a distinct zero-cost quota. Use it as
+        # an automatic fallback; do not enable paid Gemini/OmniRoute routing here.
+        if not gateway_succeeded and gemini_key and gemini_free_tier_enabled:
+            gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
+            generated = generate_batch(
+                topics, args.language, gemini_free_model, gemini_key, research=research
+            )
+            print(
+                f"SEO_GENERATION_PROVIDER=Gemini_Free_Tier | model={gemini_free_model}",
+                flush=True,
+            )
+            generated_source = "gemini_free_batch"
+            gateway_succeeded = True
+        if not gateway_succeeded and gemini_key and not gemini_free_tier_enabled:
+            print("GEMINI_FALLBACK_SKIPPED: set GEMINI_FREE_TIER_ENABLED=true only after confirming this key belongs to a Google AI Studio Free Tier project.", file=sys.stderr)
         if not gateway_succeeded:
-            if gemini_key and allow_nonfree_fallback:
-                generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
-                print("SEO_GENERATION_PROVIDER=Gemini", flush=True)
-                generated_source = "gemini_batch"
-            else:
-                raise RuntimeError(
-                    "No explicitly free model succeeded. Non-free Gemini/OmniRoute fallback is disabled by default; "
-                    "set ALLOW_NONFREE_LLM_FALLBACK=true only if you accept possible charges."
-                )
+            raise RuntimeError(
+                "No explicitly free model succeeded. Local templates are not publishable; "
+                "add an eligible FreeLLMAPI/OpenRouter key or restore free-tier provider quota. "
+                "Paid Gemini/OmniRoute routing remains disabled."
+            )
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
 
