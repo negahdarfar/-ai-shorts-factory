@@ -6,6 +6,8 @@ on:
       - "scripts/add_persian_subtitles.py"
       - "tests/test_omniroute_translation.py"
       - ".github/workflows/validate-omniroute-integration.yml"
+      - ".github/workflows/deploy-omniroute-vps.yml"
+      - "deploy/omniroute/**"
   push:
     branches:
       - main
@@ -29,3 +31,20 @@ jobs:
         run: python -m py_compile scripts/add_persian_subtitles.py
       - name: Test translation response validation
         run: python -m unittest discover -s tests -p 'test_omniroute_translation.py'
+      - name: Validate deployment YAML files
+        run: |
+          python -m pip install pyyaml
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          paths = [
+              Path(".github/workflows/deploy-omniroute-vps.yml"),
+              Path(".github/workflows/omniroute-gateway-check.yml"),
+              Path(".github/workflows/resume-existing-videos.yml"),
+              Path("deploy/omniroute/docker-compose.yml"),
+          ]
+          for path in paths:
+              with path.open(encoding="utf-8") as stream:
+                  yaml.safe_load(stream)
+              print(f"YAML_OK {path}")
+          PY
