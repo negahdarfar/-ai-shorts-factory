@@ -86,6 +86,12 @@ def normalize_item(item, topic):
     }
     if not metadata["primary_keyword"] or not metadata["title"] or not metadata["description"]:
         raise ValueError("Empty required SEO field")
+    # Keep the model's selected primary keyword visibly aligned with the metadata.
+    # Add it naturally to the description when the generated title/description omit it.
+    primary = metadata["primary_keyword"]
+    if primary.casefold() not in (metadata["title"] + " " + metadata["description"]).casefold():
+        suffix = f" Explore {primary} in this concise video."
+        metadata["description"] = (metadata["description"].rstrip() + suffix)[:5000]
     script = clean(item.get("video_script"), 8000)
     terms = item.get("video_terms")
     if not isinstance(terms, list):

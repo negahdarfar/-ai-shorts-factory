@@ -92,4 +92,27 @@ class SeoPipelineTests(unittest.TestCase):
             f=Path(d)/"chapters.txt"; f.write_text("00:00 Opening\n02:10 Background\n05:30 Conclusion\n",encoding="utf-8")
             result=subprocess.run([sys.executable,str(ROOT/"scripts/validate_chapters.py"),str(f)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
+    def test_generator_aligns_primary_keyword_with_description(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("seo_generator_keyword", ROOT / "scripts/generate_seo_metadata.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        metadata = {
+            "primary_keyword": "ancient desert cities",
+            "secondary_keywords": ["history"],
+            "title": "A forgotten civilization",
+            "description": "Discover a remarkable place and its past.",
+            "hashtags": ["history"], "tags": ["history"],
+            "pinned_comment": "What surprised you?",
+            "thumbnail_concept": "An ancient city",
+            "search_intent": "Learn about ancient places"
+        }
+        row = {
+            "metadata": metadata,
+            "video_script": "This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context.",
+            "video_terms": ["ancient city", "desert ruins", "stone walls", "archaeology site", "historic settlement"]
+        }
+        normalized = module.normalize_item(row, "Ancient desert cities")
+        self.assertIn("ancient desert cities", normalized["metadata"]["description"].casefold())
+
 if __name__=="__main__": unittest.main()
