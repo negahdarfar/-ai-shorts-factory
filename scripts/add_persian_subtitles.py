@@ -13,7 +13,7 @@ from pathlib import Path
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 RETRYABLE_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
-SRT_BLOCK = re.compile(r"(?ms)^\\s*(\\d+)\\s*\\n(\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*\\n(.*?)(?=\\n\\s*\\n|\\Z)")
+SRT_BLOCK = re.compile(r"(?ms)^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n(.*?)(?=\n\s*\n|\Z)")
 
 
 def parse_srt(path):
@@ -84,7 +84,7 @@ def translate(rows, model, key):
 
     parts = response_data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     raw = "\n".join(part.get("text", "") for part in parts)
-    raw = re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$", "", raw.strip(), flags=re.I)
+    raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
     parsed = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
     mapping = {int(row["index"]): str(row["text"]).strip() for row in parsed.get("translations", [])}
     expected = {row["index"] for row in rows}
@@ -113,12 +113,12 @@ def main():
         translations = translate(cues, args.model, key)
         persian = video.parent / "subtitle.fa.srt"
         blocks = [
-            f"{cue['index']}\\n{cue['timing']}\\n{translations[cue['index']]}\\n"
+            f"{cue['index']}\n{cue['timing']}\n{translations[cue['index']]}\n"
             for cue in cues
         ]
-        persian.write_text("\\n".join(blocks), encoding="utf-8")
+        persian.write_text("\n".join(blocks), encoding="utf-8")
         temporary = video.with_name(video.stem + ".fa-tmp.mp4")
-        escaped = str(persian.resolve()).replace("\\\\", "/").replace(":", "\\\\:")
+        escaped = str(persian.resolve()).replace("\\", "/").replace(":", "\\:")
         vf = (
             f"subtitles='{escaped}':force_style='FontName=Noto Naskh Arabic,"
             "FontSize=18,Alignment=8,MarginV=42,Outline=2,Shadow=0,"
