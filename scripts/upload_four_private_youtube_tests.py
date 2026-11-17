@@ -10,6 +10,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from topic_history import ensure_new_topics, record_published_topic
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -52,40 +54,6 @@ def load_validated_videos(home: Path) -> list[Path]:
     if len(available) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly four final MP4 files in storage, found {len(available)}.")
     return videos
-
-
-def publication_history_path(home: Path) -> Path:
-    state_dir = home / "state"
-    state_dir.mkdir(parents=True, exist_ok=True)
-    return state_dir / "published_topics.json"
-
-
-def load_published_topics(home: Path) -> set[str]:
-    path = publication_history_path(home)
-    if not path.is_file():
-        return set()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise SystemExit(f"Could not read publication history; refusing public upload: {exc}")
-    if not isinstance(data, list) or any(not isinstance(item, str) for item in data):
-        raise SystemExit("Publication history is malformed; refusing public upload.")
-    return {item.strip().casefold() for item in data if item.strip()}
-
-
-def record_published_topic(home: Path, topic: str) -> None:
-    path = publication_history_path(home)
-    current = []
-    if path.is_file():
-        try:
-            current = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise SystemExit(f"Could not update publication history safely: {exc}")
-    if not isinstance(current, list) or any(not isinstance(item, str) for item in current):
-        raise SystemExit("Publication history is malformed; refusing to overwrite it.")
-    if topic.casefold() not in {item.casefold() for item in current}:
-        current.append(topic)
-    path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_seo_manifest() -> list[dict]:
@@ -134,15 +102,11 @@ def main() -> None:
     # A reused topic must never be published twice. Private QA uploads are
     # deliberately excluded so a draft can be checked without consuming a topic.
     if scheduled or requested_privacy == "public":
-        published = load_published_topics(home)
         topics = [str(record.get("topic", "")).strip() for record in seo_records]
-        duplicates = [topic for topic in topics if topic.casefold() in published]
-        if duplicates:
-            raise SystemExit(
-                "PUBLIC_PUBLISH_BLOCKED_DUPLICATE_TOPICS: "
-                + "; ".join(duplicates)
-                + ". Choose four new topics or run private QA."
-            )
+        try:
+            ensure_new_topics(home / "state", topics)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc))
 
     credentials = Credentials(
         token=None,
@@ -205,7 +169,7 @@ def main() -> None:
         results.append(result)
         output_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
         if scheduled or requested_privacy == "public":
-            record_published_topic(home, str(record["topic"]).strip())
+            record_published_topic(home / "state", str(record["topic"]).strip())
         print(f"{privacy.upper()}_UPLOAD_SUCCEEDED {index}/{EXPECTED_COUNT}: {video_id}")
 
     if len(results) != EXPECTED_COUNT:
