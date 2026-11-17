@@ -30,36 +30,43 @@ def parse_srt(path):
     return rows
 
 
-def translate(rows, model, key):
-    prompt = (
-        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
-        'Return ONLY JSON: {"translations":[{"index":1,"text":"..."}]}. '
-        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
-        "Keep each Persian cue short enough to read on a phone. Input cues: "
-        + json.dumps(rows, ensure_ascii=False)
-    )
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}
-    request_data = json.dumps(payload).encode("utf-8")
-    request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
-    max_attempts = max(1, int(os.getenv("GEMINI_SUBTITLE_MAX_ATTEMPTS", "8")))
-    base_delay = max(1.0, float(os.getenv("GEMINI_SUBTITLE_RETRY_BASE_SECONDS", "15")))
+def parse_translation_json(raw, rows, provider):
+    cleaned = raw.strip()
+    cleaned = re.sub(r"^\s*\`\`\`(?:json)?\s*|\s*\`\`\`\s*$", "", cleaned, flags=re.I)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start < 0 or end < start:
+        raise RuntimeError(f"{provider} did not return a JSON translation object.")
+    parsed = json.loads(cleaned[start:end + 1])
+    mapping = {
+        int(row["index"]): str(row["text"]).strip()
+        for row in parsed.get("translations", [])
+    }
+    expected = {row["index"] for row in rows}
+    if set(mapping) != expected or any(not mapping[index] for index in expected):
+        raise RuntimeError(f"{provider} returned missing or empty subtitle cues.")
+    return mapping
 
-    response_data = None
+
+def post_json_with_retry(url, payload, headers, provider, max_attempts, timeout, base_delay):
+    request_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     for attempt in range(1, max_attempts + 1):
         req = urllib.request.Request(
-            request_url,
+            url,
             data=request_data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=300) as response:
-                response_data = json.loads(response.read().decode("utf-8"))
-            break
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:1200]
             if exc.code not in RETRYABLE_HTTP_STATUSES or attempt >= max_attempts:
-                raise RuntimeError(f"Gemini translation failed after {attempt} attempt(s): HTTP {exc.code}: {detail}") from exc
+                raise RuntimeError(
+                    f"{provider} request failed after {attempt} attempt(s): "
+                    f"HTTP {exc.code}: {detail}"
+                ) from exc
             retry_after = 0.0
             try:
                 retry_after = float(exc.headers.get("Retry-After", "0"))
@@ -67,42 +74,115 @@ def translate(rows, model, key):
                 pass
             delay = min(180.0, max(base_delay * (2 ** (attempt - 1)), retry_after))
             print(
-                f"GEMINI_TEMPORARY_HTTP_{exc.code}; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
+                f"{provider.upper()}_TEMPORARY_HTTP_{exc.code}; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
                 flush=True,
             )
             time.sleep(delay)
         except (urllib.error.URLError, TimeoutError, socket.timeout, http.client.HTTPException, ConnectionError) as exc:
             if attempt >= max_attempts:
-                raise RuntimeError(f"Gemini connection failed after {attempt} attempt(s): {exc}") from exc
+                raise RuntimeError(
+                    f"{provider} connection failed after {attempt} attempt(s): {exc}"
+                ) from exc
             delay = min(180.0, base_delay * (2 ** (attempt - 1)))
             print(
-                f"GEMINI_TEMPORARY_CONNECTION_OR_READ_ERROR; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
+                f"{provider.upper()}_TEMPORARY_CONNECTION_OR_READ_ERROR; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
                 flush=True,
             )
             time.sleep(delay)
+    raise RuntimeError(f"{provider} request ended without a response.")
 
-    if response_data is None:
-        raise RuntimeError("Gemini translation ended without a response.")
 
+def translate_gemini(rows, model, key):
+    prompt = (
+        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
+        'Return ONLY JSON: {"translations":[{"index":1,"text":"..."}]}. '
+        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
+        "Keep each Persian cue short enough to read on a phone. Input cues: "
+        + json.dumps(rows, ensure_ascii=False)
+    )
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json"},
+    }
+    max_attempts = max(1, int(os.getenv("GEMINI_SUBTITLE_MAX_ATTEMPTS", "8")))
+    base_delay = max(1.0, float(os.getenv("GEMINI_SUBTITLE_RETRY_BASE_SECONDS", "15")))
+    response_data = post_json_with_retry(
+        f"{API_ROOT}/{model}:generateContent?key={key}",
+        payload,
+        {"Content-Type": "application/json"},
+        "Gemini",
+        max_attempts,
+        300,
+        base_delay,
+    )
     parts = response_data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     raw = "\n".join(part.get("text", "") for part in parts)
-    raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
-    parsed = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
-    mapping = {int(row["index"]): str(row["text"]).strip() for row in parsed.get("translations", [])}
-    expected = {row["index"] for row in rows}
-    if set(mapping) != expected or any(not mapping[index] for index in expected):
-        raise RuntimeError("Persian translation returned missing or empty subtitle cues.")
-    return mapping
+    return parse_translation_json(raw, rows, "Gemini")
 
+
+def translate_omniroute(rows, base_url, key, model):
+    prompt = (
+        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
+        'Return ONLY valid JSON with this exact shape: {"translations":[{"index":1,"text":"..."}]}. '
+        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
+        "Keep each Persian cue short enough to read on a phone. Input cues: "
+        + json.dumps(rows, ensure_ascii=False)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a professional English-to-Persian subtitle translator. Output only the requested JSON.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+    }
+    max_attempts = max(1, int(os.getenv("OMNIROUTE_MAX_ATTEMPTS", "3")))
+    timeout = max(30, int(os.getenv("OMNIROUTE_TIMEOUT_SECONDS", "180")))
+    base_delay = max(1.0, float(os.getenv("OMNIROUTE_RETRY_BASE_SECONDS", "15")))
+    response_data = post_json_with_retry(
+        base_url.rstrip("/") + "/chat/completions",
+        payload,
+        {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        },
+        "OmniRoute",
+        max_attempts,
+        timeout,
+        base_delay,
+    )
+    choices = response_data.get("choices", [])
+    if not choices:
+        raise RuntimeError("OmniRoute returned no chat completion choices.")
+    content = choices[0].get("message", {}).get("content", "")
+    if isinstance(content, list):
+        raw = "\n".join(
+            part.get("text", "") for part in content if isinstance(part, dict)
+        )
+    else:
+        raw = str(content)
+    return parse_translation_json(raw, rows, "OmniRoute")
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
     parser.add_argument("--home", default=os.getenv("MPT_HOME", "mpt-runtime"))
     args = parser.parse_args()
-    key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not key:
-        raise SystemExit("GEMINI_API_KEY missing; Persian subtitle generation is mandatory.")
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    omniroute_base_url = os.getenv("OMNIROUTE_BASE_URL", "").strip()
+    omniroute_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
+    omniroute_model = os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto"
+    if not ((omniroute_base_url and omniroute_key) or gemini_key):
+        raise SystemExit(
+            "Configure OMNIROUTE_BASE_URL + OMNIROUTE_API_KEY, or keep GEMINI_API_KEY as fallback."
+        )
+    if bool(omniroute_base_url) != bool(omniroute_key):
+        print("OMNIROUTE_INCOMPLETE_CONFIGURATION; Gemini fallback will be used if available.", flush=True)
     root = Path(args.home) / "storage" / "tasks"
     videos = sorted(root.glob("**/final-*.mp4"))
     if len(videos) != 4:
@@ -112,7 +192,25 @@ def main():
         if not english.is_file():
             raise SystemExit(f"English subtitle source missing for video {index}: {english}")
         cues = parse_srt(english)
-        translations = translate(cues, args.model, key)
+        translations = None
+        if omniroute_base_url and omniroute_key:
+            try:
+                translations = translate_omniroute(
+                    cues, omniroute_base_url, omniroute_key, omniroute_model
+                )
+                print(f"OMNIROUTE_TRANSLATION_SUCCEEDED {index}/4 | model={omniroute_model}", flush=True)
+            except Exception as exc:
+                if not gemini_key:
+                    raise
+                print(
+                    f"OMNIROUTE_FAILED_GEMINI_FALLBACK {index}/4 | {exc}",
+                    flush=True,
+                )
+        if translations is None:
+            if not gemini_key:
+                raise RuntimeError("OmniRoute failed and GEMINI_API_KEY fallback is not configured.")
+            translations = translate_gemini(cues, args.model, gemini_key)
+            print(f"GEMINI_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
         blocks = [
             f"{cue['index']}\n{cue['timing']}\n{translations[cue['index']]}\n"
