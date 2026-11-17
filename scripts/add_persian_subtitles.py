@@ -32,7 +32,10 @@ def parse_srt(path):
 
 def parse_translation_json(raw, rows, provider):
     cleaned = raw.strip()
-    cleaned = re.sub(r"^\s*\`\`\`(?:json)?\s*|\s*\`\`\`\s*$", "", cleaned, flags=re.I)
+    fence = chr(96) * 3
+    cleaned = cleaned.removeprefix(fence).removesuffix(fence).strip()
+    if cleaned.lower().startswith("json"):
+        cleaned = cleaned[4:].strip()
     start = cleaned.find("{")
     end = cleaned.rfind("}")
     if start < 0 or end < start:
