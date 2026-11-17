@@ -280,6 +280,7 @@ def main():
     generated = {}
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
@@ -374,7 +375,7 @@ def main():
                 break
         # Gemini API's published Free Tier is a distinct zero-cost quota. Use it as
         # an automatic fallback; do not enable paid Gemini/OmniRoute routing here.
-        if not gateway_succeeded and gemini_key:
+        if not gateway_succeeded and gemini_key and gemini_free_tier_enabled:
             gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
             generated = generate_batch(
                 topics, args.language, gemini_free_model, gemini_key, research=research
@@ -385,6 +386,8 @@ def main():
             )
             generated_source = "gemini_free_batch"
             gateway_succeeded = True
+        if not gateway_succeeded and gemini_key and not gemini_free_tier_enabled:
+            print("GEMINI_FALLBACK_SKIPPED: set GEMINI_FREE_TIER_ENABLED=true only after confirming this key belongs to a Google AI Studio Free Tier project.", file=sys.stderr)
         if not gateway_succeeded:
             raise RuntimeError(
                 "No explicitly free model succeeded. Local templates are not publishable; "
