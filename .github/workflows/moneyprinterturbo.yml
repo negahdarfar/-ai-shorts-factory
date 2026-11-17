@@ -72,11 +72,12 @@ jobs:
           restore-keys: |
             mpt-topics-${{ runner.os }}-
       - name: Connect to private FreeLLMAPI phone gateway
-        if: ${{ env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
       - name: Check FreeLLMAPI gateway without inference
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         id: freeapi
         env:
           BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
@@ -87,7 +88,7 @@ jobs:
           if [ -n "$BASE_URL" ] && [ -n "$API_KEY" ]; then
             if curl --fail --silent --show-error --max-time 20 "${BASE_URL%/}/models" \
               -H "Authorization: Bearer $API_KEY" -o /tmp/freellmapi-models.json; then
-              python - <<'PY'
+              if python - <<'PY'
           import json
           with open("/tmp/freellmapi-models.json", encoding="utf-8") as f:
               data = json.load(f)
@@ -95,7 +96,11 @@ jobs:
               raise SystemExit("FreeLLMAPI model list is empty or invalid.")
           print(f"FreeLLMAPI reachable; {len(data['data'])} model entries listed. No inference request sent.")
           PY
-              READY=true
+              then
+                READY=true
+              else
+                echo "::warning::FreeLLMAPI returned an invalid model list; using the configured fallback."
+              fi
             else
               echo "::warning::FreeLLMAPI is unreachable; the workflow will use the configured fallback."
             fi
