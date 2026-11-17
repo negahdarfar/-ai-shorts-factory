@@ -30,17 +30,18 @@
 
 ## Secrets and permissions
 
-Existing Shorts generation:
-- `GEMINI_API_KEY`
-- At least one of `PEXELS_API_KEY` or `PIXABAY_API_KEY`
+Shorts generation and Persian subtitle translation:
+- At least one explicitly free LLM route: `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (pinned free model), or `FREELLMAPI_BASE_URL` + `FREELLMAPI_API_KEY` with a model discovered as explicitly free.
+- At least one footage source: `PEXELS_API_KEY` or `PIXABAY_API_KEY`.
+- `GEMINI_API_KEY` and `OMNIROUTE_API_KEY` are optional fallback credentials and are not used unless `ALLOW_NONFREE_LLM_FALLBACK=true`.
 
-Required for the current production workflow:
+Required for production research:
 - `YOUTUBE_API_KEY` with YouTube Data API v3 enabled for recent Shorts competitor research.
 
-Existing private upload:
+YouTube upload and scheduled public release:
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
-- `YOUTUBE_REFRESH_TOKEN` with the upload scope.
+- `YOUTUBE_REFRESH_TOKEN` with the YouTube upload scope.
 
 Analytics:
 - Re-authorize the channel and replace the refresh token with one granted `https://www.googleapis.com/auth/yt-analytics.readonly`.
