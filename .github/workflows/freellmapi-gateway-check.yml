@@ -26,6 +26,7 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
+          ping: 100.92.131.90
 
       - name: Check authenticated model catalogue (no inference)
         run: |
