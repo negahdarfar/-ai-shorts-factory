@@ -7,6 +7,7 @@ workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public.
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -71,11 +72,21 @@ def load_seo_manifest() -> list[dict]:
 
 
 def main() -> None:
-    privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", "private").strip().lower()
-    if privacy not in {"private", "public"}:
+    requested_privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", "private").strip().lower()
+    scheduled = os.environ.get("YOUTUBE_SCHEDULED_PUBLISH", "NO").strip().upper() == "YES"
+    if requested_privacy not in {"private", "public"}:
         raise SystemExit("YOUTUBE_PRIVACY_STATUS must be either private or public.")
-    if privacy == "public" and os.environ.get("CONFIRM_PUBLIC_PUBLISHING") != "YES":
+    if requested_privacy == "public" and os.environ.get("CONFIRM_PUBLIC_PUBLISHING") != "YES":
         raise SystemExit("Public upload blocked: explicit workflow confirmation is missing.")
+
+    privacy = "private" if scheduled else requested_privacy
+    first_publish_at = None
+    if scheduled:
+        candidate = datetime.now(timezone.utc) + timedelta(minutes=60)
+        first_publish_at = candidate.replace(minute=0, second=0, microsecond=0)
+        if first_publish_at < candidate:
+            first_publish_at += timedelta(hours=1)
+        print("SCHEDULING_FOUR_PUBLIC_SHORTS: first slot " + first_publish_at.isoformat())
 
     required = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     missing = [key for key in required if not os.environ.get(key, "").strip()]
@@ -100,7 +111,7 @@ def main() -> None:
 
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     results = []
-    output_path = Path(f"youtube_{privacy}_upload_results.json")
+    output_path = Path("youtube_scheduled_upload_results.json" if scheduled else f"youtube_{privacy}_upload_results.json")
     for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
         metadata = record["metadata"]
         description = metadata["description"].strip()
@@ -108,6 +119,7 @@ def main() -> None:
         if hashtags:
             description += "\n\n" + " ".join("#" + tag for tag in hashtags[:3])
         tags = [str(tag).strip() for tag in metadata.get("tags", []) if str(tag).strip()][:15]
+        publish_at = (first_publish_at + timedelta(hours=3 * (index - 1))) if scheduled else None
         body = {
             "snippet": {
                 "title": metadata["title"][:100],
@@ -119,6 +131,7 @@ def main() -> None:
             "status": {
                 "privacyStatus": privacy,
                 "selfDeclaredMadeForKids": False,
+                **({"publishAt": publish_at.isoformat(timespec="seconds").replace("+00:00", "Z")} if publish_at else {}),
             },
         }
         media = MediaFileUpload(str(video_path), mimetype="video/mp4",
@@ -137,7 +150,8 @@ def main() -> None:
             "index": index,
             "file": video_path.name,
             "video_id": video_id,
-            "privacy": privacy,
+            "privacy": "scheduled" if scheduled else privacy,
+            **({"publish_at_utc": publish_at.isoformat(timespec="seconds").replace("+00:00", "Z")} if publish_at else {}),
             "seo_source": record.get("metadata_source", "unknown"),
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
@@ -147,8 +161,8 @@ def main() -> None:
 
     if len(results) != EXPECTED_COUNT:
         raise SystemExit(f"Only {len(results)} of {EXPECTED_COUNT} uploads completed.")
-    print(f"ALL_FOUR_{privacy.upper()}_UPLOADS_SUCCEEDED")
-    print(f"All four videos were uploaded with privacy={privacy}.")
+    print("ALL_FOUR_SCHEDULED_UPLOADS_SUCCEEDED" if scheduled else f"ALL_FOUR_{privacy.upper()}_UPLOADS_SUCCEEDED")
+    print("All four videos were scheduled as private uploads with future public release times." if scheduled else f"All four videos were uploaded with privacy={privacy}.")
 
 
 if __name__ == "__main__":
