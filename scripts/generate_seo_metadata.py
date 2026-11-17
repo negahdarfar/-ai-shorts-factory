@@ -252,6 +252,7 @@ def main():
     generated = {}
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     gateways = [
         (
             "FreeLLMAPI",
@@ -259,13 +260,16 @@ def main():
             os.getenv("FREELLMAPI_API_KEY", "").strip(),
             os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
         ),
-        (
+    ]
+    if allow_nonfree_fallback:
+        gateways.append((
             "OmniRoute",
             os.getenv("OMNIROUTE_BASE_URL", "").strip(),
             os.getenv("OMNIROUTE_API_KEY", "").strip(),
             os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto",
-        ),
-    ]
+        ))
+    elif os.getenv("OMNIROUTE_API_KEY", "").strip():
+        print("NON_FREE_LLM_FALLBACK_DISABLED; OmniRoute will not be called.", flush=True)
     try:
         gateway_succeeded = False
         for provider, base_url, api_key, api_model in gateways:
@@ -309,12 +313,15 @@ def main():
             if gateway_succeeded:
                 break
         if not gateway_succeeded:
-            if gemini_key:
+            if gemini_key and allow_nonfree_fallback:
                 generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
                 print("SEO_GENERATION_PROVIDER=Gemini", flush=True)
                 generated_source = "gemini_batch"
             else:
-                raise RuntimeError("All configured gateways failed and GEMINI_API_KEY is not configured.")
+                raise RuntimeError(
+                    "No explicitly free model succeeded. Non-free Gemini/OmniRoute fallback is disabled by default; "
+                    "set ALLOW_NONFREE_LLM_FALLBACK=true only if you accept possible charges."
+                )
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
 

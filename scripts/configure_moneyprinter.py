@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import toml
+from free_model_router import discover_free_models
 
 home = Path(os.environ["MPT_HOME"]).expanduser()
 source = Path(os.environ["MPT_SOURCE_DIR"]).expanduser()
@@ -14,14 +15,40 @@ gemini = os.environ.get("GEMINI_API_KEY", "").strip()
 freellmapi_base_url = os.environ.get("FREELLMAPI_BASE_URL", "").strip()
 freellmapi_key = os.environ.get("FREELLMAPI_API_KEY", "").strip()
 freellmapi_model = os.environ.get("FREELLMAPI_MODEL", "auto").strip() or "auto"
+allow_nonfree_fallback = os.environ.get("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
+if freellmapi_base_url and freellmapi_key:
+    try:
+        free_models = discover_free_models(
+            freellmapi_base_url, freellmapi_key, task="seo", preferred=freellmapi_model
+        )
+    except Exception as exc:
+        free_models = []
+        print(f"FreeLLMAPI model discovery failed: {exc}")
+    if free_models:
+        # MoneyPrinterTurbo does not expose per-request model failover. Prefer
+        # the gateway's free-only router when available; otherwise use the
+        # strongest discovered free text model.
+        freellmapi_model = next(
+            (model for model in free_models if model == "kilo-auto/free"),
+            free_models[0],
+        )
+        print(f"MoneyPrinterTurbo auto-selected explicitly free model: {freellmapi_model}")
+    else:
+        print("No explicitly free FreeLLMAPI models discovered; refusing unknown-price models.")
+        freellmapi_base_url = ""
+        freellmapi_key = ""
 omniroute_base_url = os.environ.get("OMNIROUTE_BASE_URL", "").strip()
 omniroute_key = os.environ.get("OMNIROUTE_API_KEY", "").strip()
 omniroute_model = os.environ.get("OMNIROUTE_MODEL", "auto").strip() or "auto"
 pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
-if not gemini and not (freellmapi_base_url and freellmapi_key) and not (omniroute_base_url and omniroute_key):
-    missing.append("FreeLLMAPI or OmniRoute credentials, or GEMINI_API_KEY")
+if not (freellmapi_base_url and freellmapi_key) and not (
+    allow_nonfree_fallback and (
+        gemini or (omniroute_base_url and omniroute_key)
+    )
+):
+    missing.append("FreeLLMAPI with an explicitly free model (or set ALLOW_NONFREE_LLM_FALLBACK=true to permit other providers)")
 if not pexels and not pixabay:
     missing.append("PEXELS_API_KEY or PIXABAY_API_KEY")
 if missing:
@@ -39,15 +66,20 @@ if freellmapi_base_url and freellmapi_key:
     app["openai_api_key"] = freellmapi_key
     app["openai_base_url"] = freellmapi_base_url.rstrip("/")
     app["openai_model_name"] = freellmapi_model
-elif omniroute_base_url and omniroute_key:
+elif allow_nonfree_fallback and omniroute_base_url and omniroute_key:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = omniroute_key
     app["openai_base_url"] = omniroute_base_url.rstrip("/")
     app["openai_model_name"] = omniroute_model
-else:
+elif allow_nonfree_fallback and gemini:
     app["llm_provider"] = "gemini"
     app["gemini_api_key"] = gemini
     app["gemini_model_name"] = "gemini-3.8-flash"
+else:
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+        output.write("ready=false\n")
+    print("No explicitly free LLM route is available; skipping generation rather than risk paid inference.")
+    raise SystemExit(0)
 app["video_source"] = "pexels" if pexels else "pixabay"
 app["pexels_api_keys"] = [pexels] if pexels else []
 app["pixabay_api_keys"] = [pixabay] if pixabay else []

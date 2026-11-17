@@ -213,7 +213,8 @@ def translate_freellmapi(rows, base_url, key, model):
 
 def translate_with_fallback(rows, omni, free, gemini):
     failures = []
-    if omni[0] and omni[1]:
+    allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
+    if omni[0] and omni[1] and allow_nonfree_fallback:
         try:
             return translate_omniroute(rows, *omni), "OmniRoute"
         except Exception as exc:
@@ -237,8 +238,10 @@ def translate_with_fallback(rows, omni, free, gemini):
             except Exception as exc:
                 failures.append(f"FreeLLMAPI/{model_id}: {exc}")
                 print(f"FREELLMAPI_MODEL_FAILED_NEXT_MODEL | model={model_id} | {exc}", flush=True)
-    if gemini[0]:
+    if gemini[0] and allow_nonfree_fallback:
         return translate_gemini(rows, gemini[1], gemini[0]), "Gemini"
+    if (omni[0] and omni[1]) or gemini[0]:
+        print("NON_FREE_LLM_FALLBACK_DISABLED; paid or unknown-price providers were not called.", flush=True)
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
     raise RuntimeError(f"All configured subtitle providers failed. {detail}")
 
