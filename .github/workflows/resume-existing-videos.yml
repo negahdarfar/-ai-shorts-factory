@@ -25,11 +25,11 @@ concurrency:
 
 jobs:
   resume:
-    if: ${ github.event_name != 'push' || contains(github.event.head_commit.message, 'one-time recovery trigger') }
+    if: ${{ github.event_name != 'push' || contains(github.event.head_commit.message, 'one-time recovery trigger') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      MPT_HOME: ${ github.workspace }/mpt-runtime
+      MPT_HOME: ${{ github.workspace }}/mpt-runtime
     steps:
       - name: Checkout factory
         uses: actions/checkout@v4
@@ -53,8 +53,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: moneyprinterturbo-quality-test
-          run-id: ${ inputs.source_run_id || '44048295025' }
-          github-token: ${ secrets.GITHUB_TOKEN }
+          run-id: ${{ inputs.source_run_id || '44048295025' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: recovered-artifact
 
       - name: Restore the four existing rendered videos and SEO manifest
@@ -71,7 +71,7 @@ jobs:
 
       - name: Translate and burn Persian subtitles into recovered videos
         env:
-          GEMINI_API_KEY: ${ secrets.GEMINI_API_KEY }
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/add_persian_subtitles.py
 
@@ -84,22 +84,22 @@ jobs:
         run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count 4 --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
 
       - name: Validate YouTube OAuth refresh token
-        if: ${ github.event_name == 'push' || inputs.publish_public == true }
+        if: ${{ github.event_name == 'push' || inputs.publish_public == true }}
         env:
-          YOUTUBE_CLIENT_ID: ${ secrets.YOUTUBE_CLIENT_ID }
-          YOUTUBE_CLIENT_SECRET: ${ secrets.YOUTUBE_CLIENT_SECRET }
-          YOUTUBE_REFRESH_TOKEN: ${ secrets.YOUTUBE_REFRESH_TOKEN }
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/check_youtube_auth.py
 
       - name: Publish the four recovered videos PUBLIC on YouTube
-        if: ${ github.event_name == 'push' || inputs.publish_public == true }
+        if: ${{ github.event_name == 'push' || inputs.publish_public == true }}
         env:
-          YOUTUBE_CLIENT_ID: ${ secrets.YOUTUBE_CLIENT_ID }
-          YOUTUBE_CLIENT_SECRET: ${ secrets.YOUTUBE_CLIENT_SECRET }
-          YOUTUBE_REFRESH_TOKEN: ${ secrets.YOUTUBE_REFRESH_TOKEN }
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
           CONFIRM_PUBLIC_PUBLISHING: YES
-          MPT_HOME: ${ env.MPT_HOME }
+          MPT_HOME: ${{ env.MPT_HOME }}
         run: python scripts/upload_four_private_youtube_tests.py
 
       - name: Save recovery reports and publication results
