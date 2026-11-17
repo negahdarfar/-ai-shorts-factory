@@ -73,6 +73,19 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
         self.assertEqual(provider, "Gemini")
         self.assertEqual(result[2], "خداحافظ")
 
+    @patch.dict("os.environ", {"ALLOW_NONFREE_LLM_FALLBACK": "false"})
+    @patch("add_persian_subtitles.translate_omniroute")
+    @patch("add_persian_subtitles.translate_gemini")
+    @patch("add_persian_subtitles.discover_free_models", return_value=[])
+    def test_blocks_nonfree_fallback_by_default(self, discovery, gemini, omni):
+        with self.assertRaises(RuntimeError):
+            translate_with_fallback(
+                self.rows, ("http://omni/v1", "key", "auto"),
+                ("http://free/v1", "key", "auto"), ("gemini-key", "gemini-flash")
+            )
+        omni.assert_not_called()
+        gemini.assert_not_called()
+
     def test_fails_when_no_provider_is_configured(self):
         with self.assertRaises(RuntimeError):
             translate_with_fallback(
