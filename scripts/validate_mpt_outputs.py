@@ -35,6 +35,12 @@ for path in files:
     audio = any(s.get("codec_type") == "audio" for s in info.get("streams", []))
     if not video or not audio:
         raise SystemExit(f"Missing video or audio stream: {path}")
+    persian_subtitles = path.parent / "subtitle.fa.srt"
+    if not persian_subtitles.is_file() or persian_subtitles.stat().st_size < 20:
+        raise SystemExit(f"Missing or empty Persian subtitle file: {persian_subtitles}")
+    subtitle_text = persian_subtitles.read_text(encoding="utf-8-sig").strip()
+    if "-->" not in subtitle_text or not any("\\u0600" <= char <= "\\u06ff" for char in subtitle_text):
+        raise SystemExit(f"Persian subtitle file has no valid timing or Persian-script text: {persian_subtitles}")
     width, height = int(video["width"]), int(video["height"])
     if height <= width or abs((width / height) - (9 / 16)) > 0.025:
         raise SystemExit(f"Not a proper 9:16 vertical video ({width}x{height}): {path}")
@@ -47,6 +53,7 @@ for path in files:
         "duration_seconds": round(duration, 1),
         "resolution": f"{width}x{height}",
         "size_mb": round(path.stat().st_size / 1_000_000, 2),
+        "persian_subtitles": str(persian_subtitles.relative_to(tasks_root)),
     })
 
 Path("mpt_quality_report.json").write_text(
