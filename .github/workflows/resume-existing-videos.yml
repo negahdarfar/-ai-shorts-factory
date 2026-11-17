@@ -12,12 +12,6 @@ on:
         required: true
         type: boolean
         default: true
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/one-time-recovery-trigger.txt"
-
 permissions:
   actions: read
   contents: read
@@ -28,7 +22,6 @@ concurrency:
 
 jobs:
   resume:
-    if: ${{ github.event_name != 'push' || contains(github.event.head_commit.message, 'one-time recovery trigger') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -56,7 +49,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: moneyprinterturbo-quality-test
-          run-id: ${{ inputs.source_run_id || '44048295025' }}
+          run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: recovered-artifact
 
@@ -87,7 +80,7 @@ jobs:
         run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count 4 --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
 
       - name: Validate YouTube OAuth refresh token
-        if: ${{ github.event_name == 'push' || inputs.publish_public == true }}
+        if: ${{ inputs.publish_public == true }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -95,7 +88,7 @@ jobs:
         run: python scripts/check_youtube_auth.py
 
       - name: Publish the four recovered videos PUBLIC on YouTube
-        if: ${{ github.event_name == 'push' || inputs.publish_public == true }}
+        if: ${{ inputs.publish_public == true }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
