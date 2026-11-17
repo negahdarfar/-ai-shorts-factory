@@ -1,0 +1,44 @@
+name: YouTube Agent Toolkit Checks
+
+on:
+  push:
+    paths:
+      - ".claude/skills/**"
+      - ".claude/youtube/**"
+      - "YOUTUBE_AGENT_INTEGRATION.md"
+      - ".github/workflows/youtube-agent-toolkit-check.yml"
+  pull_request:
+    paths:
+      - ".claude/skills/**"
+      - ".claude/youtube/**"
+      - "YOUTUBE_AGENT_INTEGRATION.md"
+      - ".github/workflows/youtube-agent-toolkit-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile all vendored Python helpers
+        run: python -m compileall -q .claude/skills
+      - name: Verify all eleven skill manifests exist
+        run: |
+          set -euo pipefail
+          for skill in yt-audit yt-chapters yt-comment yt-edit yt-package yt-plan yt-retention yt-script yt-seo yt-shorts yt-viral; do
+            test -s ".claude/skills/$skill/SKILL.md"
+          done
+      - name: Verify helper scripts and voice profile
+        run: |
+          set -euo pipefail
+          for file in             .claude/skills/yt-chapters/chapters.py             .claude/skills/yt-edit/deadair.py             .claude/skills/yt-package/title.py             .claude/skills/yt-retention/retention.py             .claude/skills/yt-script/hookscore.py             .claude/skills/yt-viral/swipe.py; do
+            test -s "$file"
+          done
+          test -s .claude/youtube/voice.md
+          test -s .claude/skills/YOUTUBE-AGENT-LICENSE
