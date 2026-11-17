@@ -107,7 +107,7 @@ def normalize_item(item, topic):
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
 
 
-def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto"):
+def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto", api_provider="FreeLLMAPI"):
     topic_text = "\\n".join(f"{i}. {topic}" for i, topic in enumerate(topics, 1))
     research_by_topic = {}
     for row in (research or {}).get("topics", []):
@@ -162,7 +162,7 @@ Exactly one indexed item per input topic. Script should be 55-130 words, have a 
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        provider = "FreeLLMAPI"
+        provider = api_provider
     else:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -249,27 +249,42 @@ def main():
 
     generated = {}
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    freellmapi_base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
-    freellmapi_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
-    freellmapi_model = os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto"
+    gateways = [
+        (
+            "FreeLLMAPI",
+            os.getenv("FREELLMAPI_BASE_URL", "").strip(),
+            os.getenv("FREELLMAPI_API_KEY", "").strip(),
+            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
+        ),
+        (
+            "OmniRoute",
+            os.getenv("OMNIROUTE_BASE_URL", "").strip(),
+            os.getenv("OMNIROUTE_API_KEY", "").strip(),
+            os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto",
+        ),
+    ]
     try:
-        if freellmapi_base_url and freellmapi_key:
+        gateway_succeeded = False
+        for provider, base_url, api_key, api_model in gateways:
+            if not (base_url and api_key):
+                continue
             try:
                 generated = generate_batch(
                     topics, args.language, args.model, "", research=research,
-                    api_base_url=freellmapi_base_url, api_key=freellmapi_key,
-                    api_model=freellmapi_model,
+                    api_base_url=base_url, api_key=api_key,
+                    api_model=api_model, api_provider=provider,
                 )
-                print(f"SEO_GENERATION_PROVIDER=FreeLLMAPI | model={freellmapi_model}", flush=True)
-            except (RuntimeError, ValueError, OSError) as free_error:
-                if not gemini_key:
-                    raise
-                print(f"FREELLMAPI_SEO_FAILED_GEMINI_FALLBACK: {free_error}", file=sys.stderr)
+                print(f"SEO_GENERATION_PROVIDER={provider} | model={api_model}", flush=True)
+                gateway_succeeded = True
+                break
+            except (RuntimeError, ValueError, OSError) as gateway_error:
+                print(f"{provider.upper()}_SEO_FAILED_NEXT_PROVIDER: {gateway_error}", file=sys.stderr)
+        if not gateway_succeeded:
+            if gemini_key:
                 generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
-        elif gemini_key:
-            generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
-        else:
-            raise RuntimeError("Configure FreeLLMAPI credentials or GEMINI_API_KEY.")
+                print("SEO_GENERATION_PROVIDER=Gemini", flush=True)
+            else:
+                raise RuntimeError("All configured gateways failed and GEMINI_API_KEY is not configured.")
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
 
