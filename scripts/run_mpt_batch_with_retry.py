@@ -61,6 +61,25 @@ def attach_prebuilt_content(batch, seo_path):
     return enriched
 
 
+def validate_distinct_visual_terms(batch):
+    """Require separate, topic-specific stock-footage searches for every Short."""
+    import re
+    term_sets = []
+    for index, item in enumerate(batch, 1):
+        terms = item.get("video_terms", [])
+        normalized = {re.sub(r"[^a-z0-9 ]", "", str(term).lower()).strip() for term in terms}
+        normalized.discard("")
+        if len(normalized) < 5:
+            raise SystemExit(f"Video {index} has fewer than five distinct visual search terms.")
+        if any(len(term.split()) < 2 for term in normalized):
+            raise SystemExit(f"Video {index} contains a vague one-word visual search term.")
+        term_sets.append(normalized)
+    for i in range(len(term_sets)):
+        for j in range(i + 1, len(term_sets)):
+            overlap = len(term_sets[i] & term_sets[j]) / max(1, len(term_sets[i] | term_sets[j]))
+            if overlap > 0.20:
+                raise SystemExit(f"Videos {i+1} and {j+1} have overly similar stock-footage searches (Jaccard={overlap:.2f}); refusing repetitive visuals.")
+
 def run_one(item, index, total, video_source, attempts, delay, temp_dir):
     topic = item.get("video_subject", f"item-{index}")
     result = {"index": index, "topic": topic, "status": "failed", "attempts": 0, "last_error": ""}
@@ -74,8 +93,8 @@ def run_one(item, index, total, video_source, attempts, delay, temp_dir):
         "--video-language", "en-US",
         "--voice-name", "en-US-GuyNeural",
         "--subtitle-enabled",
-        "--subtitle-display-mode", "word_by_word",
-        "--subtitle-animation", "pop_spring",
+        "--subtitle-display-mode", "sentence",
+        "--subtitle-animation", "fade",
         "--subtitle-position", "bottom",
         "--video-fit-mode", "cover",
         "--bgm-volume", "0.12",
@@ -141,6 +160,7 @@ def main():
     if not isinstance(batch, list) or not batch:
         raise SystemExit("Batch manifest must be a non-empty JSON array.")
     batch = attach_prebuilt_content(batch, batch_path.parent / "seo_metadata.json")
+    validate_distinct_visual_terms(batch)
 
     attempts = max(1, min(5, args.max_attempts))
     delay = max(1, args.retry_delay_seconds)
