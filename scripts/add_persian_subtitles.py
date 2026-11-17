@@ -2,6 +2,8 @@
 """Translate generated English SRT captions to Persian and burn them in above the English captions."""
 import argparse
 import json
+import http.client
+import socket
 import os
 import re
 import subprocess
@@ -39,7 +41,7 @@ def translate(rows, model, key):
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"responseMimeType": "application/json"}}
     request_data = json.dumps(payload).encode("utf-8")
     request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
-    max_attempts = max(1, int(os.getenv("GEMINI_SUBTITLE_MAX_ATTEMPTS", "6")))
+    max_attempts = max(1, int(os.getenv("GEMINI_SUBTITLE_MAX_ATTEMPTS", "8")))
     base_delay = max(1.0, float(os.getenv("GEMINI_SUBTITLE_RETRY_BASE_SECONDS", "15")))
 
     response_data = None
@@ -51,7 +53,7 @@ def translate(rows, model, key):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=120) as response:
+            with urllib.request.urlopen(req, timeout=300) as response:
                 response_data = json.loads(response.read().decode("utf-8"))
             break
         except urllib.error.HTTPError as exc:
@@ -69,12 +71,12 @@ def translate(rows, model, key):
                 flush=True,
             )
             time.sleep(delay)
-        except urllib.error.URLError as exc:
+        except (urllib.error.URLError, TimeoutError, socket.timeout, http.client.HTTPException, ConnectionError) as exc:
             if attempt >= max_attempts:
                 raise RuntimeError(f"Gemini connection failed after {attempt} attempt(s): {exc}") from exc
             delay = min(180.0, base_delay * (2 ** (attempt - 1)))
             print(
-                f"GEMINI_TEMPORARY_CONNECTION_ERROR; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
+                f"GEMINI_TEMPORARY_CONNECTION_OR_READ_ERROR; retry {attempt + 1}/{max_attempts} in {delay:.0f}s",
                 flush=True,
             )
             time.sleep(delay)
