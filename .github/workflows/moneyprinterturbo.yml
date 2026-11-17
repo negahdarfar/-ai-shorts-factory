@@ -8,6 +8,11 @@ name: MoneyPrinterTurbo Shorts Factory
     - cron: "0 14 * * *" # Daily UTC production; release times are staggered after rendering.
   workflow_dispatch:
     inputs:
+      use_phone_gateway:
+        description: 'Connect to the Android FreeLLMAPI gateway through Tailscale (requires the phone to be online)'
+        required: false
+        type: boolean
+        default: false
       use_previous_four_topics:
         description: 'Reuse the four preserved topics from the previous run (recommended)'
         required: false
@@ -72,7 +77,7 @@ jobs:
           restore-keys: |
             mpt-topics-${{ runner.os }}-
       - name: Connect to private FreeLLMAPI phone gateway
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
@@ -80,7 +85,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         id: freeapi
         env:
-          BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          BASE_URL: ${{ (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && secrets.FREELLMAPI_BASE_URL || '' }}
           API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
         run: |
           set -euo pipefail
@@ -218,14 +223,22 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/check_youtube_auth.py
       - name: Publish all four videos PUBLIC on YouTube
-        if: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish_four_public == true)) && steps.configure.outputs.ready == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_four_public == true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
           CONFIRM_PUBLIC_PUBLISHING: YES
-          YOUTUBE_SCHEDULED_PUBLISH: ${{ github.event_name == 'schedule' && 'YES' || 'NO' }}
+          YOUTUBE_SCHEDULED_PUBLISH: NO
+        run: python scripts/upload_four_private_youtube_tests.py
+      - name: Upload scheduled batch as PRIVATE QA videos (never auto-publish publicly)
+        if: ${{ github.event_name == 'schedule' && steps.configure.outputs.ready == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: private
         run: python scripts/upload_four_private_youtube_tests.py
       - name: Upload all four PRIVATE YouTube QA videos
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && inputs.publish_four_public != true && steps.configure.outputs.ready == 'true' }}
