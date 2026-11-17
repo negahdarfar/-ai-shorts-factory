@@ -41,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
+      FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+      TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
       MPT_HOME: ${{ github.workspace }}/mpt-runtime
       MPT_SOURCE_DIR: ${{ github.workspace }}/vendor/MoneyPrinterTurbo
     steps:
@@ -69,11 +71,19 @@ jobs:
           key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mpt-topics-${{ runner.os }}-
+      - name: Connect to private FreeLLMAPI phone gateway
+        if: ${{ env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ env.TAILSCALE_AUTHKEY }}
       - name: Configure free-tier providers
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/configure_moneyprinter.py
@@ -116,6 +126,9 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/generate_seo_metadata.py --input trending_batch.json --output seo_metadata.json --language English --research youtube_competitor_research.json --require-viral-research
       - name: Validate generated SEO metadata
@@ -136,6 +149,12 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           MPT_HOME: ${{ env.MPT_HOME }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/add_persian_subtitles.py
