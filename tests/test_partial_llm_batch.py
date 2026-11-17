@@ -35,18 +35,20 @@ class PartialBatchTests(unittest.TestCase):
                 {"message": {"content": json.dumps({"items": []})}}
             ]
         }
-        with patch.object(MODULE.urllib.request, "urlopen", return_value=FakeResponse(response)):
-            with self.assertRaisesRegex(RuntimeError, "incomplete content batch"):
-                MODULE.generate_batch(
-                    ["Solar storms", "Ocean currents"],
-                    "English",
-                    "unused-model",
-                    "",
-                    api_base_url="https://example.invalid/v1",
-                    api_key="test-key",
-                    api_model="free-model",
-                    api_provider="Cloudflare",
-                )
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=FakeResponse(response)) as mocked_request:
+            with patch.object(MODULE.time, "sleep"):
+                with self.assertRaisesRegex(RuntimeError, "incomplete content batch"):
+                    MODULE.generate_batch(
+                        ["Solar storms", "Ocean currents"],
+                        "English",
+                        "unused-model",
+                        "",
+                        api_base_url="https://example.invalid/v1",
+                        api_key="test-key",
+                        api_model="free-model",
+                        api_provider="Cloudflare",
+                    )
+            self.assertEqual(mocked_request.call_count, 3)
 
 
 if __name__ == "__main__":
