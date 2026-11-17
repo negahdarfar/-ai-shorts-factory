@@ -25,7 +25,13 @@ if freellmapi_base_url and freellmapi_key:
         free_models = []
         print(f"FreeLLMAPI model discovery failed: {exc}")
     if free_models:
-        freellmapi_model = free_models[0]
+        # MoneyPrinterTurbo does not expose per-request model failover. Prefer
+        # the gateway's free-only router when available; otherwise use the
+        # strongest discovered free text model.
+        freellmapi_model = next(
+            (model for model in free_models if model == "kilo-auto/free"),
+            free_models[0],
+        )
         print(f"MoneyPrinterTurbo auto-selected explicitly free model: {freellmapi_model}")
     else:
         print("No explicitly free FreeLLMAPI models discovered; refusing unknown-price models.")
