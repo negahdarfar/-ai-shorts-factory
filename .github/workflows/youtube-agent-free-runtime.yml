@@ -1,0 +1,77 @@
+name: YouTube Agent free-model runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: Skill to execute using a verified-free model
+        required: true
+        type: choice
+        options:
+          - yt-plan
+          - yt-viral
+          - yt-script
+          - yt-package
+          - yt-seo
+          - yt-edit
+          - yt-chapters
+          - yt-shorts
+          - yt-comment
+          - yt-retention
+          - yt-audit
+        default: yt-script
+      input_file:
+        description: Repository JSON file containing the task context
+        required: true
+        default: data/previous_four_topics.json
+      task:
+        description: Model ranking profile
+        required: true
+        type: choice
+        options:
+          - general
+          - seo
+          - translation
+          - vision
+        default: general
+
+permissions:
+  contents: read
+
+jobs:
+  run-editorial-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate input and runtime
+        env:
+          INPUT_FILE: ${{ inputs.input_file }}
+        run: |
+          test -f "$INPUT_FILE" || { echo "::error::Input JSON file not found: $INPUT_FILE"; exit 1; }
+          python -m py_compile scripts/free_model_router.py scripts/youtube_agent_runtime.py
+          python tests/test_youtube_agent_runtime.py -v
+      - name: Execute selected skill with verified-free model
+        env:
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_CLOUD_BASE_URL: ${{ secrets.FREELLMAPI_CLOUD_BASE_URL }}
+          FREELLMAPI_CLOUD_API_KEY: ${{ secrets.FREELLMAPI_CLOUD_API_KEY }}
+          SKILL: ${{ inputs.skill }}
+          INPUT_FILE: ${{ inputs.input_file }}
+          TASK: ${{ inputs.task }}
+        run: |
+          python scripts/youtube_agent_runtime.py --skill "$SKILL" --input "$INPUT_FILE" --task "$TASK" --output-dir youtube-agent-output
+      - name: Upload editorial artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-agent-editorial-output
+          path: youtube-agent-output/
+          if-no-files-found: ignore
+          retention-days: 7
