@@ -8,6 +8,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from topic_history import load_seen_topics, load_published_topics
+
 RSS = "https://trends.google.com/trending/rss?geo={geo}"
 FALLBACK = [
     "The science behind why the Moon appears larger near the horizon",
@@ -64,24 +66,10 @@ def main():
     count = max(1, min(4, args.count))
     state_dir = Path(args.state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    seen_file = state_dir / "seen_topics.json"
     try:
-        seen = set(json.loads(seen_file.read_text(encoding="utf-8")))
-    except FileNotFoundError:
-        seen = set()
-    except (OSError, ValueError) as exc:
-        raise SystemExit(f"Could not read topic history safely: {exc}")
-
-    published_file = state_dir / "published_topics.json"
-    try:
-        published = set(json.loads(published_file.read_text(encoding="utf-8")))
-    except FileNotFoundError:
-        published = set()
-    except (OSError, ValueError) as exc:
-        raise SystemExit(f"Could not read publication history safely: {exc}")
-    if any(not isinstance(topic, str) for topic in seen | published):
-        raise SystemExit("Topic/publication history contains invalid entries.")
-    seen |= {topic.casefold() for topic in published}
+        seen = load_seen_topics(state_dir) | load_published_topics(state_dir)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc))
 
     try:
         topics = load_trends(args.geo)
