@@ -14,11 +14,14 @@ gemini = os.environ.get("GEMINI_API_KEY", "").strip()
 freellmapi_base_url = os.environ.get("FREELLMAPI_BASE_URL", "").strip()
 freellmapi_key = os.environ.get("FREELLMAPI_API_KEY", "").strip()
 freellmapi_model = os.environ.get("FREELLMAPI_MODEL", "auto").strip() or "auto"
+omniroute_base_url = os.environ.get("OMNIROUTE_BASE_URL", "").strip()
+omniroute_key = os.environ.get("OMNIROUTE_API_KEY", "").strip()
+omniroute_model = os.environ.get("OMNIROUTE_MODEL", "auto").strip() or "auto"
 pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
-if not gemini and not (freellmapi_base_url and freellmapi_key):
-    missing.append("FREELLMAPI_BASE_URL + FREELLMAPI_API_KEY or GEMINI_API_KEY")
+if not gemini and not (freellmapi_base_url and freellmapi_key) and not (omniroute_base_url and omniroute_key):
+    missing.append("FreeLLMAPI or OmniRoute credentials, or GEMINI_API_KEY")
 if not pexels and not pixabay:
     missing.append("PEXELS_API_KEY or PIXABAY_API_KEY")
 if missing:
@@ -36,6 +39,11 @@ if freellmapi_base_url and freellmapi_key:
     app["openai_api_key"] = freellmapi_key
     app["openai_base_url"] = freellmapi_base_url.rstrip("/")
     app["openai_model_name"] = freellmapi_model
+elif omniroute_base_url and omniroute_key:
+    app["llm_provider"] = "openai"
+    app["openai_api_key"] = omniroute_key
+    app["openai_base_url"] = omniroute_base_url.rstrip("/")
+    app["openai_model_name"] = omniroute_model
 else:
     app["llm_provider"] = "gemini"
     app["gemini_api_key"] = gemini
@@ -68,7 +76,7 @@ target = home / "config.toml"
 target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
-print(f"LLM: {app['llm_provider']} ({freellmapi_model if freellmapi_base_url and freellmapi_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
+print(f"LLM: {app['llm_provider']} ({freellmapi_model if freellmapi_base_url and freellmapi_key else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
     output.write("video_source=" + app["video_source"] + "\n")
