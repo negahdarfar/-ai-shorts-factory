@@ -116,4 +116,24 @@ class SeoPipelineTests(unittest.TestCase):
         normalized = module.normalize_item(row, "Ancient desert cities")
         self.assertIn("ancient desert cities", normalized["metadata"]["description"].casefold())
 
-if __name__=="__main__": unittest.main()
+
+
+
+    def test_visual_search_terms_must_be_distinct_between_videos(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("mpt_runner_visuals", ROOT / "scripts/run_mpt_batch_with_retry.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        batch = [
+            {"video_subject": "Topic A", "video_terms": ["desert summer climate", "Las Vegas skyline", "monsoon rain storm", "Mojave desert landscape", "weather forecast map"]},
+            {"video_subject": "Topic B", "video_terms": ["ballet rehearsal studio", "Australian actress portrait", "film camera closeup", "red carpet event", "theatre stage lighting"]},
+            {"video_subject": "Topic C", "video_terms": ["ceramic ocarina instrument", "retro game controller", "three dimensional game design", "pixel art landscape", "video game history"]},
+            {"video_subject": "Topic D", "video_terms": ["professional tennis court", "tennis serve practice", "Danish flag stadium", "tennis racket closeup", "hard court tournament"]},
+        ]
+        module.validate_distinct_visual_terms(batch)
+        batch[1]["video_terms"] = list(batch[0]["video_terms"])
+        with self.assertRaises(SystemExit):
+            module.validate_distinct_visual_terms(batch)
+
+if __name__ == "__main__":
+    unittest.main()

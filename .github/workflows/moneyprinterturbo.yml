@@ -54,7 +54,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-noto-core
       - name: Get MoneyPrinterTurbo v1.3.10
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         run: git clone --depth 1 --branch v1.3.10 https://github.com/harry0703/MoneyPrinterTurbo.git vendor/MoneyPrinterTurbo
@@ -132,6 +132,13 @@ jobs:
         working-directory: vendor/MoneyPrinterTurbo
         run: |
           python "$GITHUB_WORKSPACE/scripts/run_mpt_batch_with_retry.py" --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source ${{ steps.configure.outputs.video_source }} --max-attempts 3 --retry-delay-seconds 20
+      - name: Translate and burn Persian subtitles
+        if: ${{ steps.configure.outputs.ready == 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MPT_HOME: ${{ env.MPT_HOME }}
+          SEO_GEMINI_MODEL: gemini-3.8-flash
+        run: python scripts/add_persian_subtitles.py --language Persian
       - name: Validate generated vertical videos
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
