@@ -6,15 +6,19 @@ This repository vendors the MIT-licensed [Jakeschincariol/youtube-agent-skill](h
 
 Eleven skills are included: `yt-script`, `yt-package`, `yt-edit`, `yt-comment`, `yt-plan`, `yt-viral`, `yt-retention`, `yt-shorts`, `yt-seo`, `yt-chapters`, and `yt-audit`. Their six dependency-free Python helpers and the upstream MIT license are included too.
 
-## Factory integration and orchestration
+## Agent runtime
 
-The central `youtube-autonomous-manager` skill coordinates the toolkit with the existing MoneyPrinterTurbo, free-only model routing, competitor research, SEO validation, Persian subtitles, documentary assembly, YouTube publishing, and analytics components.
+The manual **YouTube Agent free-model runtime** workflow now runs one selected skill using an OpenAI-compatible FreeLLMAPI endpoint:
+- It reads the selected vendored `SKILL.md`, the project voice profile, and a repository JSON context file.
+- It uses `scripts/free_model_router.py` to discover models and permits only IDs explicitly marked free (`:free`, `/free`, `-free`, or `_free`). Unknown-price models are rejected.
+- It tries a bounded number of free models and writes a Markdown editorial artifact plus JSON execution metadata.
+- It never invokes shell tools, renders media, uploads videos, publishes, or posts comments.
 
-Run the manual GitHub Actions workflow **YouTube Agent orchestration hand-off** to validate the skill/tool map and produce an `youtube-agent-handoff` artifact containing:
-- `execution-plan.json`: machine-readable mapping of all 11 skills to phases and existing factory tools.
-- `agent-handoff.md`: constraints and instructions for a compatible agent session.
+Required GitHub Actions secrets: either `FREELLMAPI_CLOUD_BASE_URL` + `FREELLMAPI_CLOUD_API_KEY`, or `FREELLMAPI_BASE_URL` + `FREELLMAPI_API_KEY`. The endpoint must expose OpenAI-compatible `GET /models` and `POST /chat/completions`. Do not paste secrets into chat or commit them. If no explicitly free model is advertised, the runtime fails closed.
 
-The dispatcher is deliberately plan-only. It does not call an LLM, execute SKILL.md instructions, render videos, upload, or publish. GitHub Actions does not interpret SKILL.md files by itself. Actual skill execution requires a compatible agent runtime/session that loads the manager and relevant skill files. No paid agent provider is enabled by this workflow.
+To run it: Actions → **YouTube Agent free-model runtime** → Run workflow → select one skill, an existing JSON context file (default `data/previous_four_topics.json`), and a model-ranking task. Download the `youtube-agent-editorial-output` artifact after a successful run.
+
+The separate **YouTube Agent orchestration hand-off** workflow remains a no-inference validation and plan artifact. GitHub Actions does not interpret SKILL.md by itself; the new runtime is the explicit model invocation layer for editorial drafts.
 
 ## Pipeline mapping
 
@@ -36,5 +40,5 @@ The dispatcher is deliberately plan-only. It does not call an LLM, execute SKILL
 - Use real competitor and channel analytics only. State when data is unavailable.
 - Validate scripts, metadata, rendered media, subtitles, and visual uniqueness before release.
 - Public publishing remains governed by the existing scheduled-release path and its approval/QA gates.
-- Never report a skill as executed unless an agent session/log proves it ran; never report publication without confirmed YouTube API upload IDs.
+- Never report a skill as executed unless the runtime log proves it ran; never report publication without confirmed YouTube API upload IDs.
 - Never expose API keys, OAuth tokens, or Tailscale credentials.
