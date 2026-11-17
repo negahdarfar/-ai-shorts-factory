@@ -115,6 +115,7 @@ jobs:
           OMNIROUTE_MAX_ATTEMPTS: "3"
           OMNIROUTE_TIMEOUT_SECONDS: "180"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/add_persian_subtitles.py
 
