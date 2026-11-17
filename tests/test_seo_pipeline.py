@@ -72,7 +72,7 @@ class SeoPipelineTests(unittest.TestCase):
                 capture_output=True, text=True
             )
             self.assertNotEqual(validation.returncode, 0, "Fallback content must never pass public-publishing validation.")
-            self.assertIn("AI content was not generated", validation.stderr)
+            self.assertIn("content must come from one approved AI batch provider", validation.stderr)
 
 
     def test_batch_runner_injects_prebuilt_script_and_terms(self):
