@@ -142,6 +142,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           topics = json.loads(Path("data/previous_four_topics.json").read_text(encoding="utf-8"))
           if not isinstance(topics, list) or len(topics) != 4:
