@@ -6,13 +6,23 @@ name: MoneyPrinterTurbo Shorts Factory
       - main
   workflow_dispatch:
     inputs:
-      upload_private_test:
-        description: 'Upload exactly one validated Short as PRIVATE for connection testing'
+      use_previous_four_topics:
+        description: 'Reuse the four preserved topics from the previous run (recommended)'
+        required: false
+        type: boolean
+        default: true
+      publish_four_public:
+        description: 'Publish all four validated videos PUBLIC on YouTube'
         required: false
         type: boolean
         default: false
       upload_four_private_tests:
-        description: 'Upload all four validated Shorts as PRIVATE QA tests (no public publishing)'
+        description: 'Upload all four validated Shorts as PRIVATE QA tests'
+        required: false
+        type: boolean
+        default: false
+      upload_private_test:
+        description: 'Upload exactly one validated Short as PRIVATE for connection testing'
         required: false
         type: boolean
         default: false
@@ -71,8 +81,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install .
+      - name: Load the preserved four topics
+        if: ${{ steps.configure.outputs.ready == 'true' && inputs.use_previous_four_topics == true }}
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          topics = json.loads(Path("data/previous_four_topics.json").read_text(encoding="utf-8"))
+          if not isinstance(topics, list) or len(topics) != 4:
+              raise SystemExit("The preserved topic file must contain exactly four topics.")
+          if len({row.get("video_subject") for row in topics}) != 4:
+              raise SystemExit("Preserved topic names must be unique.")
+          if any(row.get("video_aspect") != "9:16" or row.get("video_count") != 1 for row in topics):
+              raise SystemExit("Preserved batch must contain four single 9:16 videos.")
+          Path("trending_batch.json").write_text(json.dumps(topics, ensure_ascii=False, indent=2), encoding="utf-8")
+          print("PRESERVED_FOUR_TOPICS_LOADED")
+          PY
       - name: Discover fresh trending topics
-        if: ${{ steps.configure.outputs.ready == 'true' }}
+        if: ${{ steps.configure.outputs.ready == 'true' && inputs.use_previous_four_topics != true }}
         run: python scripts/build_trending_batch.py --count 4 --geo US --state-dir "$MPT_HOME/state"
       - name: Research recent competing YouTube Shorts
         if: ${{ steps.configure.outputs.ready == 'true' }}
@@ -119,15 +145,25 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/check_youtube_auth.py
-      - name: Upload all four PRIVATE YouTube QA videos
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && steps.configure.outputs.ready == 'true' }}
+      - name: Publish all four videos PUBLIC on YouTube
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_four_public == true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: public
+          CONFIRM_PUBLIC_PUBLISHING: YES
+        run: python scripts/upload_four_private_youtube_tests.py
+      - name: Upload all four PRIVATE YouTube QA videos
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && inputs.publish_four_public != true && steps.configure.outputs.ready == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: private
         run: python scripts/upload_four_private_youtube_tests.py
       - name: Upload one PRIVATE YouTube connection test
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_private_test == true && inputs.upload_four_private_tests != true && steps.configure.outputs.ready == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_private_test == true && inputs.upload_four_private_tests != true && inputs.publish_four_public != true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -140,7 +176,7 @@ jobs:
           if [ -d "$MPT_HOME/storage/tasks" ]; then cp -R "$MPT_HOME/storage/tasks" artifacts/; fi
           if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
           cp trending_batch.json selected_trends.json batch_retry_report.json seo_metadata.json youtube_competitor_research.json 2>/dev/null artifacts/ || true
-          cp mpt_quality_report.json youtube_private_upload_results.json artifacts/ 2>/dev/null || true
+          cp mpt_quality_report.json youtube_private_upload_results.json youtube_public_upload_results.json artifacts/ 2>/dev/null || true
           if [ -d seo_thumbnails ]; then cp -R seo_thumbnails artifacts/; fi
       - name: Save videos, selected topics and logs
         if: ${{ always() }}
