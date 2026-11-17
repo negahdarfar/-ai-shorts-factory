@@ -25,8 +25,11 @@ def main():
         if not topic: errors.append(f"Item {index}: missing topic.")
         if topic.casefold() in seen_topics: errors.append(f"Item {index}: duplicate topic.")
         seen_topics.add(topic.casefold())
-        if record.get("metadata_source") != "gemini_batch" or record.get("content_source") != "gemini_batch":
-            errors.append(f"Item {index}: AI content was not generated (likely Gemini quota); block publishing and retry after quota reset.")
+        approved_sources = {"gemini_batch", "freellmapi_batch"}
+        metadata_source = record.get("metadata_source")
+        content_source = record.get("content_source")
+        if metadata_source not in approved_sources or content_source not in approved_sources or metadata_source != content_source:
+            errors.append(f"Item {index}: content must come from one approved AI batch provider (Gemini or a model explicitly verified as free by FreeLLMAPI); local templates and mixed providers are blocked.")
         title = str(meta.get("title", "")).strip()
         description = str(meta.get("description", "")).strip()
         primary = str(meta.get("primary_keyword", "")).strip()
