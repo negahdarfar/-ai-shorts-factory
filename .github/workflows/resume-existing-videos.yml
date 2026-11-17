@@ -67,6 +67,11 @@ jobs:
 
       - name: Translate and burn Persian subtitles into recovered videos
         env:
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
+          OMNIROUTE_MAX_ATTEMPTS: "3"
+          OMNIROUTE_TIMEOUT_SECONDS: "180"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/add_persian_subtitles.py

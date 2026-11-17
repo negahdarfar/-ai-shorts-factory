@@ -1,0 +1,54 @@
+name: OmniRoute Gateway Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check required GitHub secrets
+        env:
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+        run: |
+          test -n "$OMNIROUTE_BASE_URL" || { echo "::error::Missing OMNIROUTE_BASE_URL repository secret"; exit 1; }
+          test -n "$OMNIROUTE_API_KEY" || { echo "::error::Missing OMNIROUTE_API_KEY repository secret"; exit 1; }
+          case "$OMNIROUTE_BASE_URL" in
+            https://*/v1|https://*/v1/) ;;
+            *) echo "::error::OMNIROUTE_BASE_URL must be an HTTPS URL ending in /v1"; exit 1 ;;
+          esac
+
+      - name: Check gateway health and model catalogue
+        env:
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+        run: |
+          set -euo pipefail
+          BASE="${OMNIROUTE_BASE_URL%/}"
+          ROOT="${BASE%/v1}"
+          curl --fail --silent --show-error --max-time 20 "$ROOT/api/monitoring/health" >/tmp/omniroute-health.json
+          curl --fail --silent --show-error --max-time 30 \
+            "$BASE/models" \
+            -H "Authorization: Bearer $OMNIROUTE_API_KEY" \
+            >/tmp/omniroute-models.json
+          python - <<'PY'
+          import json
+          with open("/tmp/omniroute-health.json", encoding="utf-8") as f:
+              health = json.load(f)
+          with open("/tmp/omniroute-models.json", encoding="utf-8") as f:
+              models = json.load(f)
+          items = models.get("data", [])
+          if not isinstance(items, list) or not items:
+              raise SystemExit("OmniRoute returned an empty or invalid model catalogue.")
+          print(f"OmniRoute health response received; model catalogue contains {len(items)} model(s).")
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("## OmniRoute gateway check\n\n")
+              f.write("- HTTPS health endpoint: reachable\n")
+              f.write(f"- Authenticated model catalogue: {len(items)} model(s)\n")
+              f.write("- No inference request was sent.\n")
+          PY
