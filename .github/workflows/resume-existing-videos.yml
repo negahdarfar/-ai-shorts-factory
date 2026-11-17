@@ -1,0 +1,113 @@
+name: Resume Existing Shorts and Publish
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Completed run containing the four already-rendered videos"
+        required: true
+        type: string
+        default: "44048295025"
+      publish_public:
+        description: "Publish the four recovered videos publicly after all checks pass"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: resume-existing-shorts
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MPT_HOME: ${{ github.workspace }}/mpt-runtime
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg and Persian fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core
+
+      - name: Install validation and YouTube dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install Pillow google-api-python-client google-auth-httplib2
+
+      - name: Download the original run artifact (no video regeneration)
+        uses: actions/download-artifact@v4
+        with:
+          name: moneyprinterturbo-quality-test
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: recovered-artifact
+
+      - name: Restore the four existing rendered videos and SEO manifest
+        run: |
+          test -f recovered-artifact/seo_metadata.json
+          test -d recovered-artifact/tasks
+          mkdir -p "$MPT_HOME/storage"
+          cp -a recovered-artifact/tasks "$MPT_HOME/storage/tasks"
+          cp recovered-artifact/seo_metadata.json seo_metadata.json
+          count=$(find "$MPT_HOME/storage/tasks" -type f -name 'final-*.mp4' | wc -l)
+          test "$count" -eq 4 || { echo "::error::Expected exactly four recovered MP4s, found $count"; exit 1; }
+          echo "RECOVERED_EXISTING_VIDEOS=$count"
+          find "$MPT_HOME/storage/tasks" -type f -name 'final-*.mp4' -printf '%p %s bytes\n'
+
+      - name: Translate and burn Persian subtitles into recovered videos
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SEO_GEMINI_MODEL: gemini-3.8-flash
+        run: python scripts/add_persian_subtitles.py
+
+      - name: Validate all four recovered vertical videos
+        env:
+          EXPECTED_COUNT: "4"
+        run: python scripts/validate_mpt_outputs.py
+
+      - name: Compare sampled frames for visual uniqueness
+        run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count 4 --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
+
+      - name: Validate YouTube OAuth refresh token
+        if: ${{ inputs.publish_public == true }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python scripts/check_youtube_auth.py
+
+      - name: Publish the four recovered videos PUBLIC on YouTube
+        if: ${{ inputs.publish_public == true }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: public
+          CONFIRM_PUBLIC_PUBLISHING: YES
+          MPT_HOME: ${{ env.MPT_HOME }}
+        run: python scripts/upload_four_private_youtube_tests.py
+
+      - name: Save recovery reports and publication results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resumed-existing-videos-results
+          path: |
+            mpt_quality_report.json
+            visual_uniqueness_report.json
+            youtube_public_upload_results.json
+            recovered-artifact/seo_metadata.json
+          if-no-files-found: warn
+          retention-days: 14

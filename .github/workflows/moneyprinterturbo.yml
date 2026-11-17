@@ -138,7 +138,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MPT_HOME: ${{ env.MPT_HOME }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
-        run: python scripts/add_persian_subtitles.py --language Persian
+        run: python scripts/add_persian_subtitles.py
       - name: Validate generated vertical videos
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
