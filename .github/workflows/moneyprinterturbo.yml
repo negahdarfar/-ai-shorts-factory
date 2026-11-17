@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+      FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
       TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
       MPT_HOME: ${{ github.workspace }}/mpt-runtime
       MPT_SOURCE_DIR: ${{ github.workspace }}/vendor/MoneyPrinterTurbo
@@ -76,14 +76,41 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
+      - name: Check FreeLLMAPI gateway without inference
+        id: freeapi
+        env:
+          BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+        run: |
+          set -euo pipefail
+          READY=false
+          if [ -n "$BASE_URL" ] && [ -n "$API_KEY" ]; then
+            if curl --fail --silent --show-error --max-time 20 "${BASE_URL%/}/models" \
+              -H "Authorization: Bearer $API_KEY" -o /tmp/freellmapi-models.json; then
+              python - <<'PY'
+          import json
+          with open("/tmp/freellmapi-models.json", encoding="utf-8") as f:
+              data = json.load(f)
+          if not isinstance(data.get("data"), list) or not data["data"]:
+              raise SystemExit("FreeLLMAPI model list is empty or invalid.")
+          print(f"FreeLLMAPI reachable; {len(data['data'])} model entries listed. No inference request sent.")
+          PY
+              READY=true
+            else
+              echo "::warning::FreeLLMAPI is unreachable; the workflow will use the configured fallback."
+            fi
+          else
+            echo "FreeLLMAPI URL/key not configured; skipping gateway."
+          fi
+          echo "ready=$READY" >> "$GITHUB_OUTPUT"
       - name: Configure free-tier providers
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
-          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
-          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
+          FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/configure_moneyprinter.py
@@ -126,9 +153,9 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
-          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
-          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
+          FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/generate_seo_metadata.py --input trending_batch.json --output seo_metadata.json --language English --research youtube_competitor_research.json --require-viral-research
       - name: Validate generated SEO metadata
@@ -152,9 +179,9 @@ jobs:
           OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
-          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
-          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
-          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
+          FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
           MPT_HOME: ${{ env.MPT_HOME }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/add_persian_subtitles.py
