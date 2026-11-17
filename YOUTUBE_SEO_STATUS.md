@@ -33,8 +33,8 @@ Existing Shorts generation:
 - `GEMINI_API_KEY`
 - At least one of `PEXELS_API_KEY` or `PIXABAY_API_KEY`
 
-Optional public competitor research:
-- `YOUTUBE_API_KEY` with YouTube Data API v3 enabled.
+Required for the current production workflow:
+- `YOUTUBE_API_KEY` with YouTube Data API v3 enabled for recent Shorts competitor research.
 
 Existing private upload:
 - `YOUTUBE_CLIENT_ID`
@@ -75,8 +75,8 @@ YouTube Data API supports updating video metadata and setting thumbnails, but au
 
 1. Run lightweight CI and correct any failing checks.
 2. Confirm a successful cron-triggered run (event `schedule`) and inspect all four scheduled videos and their `publishAt` times. Manual PUBLIC runs are opt-in and default to disabled. Keep a private QA run available for rendering or subtitle changes.
-3. Add the optional YouTube API key if competitor research is desired.
+3. Keep `YOUTUBE_API_KEY` configured; the production workflow intentionally fails closed rather than generating without competitor research.
 4. Re-authorize OAuth for Analytics only when ready to connect private channel analytics.
 5. Test the metadata updater against a private QA video and a manifest with an explicit video ID.
 6. Test the documentary assembler with a short sample set and synchronized Persian SRT before using long productions.
-7. Only after review and explicit approval, design a separate public-publishing/scheduling gate.
+7. Review the first successful daily scheduled release and confirm the four YouTube `publishAt` timestamps; keep public manual publishing opt-in.
