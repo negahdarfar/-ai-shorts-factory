@@ -1,0 +1,30 @@
+[
+  {
+    "video_subject": "las vegas weather",
+    "video_language": "en-US",
+    "video_aspect": "9:16",
+    "video_count": 1,
+    "video_script_prompt": "Create an original, factual English YouTube Short (35-55 seconds) about Las Vegas weather extremes. Explain Mojave Desert summer heat, rapid nighttime cooling, scarce rainfall, and late-summer monsoon flash-flood risk. Use short concrete sentences and relevant licensed stock footage only."
+  },
+  {
+    "video_subject": "elizabeth debicki",
+    "video_language": "en-US",
+    "video_aspect": "9:16",
+    "video_count": 1,
+    "video_script_prompt": "Create an original, factual English YouTube Short (35-55 seconds) about Australian actress Elizabeth Debicki's career and acting craft. Use short concrete sentences. For visuals, use licensed stock footage of classical ballet training, acting rehearsal, film cameras, and red-carpet atmosphere; do not use unlicensed film/TV clips, posters, or celebrity photographs."
+  },
+  {
+    "video_subject": "nintendo zelda ocarina",
+    "video_language": "en-US",
+    "video_aspect": "9:16",
+    "video_count": 1,
+    "video_script_prompt": "Create an original, factual English YouTube Short (35-55 seconds) explaining the design legacy of The Legend of Zelda: Ocarina of Time, especially Z-targeting, 3D adventure design, and music as a gameplay mechanic. Use original diagrams, generic licensed footage of a retro game controller, a ceramic ocarina, and abstract 3D game-design visuals. Do not use Nintendo gameplay, game audio, logos, character art, screenshots, or other copyrighted game footage."
+  },
+  {
+    "video_subject": "august holmgren",
+    "video_language": "en-US",
+    "video_aspect": "9:16",
+    "video_count": 1,
+    "video_script_prompt": "Create an original, factual English YouTube Short (35-55 seconds) about Danish tennis player August Holmgren, his University of San Diego collegiate career, NCAA singles final, and professional tennis path. Use licensed tennis stock footage and avoid presenting unrelated players as Holmgren."
+  }
+]
