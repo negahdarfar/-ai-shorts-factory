@@ -116,7 +116,8 @@ class SeoPipelineTests(unittest.TestCase):
         normalized = module.normalize_item(row, "Ancient desert cities")
         self.assertIn("ancient desert cities", normalized["metadata"]["description"].casefold())
 
-if __name__=="__main__": unittest.main()
+
+
 
     def test_visual_search_terms_must_be_distinct_between_videos(self):
         import importlib.util
@@ -133,3 +134,6 @@ if __name__=="__main__": unittest.main()
         batch[1]["video_terms"] = list(batch[0]["video_terms"])
         with self.assertRaises(SystemExit):
             module.validate_distinct_visual_terms(batch)
+
+if __name__ == "__main__":
+    unittest.main()
