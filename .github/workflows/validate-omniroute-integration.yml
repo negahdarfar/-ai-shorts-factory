@@ -1,4 +1,4 @@
-name: Validate OmniRoute Integration
+name: Validate AI Gateway Integrations
 
 on:
   pull_request:
@@ -9,18 +9,22 @@ on:
       - "tests/test_omniroute_translation.py"
       - ".github/workflows/moneyprinterturbo.yml"
       - ".github/workflows/resume-existing-videos.yml"
-      - "deploy/freellmapi/**"
-      - "tests/test_omniroute_translation.py"
       - ".github/workflows/validate-omniroute-integration.yml"
-      - ".github/workflows/deploy-omniroute-vps.yml"
+      - "deploy/freellmapi/**"
       - "deploy/omniroute/**"
   push:
     branches:
       - main
     paths:
       - "scripts/add_persian_subtitles.py"
+      - "scripts/generate_seo_metadata.py"
+      - "scripts/configure_moneyprinter.py"
       - "tests/test_omniroute_translation.py"
+      - ".github/workflows/moneyprinterturbo.yml"
+      - ".github/workflows/resume-existing-videos.yml"
       - ".github/workflows/validate-omniroute-integration.yml"
+      - "deploy/freellmapi/**"
+      - "deploy/omniroute/**"
 
 permissions:
   contents: read
@@ -33,11 +37,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile LLM integrations
+      - name: Compile LLM integration scripts
         run: python -m py_compile scripts/add_persian_subtitles.py scripts/generate_seo_metadata.py scripts/configure_moneyprinter.py
-      - name: Test translation response validation
+      - name: Test provider response parsing and fallback order
         run: python -m unittest discover -s tests -p 'test_omniroute_translation.py'
-      - name: Validate deployment YAML files
+      - name: Validate GitHub Actions and Docker Compose YAML
         run: |
           python -m pip install pyyaml
           python - <<'PY'
@@ -46,8 +50,9 @@ jobs:
           paths = [
               Path(".github/workflows/deploy-omniroute-vps.yml"),
               Path(".github/workflows/omniroute-gateway-check.yml"),
-              Path(".github/workflows/resume-existing-videos.yml"),
               Path(".github/workflows/moneyprinterturbo.yml"),
+              Path(".github/workflows/resume-existing-videos.yml"),
+              Path(".github/workflows/validate-omniroute-integration.yml"),
               Path("deploy/omniroute/docker-compose.yml"),
           ]
           for path in paths:
