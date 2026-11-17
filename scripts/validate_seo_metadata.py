@@ -36,7 +36,7 @@ def main():
         tags, hashtags = meta.get("tags", []), meta.get("hashtags", [])
         script = str(record.get("video_script", "")).strip()
         video_terms = record.get("video_terms", [])
-        if not 55 <= len(script.split()) <= 160: errors.append(f"Item {index}: narration script must contain 55-160 words.")
+        if not 120 <= len(script.split()) <= 145: errors.append(f"Item {index}: narration script must contain 120-145 words for a 45-60 second Short.")
         if any(p in script.casefold() for p in ("let's take a closer look", "what does this subject actually mean", "look beyond the headline")):
             errors.append(f"Item {index}: generic placeholder narration detected.")
         if not isinstance(video_terms, list) or not 5 <= len(video_terms) <= 8 or any(not str(x).strip() for x in video_terms):
