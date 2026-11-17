@@ -9,6 +9,13 @@ class SeoPipelineTests(unittest.TestCase):
             f=Path(d)/"seo.json"; f.write_text(json.dumps(data),encoding="utf-8")
             result=subprocess.run([sys.executable,str(ROOT/"scripts/validate_seo_metadata.py"),"--input",str(f),"--expected-count","1"],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
+    def test_explicitly_free_freellmapi_content_passes(self):
+        data=[{"topic":"Solar storms","metadata_source":"freellmapi_batch","content_source":"freellmapi_batch","video_script":"Solar storms begin with activity on the Sun. Powerful magnetic fields can twist and reconnect, releasing energy and sometimes sending charged particles toward Earth. When those particles interact with Earth’s magnetic field, they can create auroras and, in stronger events, disrupt satellites or radio communications. Scientists monitor solar activity to understand these risks and improve forecasts. The key point is that solar storms are natural space-weather events, but their effects depend on their strength and direction.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar Storms: What Happens When the Sun Erupts?","description":"Learn how solar storms form, how solar flares affect Earth, and why space weather matters.","primary_keyword":"solar storms","tags":["solar storms","space weather","solar flare","Sun activity","Earth magnetosphere"],"hashtags":["space","science"]}}]
+        with tempfile.TemporaryDirectory() as d:
+            f=Path(d)/"seo.json"; f.write_text(json.dumps(data),encoding="utf-8")
+            result=subprocess.run([sys.executable,str(ROOT/"scripts/validate_seo_metadata.py"),"--input",str(f),"--expected-count","1"],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+
     def test_duplicate_topics_fail(self):
         row={"topic":"Solar storms","metadata":{"title":"Solar storms","description":"Solar storms","primary_keyword":"Solar storms","tags":[],"hashtags":[]}}
         with tempfile.TemporaryDirectory() as d:
