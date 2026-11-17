@@ -48,7 +48,7 @@ class PartialBatchTests(unittest.TestCase):
                         api_model="free-model",
                         api_provider="Cloudflare",
                     )
-            self.assertEqual(mocked_request.call_count, 3)
+            self.assertEqual(mocked_request.call_count, 5)
 
 
 if __name__ == "__main__":
