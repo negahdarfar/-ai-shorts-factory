@@ -107,7 +107,7 @@ def normalize_item(item, topic):
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
 
 
-def generate_batch(topics, language, model, key, research=None):
+def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto"):
     topic_text = "\\n".join(f"{i}. {topic}" for i, topic in enumerate(topics, 1))
     research_by_topic = {}
     for row in (research or {}).get("topics", []):
@@ -144,35 +144,69 @@ Use the research to identify audience-interest patterns, opening-hook structures
 Return ONLY valid JSON in this structure:
 {{"items":[{{"index":1,"video_script":"80-120 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
 Exactly one indexed item per input topic. Script should be 55-130 words, have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all four topics, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json"}
-    }
-    req = urllib.request.Request(
-        f"{API_ROOT}/{model}:generateContent?key={key}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
+    if api_base_url and api_key:
+        payload = {
+            "model": api_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a research-aware factual documentary writer and YouTube SEO editor. Return only valid JSON.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.35,
+            "response_format": {"type": "json_object"},
+        }
+        request_url = api_base_url.rstrip("/") + "/chat/completions"
+        request_headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        provider = "FreeLLMAPI"
+    else:
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
+        request_headers = {"Content-Type": "application/json"}
+        provider = "Gemini"
+
+    result = {}
     for attempt in range(3):
+        req = urllib.request.Request(
+            request_url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=request_headers,
+            method="POST"
+        )
         try:
-            with urllib.request.urlopen(req, timeout=150) as response:
+            with urllib.request.urlopen(req, timeout=180 if provider == "FreeLLMAPI" else 150) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            parsed = extract_json("\\n".join(p.get("text", "") for p in parts))
-            result = {}
+            if provider == "FreeLLMAPI":
+                choices = data.get("choices", [])
+                if not choices:
+                    raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
+                raw = choices[0].get("message", {}).get("content", "")
+                if isinstance(raw, list):
+                    raw = "\\n".join(part.get("text", "") for part in raw if isinstance(part, dict))
+                raw = str(raw)
+            else:
+                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                raw = "\\n".join(p.get("text", "") for p in parts)
+            parsed = extract_json(raw)
             for row in parsed.get("items", []):
                 try:
                     index = int(row["index"])
                     if 1 <= index <= len(topics):
                         result[index] = normalize_item(row, topics[index - 1])
                 except (KeyError, TypeError, ValueError) as exc:
-                    print(f"Discarding incomplete Gemini item: {exc}", file=sys.stderr)
+                    print(f"Discarding incomplete {provider} item: {exc}", file=sys.stderr)
             return result
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:2000]
-            message = f"Gemini HTTP {exc.code}: {detail}"
-            if exc.code not in (429, 500, 502, 503, 504) or attempt == 2:
+            message = f"{provider} HTTP {exc.code}: {detail}"
+            if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == 2:
                 raise RuntimeError(message) from exc
             if exc.code == 429 and any(marker in message.lower() for marker in (
                 "generate_content_free_tier_requests", "per_day", "daily limit", "free_tier_requests"
@@ -181,9 +215,9 @@ Exactly one indexed item per input topic. Script should be 55-130 words, have a 
             time.sleep(2 ** (attempt + 1))
         except (TimeoutError, urllib.error.URLError) as exc:
             if attempt == 2:
-                raise RuntimeError(str(exc)) from exc
+                raise RuntimeError(f"{provider} connection error: {exc}") from exc
             time.sleep(2 ** (attempt + 1))
-    return {}
+    return result
 
 
 def main():
@@ -214,11 +248,28 @@ def main():
         raise SystemExit("Every input item must have video_subject")
 
     generated = {}
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    freellmapi_base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
+    freellmapi_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
+    freellmapi_model = os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto"
     try:
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured")
-        generated = generate_batch(topics, args.language, args.model, api_key, research=research)
+        if freellmapi_base_url and freellmapi_key:
+            try:
+                generated = generate_batch(
+                    topics, args.language, args.model, "", research=research,
+                    api_base_url=freellmapi_base_url, api_key=freellmapi_key,
+                    api_model=freellmapi_model,
+                )
+                print(f"SEO_GENERATION_PROVIDER=FreeLLMAPI | model={freellmapi_model}", flush=True)
+            except (RuntimeError, ValueError, OSError) as free_error:
+                if not gemini_key:
+                    raise
+                print(f"FREELLMAPI_SEO_FAILED_GEMINI_FALLBACK: {free_error}", file=sys.stderr)
+                generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
+        elif gemini_key:
+            generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
+        else:
+            raise RuntimeError("Configure FreeLLMAPI credentials or GEMINI_API_KEY.")
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
 
