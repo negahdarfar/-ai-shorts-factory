@@ -3,7 +3,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from add_persian_subtitles import parse_translation_json
+from unittest.mock import patch
+from add_persian_subtitles import parse_translation_json, translate_with_fallback
 
 
 class OmniRouteTranslationParsingTests(unittest.TestCase):
@@ -27,6 +28,51 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
         raw = '{"translations":[{"index":1,"text":"سلام"}]}'
         with self.assertRaises(RuntimeError):
             parse_translation_json(raw, self.rows, "OmniRoute")
+
+    @patch("add_persian_subtitles.translate_omniroute")
+    @patch("add_persian_subtitles.translate_freellmapi")
+    @patch("add_persian_subtitles.translate_gemini")
+    def test_prefers_omniroute(self, gemini, free, omni):
+        omni.return_value = {1: "سلام", 2: "خداحافظ"}
+        result, provider = translate_with_fallback(
+            self.rows, ("http://omni/v1", "key", "auto"),
+            ("http://free/v1", "key", "auto"), ("gemini-key", "gemini-flash")
+        )
+        self.assertEqual(provider, "OmniRoute")
+        self.assertEqual(result[1], "سلام")
+        free.assert_not_called()
+        gemini.assert_not_called()
+
+    @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
+    @patch("add_persian_subtitles.translate_freellmapi")
+    @patch("add_persian_subtitles.translate_gemini")
+    def test_falls_back_to_freellmapi_before_gemini(self, gemini, free, omni):
+        free.return_value = {1: "سلام", 2: "خداحافظ"}
+        result, provider = translate_with_fallback(
+            self.rows, ("http://omni/v1", "key", "auto"),
+            ("http://free/v1", "key", "auto"), ("gemini-key", "gemini-flash")
+        )
+        self.assertEqual(provider, "FreeLLMAPI")
+        self.assertEqual(result[1], "سلام")
+        gemini.assert_not_called()
+
+    @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
+    @patch("add_persian_subtitles.translate_freellmapi", side_effect=RuntimeError("offline"))
+    @patch("add_persian_subtitles.translate_gemini")
+    def test_uses_gemini_as_last_fallback(self, gemini, free, omni):
+        gemini.return_value = {1: "سلام", 2: "خداحافظ"}
+        result, provider = translate_with_fallback(
+            self.rows, ("http://omni/v1", "key", "auto"),
+            ("http://free/v1", "key", "auto"), ("gemini-key", "gemini-flash")
+        )
+        self.assertEqual(provider, "Gemini")
+        self.assertEqual(result[2], "خداحافظ")
+
+    def test_fails_when_no_provider_is_configured(self):
+        with self.assertRaises(RuntimeError):
+            translate_with_fallback(
+                self.rows, ("", "", "auto"), ("", "", "auto"), ("", "gemini-flash")
+            )
 
 
 if __name__ == "__main__":
