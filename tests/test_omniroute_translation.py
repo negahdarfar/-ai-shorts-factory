@@ -31,6 +31,7 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
 
     @patch("add_persian_subtitles.translate_omniroute")
     @patch("add_persian_subtitles.translate_freellmapi")
+    @patch.dict("os.environ", {"ALLOW_NONFREE_LLM_FALLBACK": "true"})
     @patch("add_persian_subtitles.translate_gemini")
     @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     def test_prefers_omniroute(self, discovery, gemini, free, omni):
@@ -60,6 +61,7 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
 
     @patch("add_persian_subtitles.translate_omniroute", side_effect=RuntimeError("offline"))
     @patch("add_persian_subtitles.translate_freellmapi", side_effect=RuntimeError("offline"))
+    @patch.dict("os.environ", {"ALLOW_NONFREE_LLM_FALLBACK": "true"})
     @patch("add_persian_subtitles.translate_gemini")
     @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     def test_uses_gemini_as_last_fallback(self, discovery, gemini, free, omni):
