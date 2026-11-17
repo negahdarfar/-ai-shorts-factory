@@ -183,9 +183,9 @@ Exactly one indexed item per input topic. Script should be 55-130 words, have a 
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider == "FreeLLMAPI" else 150) as response:
+            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare") else 150) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if provider == "FreeLLMAPI":
+            if provider in ("FreeLLMAPI", "Cloudflare"):
                 choices = data.get("choices", [])
                 if not choices:
                     raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
@@ -253,8 +253,20 @@ def main():
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
-    gateways = [
-        (
+    cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
+    gateways = []
+    if cloudflare_account_id and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash":
+        gateways.append((
+            "Cloudflare",
+            f"https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1",
+            cloudflare_api_token,
+            cloudflare_model,
+        ))
+    elif cloudflare_account_id or cloudflare_api_token:
+        print("CLOUDFLARE_CONFIGURATION_INCOMPLETE_OR_MODEL_NOT_ALLOWLISTED; refusing unknown-price routing.", file=sys.stderr)
+    gateways.append((
             "FreeLLMAPI",
             os.getenv("FREELLMAPI_BASE_URL", "").strip(),
             os.getenv("FREELLMAPI_API_KEY", "").strip(),
@@ -289,6 +301,8 @@ def main():
                         file=sys.stderr,
                     )
                     continue
+            elif provider == "Cloudflare":
+                candidate_models = [api_model]
             else:
                 candidate_models = [api_model]
             for selected_model in candidate_models:
