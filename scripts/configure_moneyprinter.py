@@ -19,7 +19,7 @@ cloudflare_base_url = f"https://api.cloudflare.com/client/v4/accounts/{cloudflar
 cloudflare_ready = bool(cloudflare_account_id and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash")
 if cloudflare_account_id and cloudflare_api_token and not cloudflare_ready:
     print("Cloudflare model is not on the pinned free-model allowlist; refusing it.")
-freellmapi_base_url = os.environ.get("FREELLMAPI_BASE_URL", "").strip()
+freellmapi_base_url = (os.environ.get("FREELLMAPI_CLOUD_BASE_URL", "").strip() or os.environ.get("FREELLMAPI_BASE_URL", "").strip())
 freellmapi_key = os.environ.get("FREELLMAPI_API_KEY", "").strip()
 freellmapi_model = os.environ.get("FREELLMAPI_MODEL", "auto").strip() or "auto"
 allow_nonfree_fallback = os.environ.get("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
@@ -44,13 +44,29 @@ if freellmapi_base_url and freellmapi_key:
         print("No explicitly free FreeLLMAPI models discovered; refusing unknown-price models.")
         freellmapi_base_url = ""
         freellmapi_key = ""
+openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+openrouter_base_url = "https://openrouter.ai/api/v1"
+openrouter_model = os.environ.get("OPENROUTER_MODEL", "auto").strip() or "auto"
+openrouter_free_models = []
+if openrouter_key:
+    try:
+        openrouter_free_models = discover_free_models(
+            openrouter_base_url, openrouter_key, task="seo", preferred=openrouter_model
+        )
+    except Exception as exc:
+        print(f"OpenRouter free-model discovery failed: {exc}")
+    if openrouter_free_models:
+        openrouter_model = openrouter_free_models[0]
+        print(f"MoneyPrinterTurbo selected verified OpenRouter free model: {openrouter_model}")
+    else:
+        print("No explicitly free OpenRouter models discovered; refusing paid or unknown-price routing.")
 omniroute_base_url = os.environ.get("OMNIROUTE_BASE_URL", "").strip()
 omniroute_key = os.environ.get("OMNIROUTE_API_KEY", "").strip()
 omniroute_model = os.environ.get("OMNIROUTE_MODEL", "auto").strip() or "auto"
 pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
-if not cloudflare_ready and not (freellmapi_base_url and freellmapi_key) and not (
+if not cloudflare_ready and not (freellmapi_base_url and freellmapi_key) and not openrouter_free_models and not (
     allow_nonfree_fallback and (
         gemini or (omniroute_base_url and omniroute_key)
     )
@@ -78,6 +94,11 @@ elif freellmapi_base_url and freellmapi_key:
     app["openai_api_key"] = freellmapi_key
     app["openai_base_url"] = freellmapi_base_url.rstrip("/")
     app["openai_model_name"] = freellmapi_model
+elif openrouter_free_models:
+    app["llm_provider"] = "openai"
+    app["openai_api_key"] = openrouter_key
+    app["openai_base_url"] = openrouter_base_url
+    app["openai_model_name"] = openrouter_model
 elif allow_nonfree_fallback and omniroute_base_url and omniroute_key:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = omniroute_key
@@ -120,7 +141,7 @@ target = home / "config.toml"
 target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
-print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else freellmapi_model if freellmapi_base_url and freellmapi_key else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
+print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else freellmapi_model if freellmapi_base_url and freellmapi_key else openrouter_model if openrouter_free_models else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
     output.write("video_source=" + app["video_source"] + "\n")
