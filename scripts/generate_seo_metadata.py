@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate SEO, narration scripts and footage terms in one Gemini batch, with safe local fallback."""
+"""Generate SEO, narration scripts and footage terms through free LLM gateways, with safe local fallback."""
 import argparse
 import json
 import os
@@ -248,6 +248,7 @@ def main():
         raise SystemExit("Every input item must have video_subject")
 
     generated = {}
+    generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     gateways = [
         (
@@ -275,6 +276,7 @@ def main():
                     api_model=api_model, api_provider=provider,
                 )
                 print(f"SEO_GENERATION_PROVIDER={provider} | model={api_model}", flush=True)
+                generated_source = provider.lower() + "_batch"
                 gateway_succeeded = True
                 break
             except (RuntimeError, ValueError, OSError) as gateway_error:
@@ -283,6 +285,7 @@ def main():
             if gemini_key:
                 generated = generate_batch(topics, args.language, args.model, gemini_key, research=research)
                 print("SEO_GENERATION_PROVIDER=Gemini", flush=True)
+                generated_source = "gemini_batch"
             else:
                 raise RuntimeError("All configured gateways failed and GEMINI_API_KEY is not configured.")
     except (RuntimeError, ValueError, OSError) as exc:
@@ -307,14 +310,14 @@ def main():
             **content,
             "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "basis": "topic_and_optional_public_competitor_sample",
-            "metadata_source": "gemini_batch" if is_ai else "local_template_fallback",
-            "content_source": "gemini_batch" if is_ai else "local_template_fallback",
+            "metadata_source": generated_source if is_ai else "local_template_fallback",
+            "content_source": generated_source if is_ai else "local_template_fallback",
             "requires_final_script_review": True
         })
 
     Path(args.output).write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    ai_count = sum(row["content_source"] == "gemini_batch" for row in output)
-    print(f"CONTENT_BATCH_READY: {len(output)} records; Gemini={ai_count}; local_fallback={len(output)-ai_count}")
+    ai_count = sum(row["content_source"] != "local_template_fallback" for row in output)
+    print(f"CONTENT_BATCH_READY: {len(output)} records; AI={ai_count}; local_fallback={len(output)-ai_count}")
     if ai_count < len(output):
         print("CONTENT_REVIEW_WARNING: fallback scripts are generic, fact-safe drafts; review and improve before public use.")
 
