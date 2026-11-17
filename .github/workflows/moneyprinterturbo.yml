@@ -116,6 +116,9 @@ jobs:
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
           FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
           FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/configure_moneyprinter.py
@@ -161,6 +164,9 @@ jobs:
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
           FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
           FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
           SEO_GEMINI_MODEL: gemini-3.8-flash
         run: python scripts/generate_seo_metadata.py --input trending_batch.json --output seo_metadata.json --language English --research youtube_competitor_research.json --require-viral-research
       - name: Validate generated SEO metadata
