@@ -15,12 +15,12 @@ SEO_FIELDS = ("primary_keyword", "secondary_keywords", "title", "description", "
 
 
 def clean(value, limit=None):
-    value = re.sub(r"\\s+", " ", str(value or "")).strip()
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
     return value[:limit] if limit else value
 
 
 def extract_json(raw):
-    raw = re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$", "", raw.strip(), flags=re.I)
+    raw = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
     left, right = raw.find("{"), raw.rfind("}")
     if left < 0 or right <= left:
         raise ValueError("No JSON object in Gemini response")
@@ -52,20 +52,22 @@ def fallback_content(topic):
 
 
 def fallback_metadata(topic):
-    keyword = clean(re.sub(r"[^\\w\\s'-]", " ", topic), 80) or "interesting facts"
-    title = (keyword + ": Explained")[:100]
+    """Topic-specific conservative metadata used only as a draft if the AI quota is unavailable."""
+    keyword = clean(topic, 80)
+    display = keyword.title()
+    title = f"{display}: The Story Behind the Topic"[:100]
+    tags = list(dict.fromkeys([keyword.lower(), *[w.lower() for w in re.findall(r"[A-Za-z0-9]+", keyword) if len(w) > 2], "short documentary", "explained"]))[:15]
     return {
         "primary_keyword": keyword,
-        "secondary_keywords": ["explained", "how it works", "quick facts"],
+        "secondary_keywords": [f"{display} explained", f"{display} facts", f"{display} background"],
         "title": title,
-        "description": f"Discover {keyword.lower()} in this concise educational explainer. Learn the key idea, context, and what evidence helps explain it.",
-        "hashtags": ["Shorts", "Explained", "Education"],
-        "tags": list(dict.fromkeys([keyword.lower(), "explained", "educational video"] + [w.lower() for w in keyword.split() if len(w) > 2]))[:15],
-        "pinned_comment": f"What would you like to know next about {keyword.lower()}?",
-        "thumbnail_concept": f"A clear, topic-specific visual showing {keyword.lower()}, with minimal text.",
-        "search_intent": f"Understand {keyword.lower()} quickly."
+        "description": f"Explore {keyword} in this short documentary. This video introduces the subject, explains its context, and highlights the key questions viewers should understand.",
+        "hashtags": ["Shorts", "Documentary", "Explained"],
+        "tags": tags,
+        "pinned_comment": f"What question about {keyword} should we explore next?",
+        "thumbnail_concept": f"A clear, authentic visual directly connected to {keyword}; use no unlicensed logos, celebrity images, or copyrighted footage.",
+        "search_intent": f"Learn the background and context of {keyword}."
     }
-
 
 def normalize_item(item, topic):
     if not isinstance(item, dict):
