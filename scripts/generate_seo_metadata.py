@@ -183,9 +183,9 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare") else 150) as response:
+            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if provider in ("FreeLLMAPI", "Cloudflare"):
+            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
                 choices = data.get("choices", [])
                 if not choices:
                     raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
