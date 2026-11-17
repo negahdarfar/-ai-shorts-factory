@@ -232,13 +232,14 @@ jobs:
           CONFIRM_PUBLIC_PUBLISHING: YES
           YOUTUBE_SCHEDULED_PUBLISH: NO
         run: python scripts/upload_four_private_youtube_tests.py
-      - name: Upload scheduled batch as PRIVATE QA videos (never auto-publish publicly)
+      - name: Schedule four videos for staggered PUBLIC release
         if: ${{ github.event_name == 'schedule' && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: private
+          YOUTUBE_SCHEDULED_PUBLISH: YES
         run: python scripts/upload_four_private_youtube_tests.py
       - name: Upload all four PRIVATE YouTube QA videos
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && inputs.publish_four_public != true && steps.configure.outputs.ready == 'true' }}
