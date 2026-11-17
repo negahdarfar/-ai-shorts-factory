@@ -31,8 +31,8 @@ class OmniRouteTranslationParsingTests(unittest.TestCase):
 
     @patch("add_persian_subtitles.translate_omniroute")
     @patch("add_persian_subtitles.translate_freellmapi")
-    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     @patch("add_persian_subtitles.translate_gemini")
+    @patch("add_persian_subtitles.discover_free_models", return_value=["kilo-auto/free"])
     def test_prefers_omniroute(self, discovery, gemini, free, omni):
         omni.return_value = {1: "سلام", 2: "خداحافظ"}
         result, provider = translate_with_fallback(
