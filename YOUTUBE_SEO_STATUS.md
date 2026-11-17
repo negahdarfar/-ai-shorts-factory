@@ -3,10 +3,10 @@
 ## Implemented in this branch
 
 ### Shorts topic and SEO preparation
-- Selects up to four non-repeated topics from Google Trends, with a curated fallback list.
+- Selects up to four non-repeated topics from Google Trends, with a curated fallback list; persistent seen-topic and published-topic history is stored in the GitHub Actions cache.
 - Drafts English metadata per topic through the configured, free-tier-approved LLM route (Cloudflare Workers AI or explicitly free FreeLLMAPI; paid/unknown-price fallback is disabled by default): primary/secondary keywords, title, description, hashtags, tags, pinned-comment prompt, search intent and thumbnail concept.
 - Requires recent public YouTube Shorts competitor research through YouTube Data API v3 before generation; this is a directional sample, not a ranking or virality guarantee.
-- Validates metadata fields, title/description limits, primary keyword presence, tags, hashtags and record count.
+- Validates metadata fields, title/description limits, primary keyword presence, tags, hashtags and record count. Production requires a complete four-item AI-generated batch; partial provider responses trigger provider failover and local fallback content is rejected.
 - Renders reviewable 1280x720 thumbnail draft images from the generated metadata using Pillow. These are typographic concept drafts, not finished topic-specific photographic artwork.
 - `upload_youtube_thumbnails.py` uploads thumbnails only for explicit video IDs in a reviewed manifest; it has a dry-run mode.
 
@@ -15,10 +15,11 @@
 - `apply_youtube_seo_metadata.py` can update title, description, tags and language for explicitly mapped video IDs using a reviewed JSON manifest. It never changes privacy status. It is intentionally not auto-run against public videos.
 - `youtube_analytics_report.py` fetches read-only channel reports for views, watch time, average view duration/percentage and (when supported) impressions/CTR.
 - The analytics script requires a refresh token consented for `yt-analytics.readonly`. Existing upload-only refresh tokens do not gain new scopes automatically; re-consent is required.
-- Manual PUBLIC publishing is opt-in (`publish_four_public`, default false). The daily cron path separately schedules four PRIVATE uploads with future public-release times. Automatic SEO writes to already-published videos remain disabled; SEO metadata is attached during upload.
+- Manual PUBLIC publishing is opt-in (`publish_four_public`, default false). The daily cron path separately schedules four PRIVATE uploads with future public-release times. A persistent publication-history guard blocks previously published topics from public re-use; history is saved even after partial upload failures. Automatic SEO writes to already-published videos remain disabled; SEO metadata is attached during upload.
 
 ### Long-form assembly utilities
-- `translate_srt_to_persian.py` translates an English SRT into Persian while preserving cue count, indices and timestamps. It does not perform speech recognition or automatic alignment; start with an accurately timed source SRT.\n- `assemble_documentary.py` joins an ordered JSON list of video clips, normalizes them to 1080p landscape MP4, can replace clip audio with a narration track, and can burn an externally prepared UTF-8 Persian SRT file.
+- `translate_srt_to_persian.py` translates an English SRT into Persian while preserving cue count, indices and timestamps. It does not perform speech recognition or automatic alignment; start with an accurately timed source SRT.
+- `assemble_documentary.py` joins an ordered JSON list of video clips, normalizes them to 1080p landscape MP4, can replace clip audio with a narration track, and can burn an externally prepared UTF-8 Persian SRT file.
 - `validate_chapters.py` checks that chapter timestamps start at 00:00, contain at least three chapters and increase strictly.
 - These are assembly utilities, not yet a complete autonomous documentary creator. Clip generation, story continuity, fact-checking, Persian translation/timing, music licensing, chapter generation from the final timeline and final editorial approval still require integration and testing.
 
