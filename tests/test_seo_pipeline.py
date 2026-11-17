@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class SeoPipelineTests(unittest.TestCase):
     def test_valid_manifest_passes(self):
-        data=[{"topic":"Solar storms","video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar storms explained","description":"Learn about solar storms.","primary_keyword":"solar storms","tags":["space","science"],"hashtags":["space"]}}]
+        data=[{"topic":"Solar storms","metadata_source":"gemini_batch","content_source":"gemini_batch","video_script":"Solar storms begin with activity on the Sun. Powerful magnetic fields can twist and reconnect, releasing energy and sometimes sending charged particles toward Earth. When those particles interact with Earth’s magnetic field, they can create auroras and, in stronger events, disrupt satellites or radio communications. Scientists monitor solar activity to understand these risks and improve forecasts. The key point is that solar storms are natural space-weather events, but their effects depend on their strength and direction.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar Storms: What Happens When the Sun Erupts?","description":"Learn how solar storms form, how solar flares affect Earth, and why space weather matters.","primary_keyword":"solar storms","tags":["solar storms","space weather","solar flare","Sun activity","Earth magnetosphere"],"hashtags":["space","science"]}}]
         with tempfile.TemporaryDirectory() as d:
             f=Path(d)/"seo.json"; f.write_text(json.dumps(data),encoding="utf-8")
             result=subprocess.run([sys.executable,str(ROOT/"scripts/validate_seo_metadata.py"),"--input",str(f),"--expected-count","1"],capture_output=True,text=True)
@@ -39,7 +39,7 @@ class SeoPipelineTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 1)
         self.assertEqual(len(result), 4)
 
-    def test_quota_fallback_creates_four_valid_records(self):
+    def test_quota_fallback_is_blocked_before_publish(self):
         import os
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -64,7 +64,8 @@ class SeoPipelineTests(unittest.TestCase):
                  "--input", str(output), "--expected-count", "4"],
                 capture_output=True, text=True
             )
-            self.assertEqual(validation.returncode, 0, validation.stderr)
+            self.assertNotEqual(validation.returncode, 0, "Fallback content must never pass public-publishing validation.")
+            self.assertIn("AI content was not generated", validation.stderr)
 
 
     def test_batch_runner_injects_prebuilt_script_and_terms(self):
