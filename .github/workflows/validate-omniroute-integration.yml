@@ -51,6 +51,7 @@ jobs:
               Path(".github/workflows/deploy-omniroute-vps.yml"),
               Path(".github/workflows/omniroute-gateway-check.yml"),
               Path(".github/workflows/moneyprinterturbo.yml"),
+              Path(".github/workflows/freellmapi-gateway-check.yml"),
               Path(".github/workflows/resume-existing-videos.yml"),
               Path(".github/workflows/validate-omniroute-integration.yml"),
               Path("deploy/omniroute/docker-compose.yml"),
