@@ -207,11 +207,31 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
             expected = set(range(1, len(topics) + 1))
             missing = sorted(expected - set(result))
             if missing:
+                if attempt < 2:
+                    delay = 2 ** (attempt + 1)
+                    print(
+                        f"{provider.upper()}_INCOMPLETE_BATCH; retrying full batch in {delay}s "
+                        f"(attempt {attempt + 2}/3).",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    time.sleep(delay)
+                    continue
                 raise RuntimeError(
-                    f"{provider} returned an incomplete content batch; missing item(s): {missing}. "
-                    "Trying the next explicitly permitted provider."
+                    f"{provider} returned an incomplete content batch after three attempts; "
+                    f"missing item(s): {missing}. Trying the next explicitly permitted provider."
                 )
             return result
+        except (ValueError, KeyError, TypeError) as exc:
+            if attempt == 2:
+                raise RuntimeError(f"{provider} returned invalid content after three attempts: {exc}") from exc
+            delay = 2 ** (attempt + 1)
+            print(
+                f"{provider.upper()}_INVALID_CONTENT; retrying in {delay}s (attempt {attempt + 2}/3).",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:2000]
             message = f"{provider} HTTP {exc.code}: {detail}"
