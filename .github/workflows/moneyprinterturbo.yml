@@ -113,6 +113,7 @@ jobs:
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
           FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
           FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
@@ -161,6 +162,7 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
           FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
           FREELLMAPI_MODEL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_MODEL || 'auto' }}
@@ -187,6 +189,7 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALLOW_NONFREE_LLM_FALLBACK: ${{ vars.ALLOW_NONFREE_LLM_FALLBACK || 'false' }}
           OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           OMNIROUTE_MODEL: ${{ secrets.OMNIROUTE_MODEL }}
