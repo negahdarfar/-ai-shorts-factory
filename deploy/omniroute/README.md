@@ -18,7 +18,7 @@ On the VPS:
 
 ```bash
 git clone https://github.com/negahdarfar/-ai-shorts-factory.git
-cd -ai-shorts-factory/deploy/omniroute
+cd ./-ai-shorts-factory/deploy/omniroute
 cp .env.example .env
 openssl rand -base64 48
 openssl rand -hex 32
