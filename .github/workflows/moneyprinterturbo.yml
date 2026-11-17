@@ -14,15 +14,15 @@ name: MoneyPrinterTurbo Shorts Factory
         type: boolean
         default: false
       use_previous_four_topics:
-        description: 'Reuse the four preserved topics from the previous run (recommended)'
+        description: 'Reuse the four preserved topics from the previous run'
         required: false
         type: boolean
-        default: true
+        default: false
       publish_four_public:
         description: 'Publish all four validated videos PUBLIC on YouTube'
         required: false
         type: boolean
-        default: false
+        default: true
       upload_four_private_tests:
         description: 'Upload all four validated Shorts as PRIVATE QA tests'
         required: false
