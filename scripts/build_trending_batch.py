@@ -67,8 +67,21 @@ def main():
     seen_file = state_dir / "seen_topics.json"
     try:
         seen = set(json.loads(seen_file.read_text(encoding="utf-8")))
-    except (OSError, ValueError):
+    except FileNotFoundError:
         seen = set()
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Could not read topic history safely: {exc}")
+
+    published_file = state_dir / "published_topics.json"
+    try:
+        published = set(json.loads(published_file.read_text(encoding="utf-8")))
+    except FileNotFoundError:
+        published = set()
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Could not read publication history safely: {exc}")
+    if any(not isinstance(topic, str) for topic in seen | published):
+        raise SystemExit("Topic/publication history contains invalid entries.")
+    seen |= {topic.casefold() for topic in published}
 
     try:
         topics = load_trends(args.geo)
