@@ -83,32 +83,57 @@ def research_topic(topic, api_key, days, max_results):
         except Exception:
             age_days = None
         views = int(stats.get("viewCount", 0) or 0)
+        likes = int(stats.get("likeCount", 0) or 0)
+        comments = int(stats.get("commentCount", 0) or 0)
+        title = clean(snippet.get("title"), 180)
         competitors.append({
             "video_id": item.get("id"),
-            "title": clean(snippet.get("title"), 180),
+            "title": title,
             "channel_title": clean(snippet.get("channelTitle"), 120),
             "published_at": published,
             "views": views,
-            "likes": int(stats.get("likeCount", 0) or 0),
-            "comments": int(stats.get("commentCount", 0) or 0),
+            "likes": likes,
+            "comments": comments,
             "views_per_day_estimate": round(views / age_days, 1) if age_days else None,
+            "likes_per_view": round(likes / views, 4) if views else 0,
+            "comments_per_view": round(comments / views, 4) if views else 0,
+            "title_length": len(title),
+            "title_hook_pattern": (
+                "question" if "?" in title else
+                "number" if re.search(r"\\d", title) else
+                "how_why" if re.match(r"(?i)^(how|why|what|when|where)\\b", title) else
+                "curiosity_or_statement"
+            ),
             "url": f"https://www.youtube.com/watch?v={item.get('id')}",
         })
 
-    competitors.sort(key=lambda x: x["views"], reverse=True)
+    # Views/day surfaces newer breakouts instead of only older high-view uploads.
+    competitors.sort(key=lambda x: (x["views_per_day_estimate"] or 0, x["views"]), reverse=True)
     view_values = [x["views"] for x in competitors]
     avg_views = round(sum(view_values) / len(view_values)) if view_values else 0
-    top = competitors[:3]
+    top = competitors[:5]
+    patterns = {}
+    for row in competitors:
+        pattern = row["title_hook_pattern"]
+        patterns[pattern] = patterns.get(pattern, 0) + 1
+    strongest = top[0] if top else None
     return {
         "query": topic,
         "window_days": days,
         "videos_found": len(competitors),
         "average_views_in_sample": avg_views,
         "top_competitors": top,
-        "sample_note": "Top recent Shorts returned by YouTube search ordered by viewCount; not a complete market sample.",
+        "title_hook_pattern_counts": patterns,
+        "top_breakout_signal": {
+            "title": strongest["title"],
+            "views_per_day_estimate": strongest["views_per_day_estimate"],
+            "title_hook_pattern": strongest["title_hook_pattern"],
+            "url": strongest["url"],
+        } if strongest else None,
+        "sample_note": "Recent Shorts sample ranked primarily by estimated views per day; this is a directional public-data signal, not proof of virality or a complete market sample.",
         "insight": (
-            "Review the top titles and formats manually; look for a distinct factual angle "
-            "rather than copying titles or scripts."
+            "Use breakout titles and engagement only to infer broad audience-interest patterns. "
+            "Create a new factual angle, original script, and independently sourced visuals; never copy competitor wording or footage."
         ),
     }
 
