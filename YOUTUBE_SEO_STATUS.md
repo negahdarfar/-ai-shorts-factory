@@ -10,11 +10,11 @@
 - Renders reviewable 1280x720 thumbnail draft images from the generated metadata using Pillow. These are typographic concept drafts, not finished topic-specific photographic artwork.\n- `upload_youtube_thumbnails.py` uploads thumbnails only for explicit video IDs in a reviewed manifest; it has a dry-run mode.
 
 ### YouTube publishing and channel data tools
-- Existing uploader remains strictly PRIVATE QA and uploads exactly four videos only when the manual workflow input is selected.
+- The shared uploader supports PRIVATE QA, explicitly confirmed PUBLIC manual uploads, and staggered PUBLIC releases through scheduled uploads. The workflow's daily cron is configured for 14:00 UTC (17:30 Iran time); scheduled runs upload four videos as private with future `publishAt` times spaced three hours apart. The schedule configuration is present in `.github/workflows/moneyprinterturbo.yml`, but a successful cron-triggered run still needs to be observed before calling daily automation operationally verified.
 - `apply_youtube_seo_metadata.py` can update title, description, tags and language for explicitly mapped video IDs using a reviewed JSON manifest. It never changes privacy status. It is intentionally not auto-run against public videos.
 - `youtube_analytics_report.py` fetches read-only channel reports for views, watch time, average view duration/percentage and (when supported) impressions/CTR.
 - The analytics script requires a refresh token consented for `yt-analytics.readonly`. Existing upload-only refresh tokens do not gain new scopes automatically; re-consent is required.
-- Public publishing, scheduled publishing and automatic SEO writes are not enabled.
+- Manual PUBLIC publishing is available only through the explicit `publish_four_public` workflow input. Scheduled PUBLIC release is configured in the daily workflow path. Automatic SEO writes to already-published videos remain disabled; SEO metadata is attached during upload.
 
 ### Long-form assembly utilities
 - `translate_srt_to_persian.py` translates an English SRT into Persian while preserving cue count, indices and timestamps. It does not perform speech recognition or automatic alignment; start with an accurately timed source SRT.\n- `assemble_documentary.py` joins an ordered JSON list of video clips, normalizes them to 1080p landscape MP4, can replace clip audio with a narration track, and can burn an externally prepared UTF-8 Persian SRT file.
@@ -24,7 +24,7 @@
 ### CI and cost safeguards
 - A lightweight pull-request CI workflow runs unit tests and Python syntax checks.
 - The expensive MoneyPrinterTurbo generation job now runs only after a manual `workflow_dispatch`; opening/updating a PR no longer starts video generation.
-- No daily schedule is enabled.
+- A daily GitHub Actions cron is configured at `0 14 * * *` (14:00 UTC / 17:30 Iran time). GitHub may delay scheduled starts, and the schedule must be confirmed by observing a successful `schedule`-triggered run.
 
 ## Secrets and permissions
 
@@ -74,7 +74,7 @@ YouTube Data API supports updating video metadata and setting thumbnails, but au
 ## Safe next steps
 
 1. Run lightweight CI and correct any failing checks.
-2. Manually run the existing four-video private QA workflow and inspect all four videos.
+2. Confirm a successful cron-triggered run and inspect all four scheduled videos and their `publishAt` times. Keep a private QA run available for any rendering or subtitle changes.
 3. Add the optional YouTube API key if competitor research is desired.
 4. Re-authorize OAuth for Analytics only when ready to connect private channel analytics.
 5. Test the metadata updater against a private QA video and a manifest with an explicit video ID.
