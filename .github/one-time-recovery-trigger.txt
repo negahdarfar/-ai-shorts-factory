@@ -1,1 +1,1 @@
-One-time trigger to resume original four generated videos, add Persian subtitles, validate them, and publish publicly. Remove after the run starts.
+One-time recovery trigger updated after workflow guard correction. Resume run 44048295025 and publish the four existing videos after all checks.
