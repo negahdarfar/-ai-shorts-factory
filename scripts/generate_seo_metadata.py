@@ -109,7 +109,7 @@ def normalize_item(item, topic):
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
 
 
-def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto", api_provider="FreeLLMAPI"):
+def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto", api_provider="FreeLLMAPI", max_attempts=3, repair_missing=True):
     topic_text = "\\n".join(f"{i}. {topic}" for i, topic in enumerate(topics, 1))
     research_by_topic = {}
     for row in (research or {}).get("topics", []):
@@ -145,7 +145,7 @@ Use the research to identify audience-interest patterns, opening-hook structures
 
 Return ONLY valid JSON in this structure:
 {{"items":[{{"index":1,"video_script":"120-145 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
-Exactly one indexed item per input topic. Script must be 120-145 words, have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all four topics, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
+Exactly one indexed item per input topic. Each script MUST contain 130-140 spoken words (never fewer than 120 or more than 145). Count the words before returning each item; aim for 135 words. Script must have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all four topics, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
     if api_base_url and api_key:
         payload = {
             "model": api_model,
@@ -175,7 +175,7 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
         provider = "Gemini"
 
     result = {}
-    for attempt in range(3):
+    for attempt in range(max(1, max_attempts)):
         req = urllib.request.Request(
             request_url,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -207,7 +207,7 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
             expected = set(range(1, len(topics) + 1))
             missing = sorted(expected - set(result))
             if missing:
-                if attempt < 2:
+                if attempt < max(1, max_attempts) - 1:
                     delay = 2 ** (attempt + 1)
                     print(
                         f"{provider.upper()}_INCOMPLETE_BATCH; retrying full batch in {delay}s "
@@ -217,10 +217,33 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
                     )
                     time.sleep(delay)
                     continue
-                raise RuntimeError(
-                    f"{provider} returned an incomplete content batch after three attempts; "
-                    f"missing item(s): {missing}. Trying the next explicitly permitted provider."
-                )
+                if repair_missing:
+                    # Repair only missing items with one focused request each.
+                    # Valid batch items are preserved rather than discarded.
+                    for missing_index in missing:
+                        try:
+                            repaired = generate_batch(
+                                [topics[missing_index - 1]], language, model, key,
+                                research=research, api_base_url=api_base_url,
+                                api_key=api_key, api_model=api_model,
+                                api_provider=api_provider, max_attempts=1,
+                                repair_missing=False,
+                            )
+                            if 1 in repaired:
+                                result[missing_index] = repaired[1]
+                        except (RuntimeError, ValueError, OSError) as repair_error:
+                            print(
+                                f"{provider.upper()}_SINGLE_ITEM_REPAIR_FAILED "
+                                f"| item={missing_index} | {repair_error}",
+                                file=sys.stderr, flush=True,
+                            )
+                    missing = sorted(set(range(1, len(topics) + 1)) - set(result))
+                if missing:
+                    raise RuntimeError(
+                        f"{provider} returned an incomplete content batch after retries and "
+                        f"single-item repair; missing item(s): {missing}. "
+                        "Trying the next explicitly permitted provider."
+                    )
             return result
         except (ValueError, KeyError, TypeError) as exc:
             if attempt == 2:
