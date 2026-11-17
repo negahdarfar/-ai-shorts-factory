@@ -107,12 +107,39 @@ def normalize_item(item, topic):
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
 
 
-def generate_batch(topics, language, model, key):
+def generate_batch(topics, language, model, key, research=None):
     topic_text = "\\n".join(f"{i}. {topic}" for i, topic in enumerate(topics, 1))
+    research_by_topic = {}
+    for row in (research or {}).get("topics", []):
+        research_by_topic[clean(row.get("query", "")).casefold()] = row
+    viral_context = []
+    for topic in topics:
+        sample = research_by_topic.get(topic.casefold(), {})
+        viral_context.append({
+            "topic": topic,
+            "sample_size": sample.get("videos_found", 0),
+            "breakout_signal": sample.get("top_breakout_signal"),
+            "hook_pattern_counts": sample.get("title_hook_pattern_counts", {}),
+            "top_examples": [
+                {
+                    "title": x.get("title"),
+                    "views_per_day_estimate": x.get("views_per_day_estimate"),
+                    "likes_per_view": x.get("likes_per_view"),
+                    "comments_per_view": x.get("comments_per_view"),
+                }
+                for x in sample.get("top_competitors", [])[:5]
+            ],
+        })
+    viral_context_text = json.dumps(viral_context, ensure_ascii=False)
     prompt = f"""You are the research-aware writer and YouTube SEO editor for a factual short documentary channel.
 Create ALL deliverables for every topic below in ONE response. Output language: {language}.
 Topics:
 {topic_text}
+
+Public YouTube Shorts breakout research (directional sample; not guaranteed viral):
+{viral_context_text}
+
+Use the research to identify audience-interest patterns, opening-hook structures, pacing and subject angles that appear in stronger recent Shorts. Do NOT copy competitor titles, scripts, exact phrasing, footage, thumbnails, or distinctive creative expression. Invent a genuinely original angle and narrative for each topic. Prioritize a compelling first 1-2 seconds, fast context, escalating curiosity, concrete visual beats, a satisfying factual payoff, and a natural ending. Do not fabricate performance claims or treat views/day as a guaranteed viral predictor. If research is absent for a topic, say nothing about competitor performance and use editorial judgment.
 
 Return ONLY valid JSON in this structure:
 {{"items":[{{"index":1,"video_script":"80-120 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
@@ -165,8 +192,21 @@ def main():
     parser.add_argument("--output", default="seo_metadata.json")
     parser.add_argument("--language", default="English")
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
+    parser.add_argument("--research", default="youtube_competitor_research.json")
+    parser.add_argument("--require-viral-research", action="store_true")
     args = parser.parse_args()
     source = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    research = None
+    research_path = Path(args.research)
+    if research_path.is_file():
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+    if args.require_viral_research and not research:
+        raise SystemExit("Public YouTube viral-pattern research is required but unavailable.")
+    if args.require_viral_research:
+        found = {clean(row.get("query", "")).casefold() for row in research.get("topics", [])}
+        missing = [clean(row.get("video_subject", "")).casefold() for row in source if clean(row.get("video_subject", "")).casefold() not in found]
+        if missing:
+            raise SystemExit("Missing public competitor research for one or more selected topics.")
     if not isinstance(source, list) or not source:
         raise SystemExit("Input must be a non-empty list")
     topics = [clean(row.get("video_subject") if isinstance(row, dict) else "") for row in source]
@@ -178,7 +218,7 @@ def main():
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured")
-        generated = generate_batch(topics, args.language, args.model, api_key)
+        generated = generate_batch(topics, args.language, args.model, api_key, research=research)
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"CONTENT_BATCH_FALLBACK_ACTIVATED: {exc}", file=sys.stderr)
 
