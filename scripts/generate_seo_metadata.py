@@ -237,6 +237,7 @@ def main():
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
     parser.add_argument("--research", default="youtube_competitor_research.json")
     parser.add_argument("--require-viral-research", action="store_true")
+    parser.add_argument("--require-ai-batch", action="store_true")
     args = parser.parse_args()
     source = json.loads(Path(args.input).read_text(encoding="utf-8"))
     research = None
@@ -373,7 +374,13 @@ def main():
     ai_count = sum(row["content_source"] != "local_template_fallback" for row in output)
     print(f"CONTENT_BATCH_READY: {len(output)} records; AI={ai_count}; local_fallback={len(output)-ai_count}")
     if ai_count < len(output):
-        print("CONTENT_REVIEW_WARNING: fallback scripts are generic, fact-safe drafts; review and improve before public use.")
+        message = (
+            f"AI content batch incomplete: {ai_count}/{len(output)} items came from an approved provider. "
+            "Local fallback drafts are not publishable."
+        )
+        print("CONTENT_REVIEW_WARNING: " + message, file=sys.stderr)
+        if args.require_ai_batch:
+            raise SystemExit(message)
 
 
 if __name__ == "__main__":
