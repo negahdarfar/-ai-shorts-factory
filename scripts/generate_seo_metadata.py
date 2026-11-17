@@ -267,12 +267,11 @@ def main():
     elif cloudflare_account_id or cloudflare_api_token:
         print("CLOUDFLARE_CONFIGURATION_INCOMPLETE_OR_MODEL_NOT_ALLOWLISTED; refusing unknown-price routing.", file=sys.stderr)
     gateways.append((
-            "FreeLLMAPI",
-            os.getenv("FREELLMAPI_BASE_URL", "").strip(),
-            os.getenv("FREELLMAPI_API_KEY", "").strip(),
-            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
-        ),
-    ]
+        "FreeLLMAPI",
+        os.getenv("FREELLMAPI_BASE_URL", "").strip(),
+        os.getenv("FREELLMAPI_API_KEY", "").strip(),
+        os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
+    ))
     if allow_nonfree_fallback:
         gateways.append((
             "OmniRoute",
