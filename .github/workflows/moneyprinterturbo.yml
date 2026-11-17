@@ -19,10 +19,10 @@ name: MoneyPrinterTurbo Shorts Factory
         type: boolean
         default: false
       publish_four_public:
-        description: 'Publish all four validated videos PUBLIC on YouTube'
+        description: 'Publish all four validated videos PUBLIC on YouTube (manual runs only; daily schedule is separate)'
         required: false
         type: boolean
-        default: true
+        default: false
       upload_four_private_tests:
         description: 'Upload all four validated Shorts as PRIVATE QA tests'
         required: false
