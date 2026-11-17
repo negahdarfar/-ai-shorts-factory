@@ -103,6 +103,7 @@ def main():
         "topics": chosen
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     seen.update(chosen)
+    seen_file = state_dir / "seen_topics.json"
     seen_file.write_text(json.dumps(sorted(seen), ensure_ascii=False, indent=2), encoding="utf-8")
     for index, topic in enumerate(chosen, 1):
         print(f"{index}. {topic}")
