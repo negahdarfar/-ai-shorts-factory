@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
+      FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
       TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
       MPT_HOME: ${{ github.workspace }}/mpt-runtime
     steps:
