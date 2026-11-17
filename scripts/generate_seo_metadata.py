@@ -204,6 +204,13 @@ Exactly one indexed item per input topic. Script must be 120-145 words, have a s
                         result[index] = normalize_item(row, topics[index - 1])
                 except (KeyError, TypeError, ValueError) as exc:
                     print(f"Discarding incomplete {provider} item: {exc}", file=sys.stderr)
+            expected = set(range(1, len(topics) + 1))
+            missing = sorted(expected - set(result))
+            if missing:
+                raise RuntimeError(
+                    f"{provider} returned an incomplete content batch; missing item(s): {missing}. "
+                    "Trying the next explicitly permitted provider."
+                )
             return result
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:2000]
