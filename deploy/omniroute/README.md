@@ -68,7 +68,28 @@ quotas, rate limits, and terms are controlled by each upstream provider. The `au
 model can use any eligible route configured in the gateway; use a free-only Combo/model
 when you need to restrict routing to free providers.
 
-## 5. Configure GitHub Actions
+## 5. Automated deployment from GitHub Actions
+
+After you have a VPS and SSH access, add these repository Actions secrets:
+
+| Secret | Value |
+|---|---|
+| `OMNIROUTE_SSH_HOST` | VPS hostname or IP |
+| `OMNIROUTE_SSH_USER` | SSH user with permission to run Docker Compose |
+| `OMNIROUTE_SSH_PRIVATE_KEY` | Private SSH key for that user |
+| `OMNIROUTE_SSH_KNOWN_HOSTS` | Verified host-key line for the VPS |
+| `OMNIROUTE_INITIAL_PASSWORD` | Long unique OmniRoute dashboard password |
+| `OMNIROUTE_SSH_PORT` | Optional; defaults to `22` |
+
+The deploy workflow creates a protected `.env` on first deployment with random JWT/API
+encryption secrets and the dashboard password, then builds and starts the persistent
+container. It does not overwrite an existing `.env` or provider database.
+
+Run **Actions → Deploy OmniRoute VPS → Run workflow**, and explicitly choose
+`yes` for the deployment confirmation. The first deployment still requires a DNS
+hostname and Caddy HTTPS configuration as described above.
+
+## 6. Configure GitHub Actions
 
 In the GitHub repository, open **Settings → Secrets and variables → Actions → New repository secret**
 and add:
@@ -85,7 +106,7 @@ workflow tries OmniRoute first and falls back to Gemini if the gateway fails.
 Then run **Actions → OmniRoute Gateway Check → Run workflow**. This checks the HTTPS
 health endpoint and model catalogue without generating text or consuming inference tokens.
 
-## 6. Security and operations
+## 7. Security and operations
 
 - Keep `.env` private; it contains server secrets.
 - Keep port 20128 bound to loopback; use HTTPS through Caddy.
