@@ -1,7 +1,7 @@
 name: Factory lightweight CI
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/avgen-free-local-renderer-bridge]
   push:
     branches: [main, feature/youtube-seo-metadata]
 permissions:
