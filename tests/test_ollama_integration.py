@@ -19,7 +19,7 @@ def load_script(name, path):
 class OllamaIntegrationTests(unittest.TestCase):
     def test_seo_generation_uses_local_openai_compatible_endpoint_without_auth(self):
         module = load_script("seo_generator_ollama_test", "scripts/generate_seo_metadata.py")
-        script = " ".join(["A clear factual narration sentence explains the subject with useful context and a practical takeaway."] * 14)
+        script = " ".join(["A clear factual narration sentence explains the subject with useful context and a practical takeaway."] * 9)
         metadata = {
             "primary_keyword": "solar storms",
             "secondary_keywords": ["space weather"],
