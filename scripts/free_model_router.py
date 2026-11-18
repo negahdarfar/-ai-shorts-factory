@@ -2,7 +2,9 @@
 """Discover and rank explicitly free OpenAI-compatible models from FreeLLMAPI.
 
 Discovery only calls GET /models (no inference). A model is eligible only when
-its public ID explicitly advertises a free tier; unknown pricing is never assumed free.
+its ID or structured catalogue metadata explicitly advertises a free tier, or
+all advertised input/output token prices are exactly zero. Unknown pricing is
+never assumed free.
 """
 import json
 import urllib.error
@@ -10,22 +12,66 @@ import urllib.request
 
 FREE_MARKERS = (":free", "/free", "-free", "_free")
 ROUTER_MARKERS = ("kilo-auto/free", "openrouter/free")
+PRICE_KEYS = (
+    ("prompt", "completion"),
+    ("input", "output"),
+    ("input_cost_per_token", "output_cost_per_token"),
+    ("input_price", "output_price"),
+)
 
 
-def is_explicitly_free(model_id):
+def _is_zero_price(value):
+    if isinstance(value, bool) or value is None:
+        return False
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
+
+
+def _metadata_is_free(metadata):
+    """Recognize only unambiguous, machine-readable free-tier declarations."""
+    if not isinstance(metadata, dict):
+        return False
+
+    for key in ("is_free", "free", "free_tier"):
+        if metadata.get(key) is True:
+            return True
+    for key in ("pricing", "cost", "prices"):
+        pricing = metadata.get(key)
+        if isinstance(pricing, dict):
+            for input_key, output_key in PRICE_KEYS:
+                if input_key in pricing and output_key in pricing:
+                    if _is_zero_price(pricing[input_key]) and _is_zero_price(pricing[output_key]):
+                        return True
+    # Some catalogues put free-tier metadata under a provider object.
+    provider = metadata.get("top_provider")
+    if isinstance(provider, dict) and _metadata_is_free(provider):
+        return True
+    return False
+
+
+def is_explicitly_free(model_id, metadata=None):
     value = str(model_id or "").strip().lower()
-    return bool(value) and any(marker in value for marker in FREE_MARKERS)
+    return bool(value) and (
+        any(marker in value for marker in FREE_MARKERS)
+        or _metadata_is_free(metadata)
+    )
 
 
-def _model_ids(payload):
+def _model_rows(payload):
     rows = payload.get("data", []) if isinstance(payload, dict) else []
     if not isinstance(rows, list):
         raise RuntimeError("FreeLLMAPI /models response has no model list.")
+    return rows
+
+
+def _model_ids(payload):
     result = []
-    for row in rows:
+    for row in _model_rows(payload):
         if isinstance(row, dict):
             model_id = row.get("id") or row.get("name")
-            if model_id and is_explicitly_free(model_id):
+            if model_id and is_explicitly_free(model_id, row):
                 result.append(str(model_id))
     return list(dict.fromkeys(result))
 
@@ -59,7 +105,7 @@ def _score(model_id, task):
 
 
 def discover_free_models(base_url, api_key, task="general", preferred="auto", timeout=20):
-    """Return best-first free model IDs from the live gateway catalogue."""
+    """Return best-first explicitly free model IDs from the live gateway catalogue."""
     if not base_url or not api_key:
         return []
     url = base_url.rstrip("/") + "/models"
@@ -74,12 +120,22 @@ def discover_free_models(base_url, api_key, task="general", preferred="auto", ti
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"FreeLLMAPI model discovery failed: {exc}") from exc
 
+    rows = _model_rows(payload)
     models = _model_ids(payload)
     if not models:
+        priced = sum(
+            1 for row in rows if isinstance(row, dict)
+            and any(isinstance(row.get(key), dict) for key in ("pricing", "cost", "prices"))
+        )
+        print(
+            f"FreeLLMAPI catalogue: {len(rows)} models; {priced} include structured pricing; "
+            "none explicitly free. Unknown-price models remain excluded.",
+            flush=True,
+        )
         return []
-    preferred = str(preferred or "auto").strip()
     ordered = sorted(models, key=lambda item: (_score(item, task), item.lower()), reverse=True)
+    preferred = str(preferred or "auto").strip()
     if preferred.lower() not in ("", "auto") and preferred in models:
         ordered = [preferred] + [item for item in ordered if item != preferred]
+    print(f"FreeLLMAPI catalogue: {len(rows)} models; {len(ordered)} explicitly free candidates.", flush=True)
     return ordered
-
