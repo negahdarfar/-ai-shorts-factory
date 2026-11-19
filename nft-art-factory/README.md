@@ -28,6 +28,10 @@ Run `npm run studio` to generate the local-first creator page at `dist/gallery/i
 - `npm run generate` — create AI artwork drafts (requires configured provider secrets and explicit draft-only config).
 - `npm run pin:approved` — upload only items that have passed the rights and owner-approval gates.
 
+## Marketplace listing preparation
+
+Run `npm run marketplace:pack` to prepare OpenSea and Rarible listing drafts, a CSV review sheet and a publication checklist. This does not list or mint assets; wallet approval and signatures remain under the owner's control. See [marketplace listing preparation](docs/MARKETPLACE_LISTING_PREP.md).
+
 ## Private artwork storage
 
 An optional Cloudflare Worker + private R2 intake API is available for authenticated artwork drafts. See [private intake setup](docs/PRIVATE_INTAKE_API.md). The Creator Studio includes an optional upload panel; it requires your own deployed Worker URL and access token. The token is entered at runtime and is not stored by the page.
