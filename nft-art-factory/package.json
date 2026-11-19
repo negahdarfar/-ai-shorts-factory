@@ -10,9 +10,9 @@
     "generate": "node scripts/generate.mjs",
     "pin:approved": "node scripts/pin-approved.mjs",
     "studio": "node scripts/creator-studio.mjs",
-    "marketplace:pack": "node scripts/marketplace-pack.mjs"
+    "marketplace:pack": "node scripts/marketplace-pack.mjs",
+    "market:research": "node scripts/market-research.mjs",
+    "sales:report": "node scripts/sales-ledger.mjs"
   },
-  "engines": {
-    "node": ">=22"
-  }
+  "engines": { "node": ">=22" }
 }
