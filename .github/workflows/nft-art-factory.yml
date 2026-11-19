@@ -29,7 +29,11 @@ jobs:
         run: |
           mkdir -p assets
           printf 'placeholder-artwork-for-ci' > assets/artwork-001.png
-      - name: Run adapter tests
+      - name: Check JavaScript syntax
+        run: |
+          node --check scripts/creator-studio.mjs
+          node --check worker/index.mjs
+      - name: Run adapter and intake tests
         run: npm test
       - name: Build metadata
         run: npm run build
