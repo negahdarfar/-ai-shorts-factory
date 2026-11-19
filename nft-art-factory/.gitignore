@@ -6,6 +6,9 @@ dist/
 *.pem
 *.key
 *.wallet
-\nworkflows/ai-generation.json\nreviews/review-status.json\nreviews/ai-generation-queue.json\n
-# Private marketplace configuration
+workflows/ai-generation.json
+reviews/review-status.json
+reviews/ai-generation-queue.json
 marketplaces.json
+market-comps.json
+sales-ledger.json
