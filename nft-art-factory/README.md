@@ -27,13 +27,17 @@ Run `npm run studio` to generate the local-first creator page at `dist/gallery/i
 - `npm run studio` — generate the interactive local-first creator page.
 - `npm run generate` — create AI artwork drafts (requires configured provider secrets and explicit draft-only config).
 - `npm run pin:approved` — upload only items that have passed the rights and owner-approval gates.
+- `npm run marketplace:pack` — prepare OpenSea/Rarible listing handoff files.
+- `npm run market:research` — calculate indicative price ranges from actual completed-sale comparables entered by the operator.
+- `npm run sales:report` — validate the sales ledger format and export gross/fees/net reports.
+
+## Market research and sales
+Copy `market-comps.example.json` to the private `market-comps.json`, replace the example with real completed sales and source URLs, then run `npm run market:research`. Copy `sales-ledger.example.json` to `sales-ledger.json`, enter actual settlement data, then run `npm run sales:report`. The tools do not scrape live marketplace data and never invent comps or sales. Hash-format validation is not independent on-chain verification. See [market research and sales ledger](docs/MARKET_RESEARCH_AND_SALES.md).
 
 ## Marketplace listing preparation
-
 Run `npm run marketplace:pack` to prepare OpenSea and Rarible listing drafts, a CSV review sheet and a publication checklist. This does not list or mint assets; wallet approval and signatures remain under the owner's control. See [marketplace listing preparation](docs/MARKETPLACE_LISTING_PREP.md).
 
 ## Private artwork storage
-
 An optional Cloudflare Worker + private R2 intake API is available for authenticated artwork drafts. See [private intake setup](docs/PRIVATE_INTAKE_API.md). The Creator Studio includes an optional upload panel; it requires your own deployed Worker URL and access token. The token is entered at runtime and is not stored by the page.
 
 ## Provider setup
