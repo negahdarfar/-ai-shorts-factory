@@ -24,3 +24,6 @@ Accepted images: PNG, JPEG, WebP, maximum 10 MB. Each upload gets a unique ID an
 - R2 objects stay private. Do not enable public bucket access or expose object URLs.
 - Copyright ownership still requires human review before public publication.
 - This prototype returns only the latest 100 drafts and is not designed for multi-user production.
+
+
+The latest CI workflow also checks JavaScript syntax and exercises authenticated upload, listing, and private image preview behavior.
