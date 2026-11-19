@@ -10,7 +10,7 @@ function bucketMock() {
     async get(key) {
       const item = objects.get(key);
       if (!item) return null;
-      return { async json() { return JSON.parse(item.value); } };
+      return { body: item.value, httpMetadata: item.options?.httpMetadata, async json() { return JSON.parse(item.value); } };
     },
     async delete(key) { objects.delete(key); },
     async list({ prefix }) {
@@ -59,7 +59,7 @@ test("artwork API accepts an authorized draft and lists its record", async () =>
   assert.equal(list.status, 200);
   const records = await list.json();
   assert.equal(records.items.length, 1);
-  assert.equal(records.items[0].id, body.item.id);
+  assert.equal(records.items[0].id, body.item.id);\n\n  const preview = await worker.fetch(request("/api/artworks/" + body.item.id + "/image", { headers: { Authorization: "Bearer " + token } }), bindings);\n  assert.equal(preview.status, 200);\n  assert.equal(preview.headers.get("content-type"), "image/png");
 });
 
 test("artwork API rejects unsupported image types", async () => {
