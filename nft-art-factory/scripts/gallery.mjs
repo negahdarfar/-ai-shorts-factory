@@ -11,7 +11,7 @@ const reviews = fs.existsSync(reviewPath) ? JSON.parse(fs.readFileSync(reviewPat
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const cards = collection.items.map((item, index) => {
   const status = reviews[item.name]?.status || "draft";
-  const image = path.posix.join("../assets", path.basename(item.image || ""));
+  const image = path.posix.join("../../assets", path.basename(item.image || ""));
   const exists = item.image && fs.existsSync(path.join(root, "assets", path.basename(item.image)));
   return `<article class="card"><div class="preview">${exists ? `<img src="${esc(image)}" alt="${esc(item.name)}">` : '<span>Preview unavailable</span>'}</div><div class="body"><small>ARTWORK #${String(index + 1).padStart(3, "0")}</small><h2>${esc(item.name)}</h2><p>${esc(item.description)}</p><span class="status">${esc(status.replaceAll("_", " "))}</span><p class="file">${esc(item.image || "No image")}</p></div></article>`;
 }).join("\\n");
