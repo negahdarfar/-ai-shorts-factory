@@ -31,7 +31,7 @@ jobs:
           printf 'placeholder-artwork-for-ci' > assets/artwork-001.png
       - name: Build metadata
         run: npm run build
-      - name: Upload generated metadata artifact
+      - name: Generate creator gallery preview\n        run: npm run gallery\n      - name: Upload generated metadata artifact
         uses: actions/upload-artifact@v4
         with:
           name: nft-metadata-preview
