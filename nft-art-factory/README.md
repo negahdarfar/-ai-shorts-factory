@@ -40,6 +40,12 @@ Use `collection.example.json` as a template and copy it to `collection.json`. Pu
 - A displayed asking price is not proof of a completed sale. Track on-chain sale transactions separately.
 - Only upload artwork you own or are licensed to use.
 
+## AI generation and IPFS storage
+
+- Cloudflare Workers AI adapter for FLUX.1 [schnell], with a draft-only generation queue.
+- Pinata public IPFS upload adapter, gated by explicit rights and owner approval.
+- See [`docs/PROVIDERS_AND_STORAGE.md`](docs/PROVIDERS_AND_STORAGE.md) for setup, current limits, and safety boundaries.
+
 ## Planned adapters
 - IPFS pinning provider
 - Marketplace capability/eligibility checker
