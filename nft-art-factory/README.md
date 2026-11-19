@@ -16,7 +16,8 @@ A separate, isolated NFT workflow inside the AI Shorts Factory repository.
 - **AI-created artwork:** configure a provider using `workflows/ai-generation.example.json`. Provider execution is not enabled until a real provider adapter and its server-side credentials are configured.
 - Both routes feed the same review and marketplace pipeline. Draft-only is the default; rights review and owner approval are required before minting/listing.
 
-See [`docs/CREATOR_WORKFLOWS.md`](docs/CREATOR_WORKFLOWS.md) for the full process.\nSee [`docs/SETUP_SECRETS.md`](docs/SETUP_SECRETS.md) for secure provider setup.
+See [`docs/CREATOR_WORKFLOWS.md`](docs/CREATOR_WORKFLOWS.md) for the full process.
+See [`docs/SETUP_SECRETS.md`](docs/SETUP_SECRETS.md) for secure provider setup.\nSee [`docs/SETUP_SECRETS.md`](docs/SETUP_SECRETS.md) for secure provider setup.
 
 ## Current MVP
 - Validates collection and item fields.
