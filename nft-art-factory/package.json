@@ -8,9 +8,10 @@
     "test": "node --test",
     "gallery": "node scripts/gallery.mjs",
     "generate": "node scripts/generate.mjs",
-    "pin:approved": "node scripts/pin-approved.mjs"
+    "pin:approved": "node scripts/pin-approved.mjs",
+    "studio": "node scripts/creator-studio.mjs"
   },
   "engines": {
     "node": ">=22"
   }
-}\n
+}
