@@ -13,6 +13,7 @@ This optional backend stores original image bytes and JSON review records in a p
 ## API
 - `GET /api/health` — public, non-sensitive health check.
 - `GET /api/artworks` — requires `Authorization: Bearer <token>`; returns up to 100 private draft records.
+- `GET /api/artworks/{id}/image` — requires the same authorization; streams the selected image privately for preview.
 - `POST /api/artworks` — requires the same authorization and `multipart/form-data` fields `title`, `description`, and `image`.
 
 Accepted images: PNG, JPEG, WebP, maximum 10 MB. Each upload gets a unique ID and SHA-256 digest.
