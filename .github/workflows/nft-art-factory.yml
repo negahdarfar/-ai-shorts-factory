@@ -29,6 +29,8 @@ jobs:
         run: |
           mkdir -p assets
           printf 'placeholder-artwork-for-ci' > assets/artwork-001.png
+      - name: Run adapter tests
+        run: npm test
       - name: Build metadata
         run: npm run build
       - name: Generate creator gallery preview
