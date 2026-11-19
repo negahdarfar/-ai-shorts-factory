@@ -6,10 +6,13 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),"nft-market-ledger-"));
-const copy=(a,b)=>fs.copyFileSync(path.join(root,a),path.join(temp,b));
-const run=(script)=>spawnSync(process.execPath,[path.join(root,"scripts",script)],{cwd:temp,encoding:"utf8"});
+fs.mkdirSync(path.join(temp,"scripts"),{recursive:true});
+const copy=(a,b)=>fs.copyFileSync(path.join(sourceRoot,a),path.join(temp,b));
+copy("scripts/market-research.mjs","scripts/market-research.mjs");
+copy("scripts/sales-ledger.mjs","scripts/sales-ledger.mjs");
+const run=script=>spawnSync(process.execPath,[path.join(temp,"scripts",script)],{cwd:temp,encoding:"utf8"});
 test("market research uses only completed, sourced comps and does not auto-set listing prices",()=>{
  copy("collection.example.json","collection.json");copy("market-comps.example.json","market-comps.json");
  const r=run("market-research.mjs");assert.equal(r.status,0,r.stderr);
@@ -26,7 +29,7 @@ test("sales ledger exports format-valid sales and computes net",()=>{
 });
 test("sales ledger rejects malformed transaction hashes",()=>{
  copy("sales-ledger.example.json","sales-ledger.json");
- const p=path.join(temp,"sales-ledger.json"), data=JSON.parse(fs.readFileSync(p));
+ const p=path.join(temp,"sales-ledger.json"),data=JSON.parse(fs.readFileSync(p));
  data.sales[0].transactionHash="fake";fs.writeFileSync(p,JSON.stringify(data));
  const r=run("sales-ledger.mjs");assert.equal(r.status,2);
  const report=JSON.parse(fs.readFileSync(path.join(temp,"dist/sales-ledger/sales-report.json")));
