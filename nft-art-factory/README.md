@@ -28,6 +28,10 @@ Run `npm run studio` to generate the local-first creator page at `dist/gallery/i
 - `npm run generate` — create AI artwork drafts (requires configured provider secrets and explicit draft-only config).
 - `npm run pin:approved` — upload only items that have passed the rights and owner-approval gates.
 
+## Private artwork storage
+
+An optional Cloudflare Worker + private R2 intake API is available for authenticated artwork drafts. See [private intake setup](docs/PRIVATE_INTAKE_API.md). The Creator Studio includes an optional upload panel; it requires your own deployed Worker URL and access token. The token is entered at runtime and is not stored by the page.
+
 ## Provider setup
 See [secure provider setup](docs/SETUP_SECRETS.md) and [provider/storage notes](docs/PROVIDERS_AND_STORAGE.md).
 
