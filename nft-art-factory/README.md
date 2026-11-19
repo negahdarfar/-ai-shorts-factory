@@ -10,6 +10,14 @@ A separate, isolated NFT workflow inside the AI Shorts Factory repository.
 5. Review marketplace/network eligibility, fees, royalties and creator terms.
 6. Mint/list through a marketplace adapter only where its documented API supports it. Wallet signing and irreversible blockchain actions require an explicit owner approval step.
 
+## Two ways to add artwork
+
+- **Your own artwork:** add the file under `assets/` and prepare its intake record using `workflows/artwork-intake.example.json`.
+- **AI-created artwork:** configure a provider using `workflows/ai-generation.example.json`. Provider execution is not enabled until a real provider adapter and its server-side credentials are configured.
+- Both routes feed the same review and marketplace pipeline. Draft-only is the default; rights review and owner approval are required before minting/listing.
+
+See [`docs/CREATOR_WORKFLOWS.md`](docs/CREATOR_WORKFLOWS.md) for the full process.
+
 ## Current MVP
 - Validates collection and item fields.
 - Checks that referenced local artwork files exist.
