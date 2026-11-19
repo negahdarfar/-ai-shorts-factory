@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "gallery": "node scripts/gallery.mjs"
   },
   "engines": {
     "node": ">=22"
   }
-}
+}\n
