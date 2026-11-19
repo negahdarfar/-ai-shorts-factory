@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check scripts/creator-studio.mjs
           node --check worker/index.mjs
+          node --check scripts/marketplace-pack.mjs
       - name: Run adapter and intake tests
         run: npm test
       - name: Build metadata
