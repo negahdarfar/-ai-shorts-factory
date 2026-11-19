@@ -41,6 +41,8 @@ jobs:
         run: npm run gallery
       - name: Generate interactive creator studio
         run: npm run studio
+      - name: Generate marketplace listing drafts
+        run: npm run marketplace:pack
       - name: Upload generated metadata artifact
         uses: actions/upload-artifact@v4
         with:
