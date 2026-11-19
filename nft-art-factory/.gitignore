@@ -6,3 +6,4 @@ dist/
 *.pem
 *.key
 *.wallet
+\nworkflows/ai-generation.json\nreviews/review-status.json\nreviews/ai-generation-queue.json\n
