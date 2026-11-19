@@ -37,4 +37,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nft-metadata-preview
-          path: nft-art-factory/dist/
+          path: dist/
