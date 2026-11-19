@@ -25,3 +25,8 @@ The free plan currently lists 1GB storage, 10GB bandwidth, and a 500-file limit.
 ## Important
 
 The GitHub repository is source code, not a secure runtime for long-lived production secrets. Do not add API keys as ordinary repository files or commit them. Use a hosting provider's encrypted secret manager when the authenticated backend is deployed. Generation is draft-only; IPFS publication is separately gated by creator rights confirmation and owner approval.
+
+
+## Private Creator Studio intake
+
+For authenticated image intake, follow [PRIVATE_INTAKE_API.md](PRIVATE_INTAKE_API.md). Create a private R2 bucket, deploy the Worker, bind `ARTWORKS`, and configure the `DASHBOARD_ACCESS_TOKEN` secret plus the exact `ALLOWED_ORIGIN`. Do not paste the token into GitHub source files or chat. The Creator Studio upload panel remains optional until this backend is deployed.
