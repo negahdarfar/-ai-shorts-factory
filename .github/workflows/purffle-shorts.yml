@@ -56,7 +56,7 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-core
 
       - name: Connect to private phone gateway
-        if: ${{ inputs.use_phone_gateway == true || secrets.FREELLMAPI_CLOUD_BASE_URL == '' }}
+        if: ${{ inputs.use_phone_gateway == true }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
