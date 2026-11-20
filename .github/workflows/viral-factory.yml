@@ -8,7 +8,7 @@ on:
         required: true
         type: choice
         options: [discover, process]
-        default: discover
+        default: process
       candidate_index:
         description: "Zero-based Commons candidate index (see discovery artifact)"
         required: true
@@ -24,7 +24,7 @@ on:
         description: "Upload the rendered Shorts publicly (explicit opt-in)"
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
