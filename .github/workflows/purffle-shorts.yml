@@ -18,7 +18,7 @@ on:
         description: "Use the private Android FreeLLMAPI gateway over Tailscale"
         required: false
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -56,7 +56,7 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-core
 
       - name: Connect to private phone gateway
-        if: ${{ inputs.use_phone_gateway == true }}
+        if: ${{ inputs.use_phone_gateway == true || secrets.FREELLMAPI_CLOUD_BASE_URL == '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
@@ -74,7 +74,7 @@ jobs:
             : "${YOUTUBE_CLIENT_SECRET:?Missing YOUTUBE_CLIENT_SECRET GitHub secret}"
             : "${YOUTUBE_REFRESH_TOKEN:?Missing YOUTUBE_REFRESH_TOKEN GitHub secret}"
           fi
-          if [[ "${{ inputs.use_phone_gateway }}" == "true" ]]; then
+          if [[ "${{ inputs.use_phone_gateway }}" == "true" || -z "${FREELLMAPI_CLOUD_BASE_URL:-}" ]]; then
             : "${FREELLMAPI_BASE_URL:?Missing FREELLMAPI_BASE_URL GitHub secret}"
             : "${FREELLMAPI_API_KEY:?Missing FREELLMAPI_API_KEY GitHub secret}"
             : "${TAILSCALE_AUTHKEY:?Missing TAILSCALE_AUTHKEY GitHub secret}"
@@ -127,8 +127,8 @@ jobs:
       - name: Generate Shorts with PurffleShorts and publish
         env:
           LLM_PROVIDER: custom
-          LLM_BASE_URL: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_BASE_URL || secrets.FREELLMAPI_CLOUD_BASE_URL }}
-          LLM_API_KEY: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_API_KEY || secrets.FREELLMAPI_CLOUD_API_KEY }}
+          LLM_BASE_URL: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_BASE_URL || (secrets.FREELLMAPI_CLOUD_BASE_URL == '' && secrets.FREELLMAPI_BASE_URL) || secrets.FREELLMAPI_CLOUD_BASE_URL }}
+          LLM_API_KEY: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_API_KEY || (secrets.FREELLMAPI_CLOUD_BASE_URL == '' && secrets.FREELLMAPI_API_KEY) || secrets.FREELLMAPI_CLOUD_API_KEY }}
           LLM_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
           LLM_FALLBACKS: ""
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
