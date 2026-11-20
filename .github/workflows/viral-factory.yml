@@ -65,9 +65,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          : "\${YOUTUBE_CLIENT_ID:?Missing existing YOUTUBE_CLIENT_ID secret}"
-          : "\${YOUTUBE_CLIENT_SECRET:?Missing existing YOUTUBE_CLIENT_SECRET secret}"
-          : "\${YOUTUBE_REFRESH_TOKEN:?Missing existing YOUTUBE_REFRESH_TOKEN secret}"
+          : "${YOUTUBE_CLIENT_ID:?Missing existing YOUTUBE_CLIENT_ID secret}"
+          : "${YOUTUBE_CLIENT_SECRET:?Missing existing YOUTUBE_CLIENT_SECRET secret}"
+          : "${YOUTUBE_REFRESH_TOKEN:?Missing existing YOUTUBE_REFRESH_TOKEN secret}"
       - name: Compile and test the isolated Viral Factory
         run: |
           python -m py_compile viral_factory/cli.py
