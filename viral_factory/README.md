@@ -11,7 +11,7 @@ Standalone, manually triggered content discovery and Shorts rendering.
 - Existing YouTube OAuth secrets are reused only when publishing is explicitly enabled.
 
 ## Features
-1. Searches Wikimedia Commons for video files and accepts only identified CC0, CC BY, CC BY-SA or public-domain material.
+1. Searches Wikimedia Commons for video files and accepts only identified CC0, CC BY or public-domain material.
 2. Optionally reads YouTube most-popular metadata if \`YOUTUBE_API_KEY\` exists. This is trend research only; it does not download YouTube videos.
 3. Downloads only a selected Wikimedia Commons candidate and rechecks its source host and license.
 4. Transcribes locally with faster-whisper, scores transcript windows for hooks/questions/numbers, and renders vertical 9:16 MP4 clips with FFmpeg.
