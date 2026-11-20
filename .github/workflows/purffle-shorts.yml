@@ -92,6 +92,26 @@ jobs:
           echo "UPLOAD=$PUBLISH_PUBLIC" >> "$GITHUB_ENV"
           echo "YT_PRIVACY=public" >> "$GITHUB_ENV"
 
+      - name: Preflight FreeLLMAPI connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A non-000 HTTP status proves that the API host answered. 401/404
+          # are still useful connectivity signals; the generation step will
+          # report authentication or route errors separately.
+          probe_url="${LLM_BASE_URL%/}/models"
+          echo "Checking FreeLLMAPI reachability (no credentials are printed)..."
+          set +e
+          http_code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 8 --max-time 12 \
+            --header "Authorization: Bearer $LLM_API_KEY" "$probe_url" 2>/dev/null)"
+          curl_status=$?
+          set -e
+          if [[ "$curl_status" -ne 0 || "$http_code" == "000" || -z "$http_code" ]]; then
+            echo "::error::FreeLLMAPI is unreachable from this GitHub runner. Check that the Android FreeLLMAPI server is running, listening on the Tailscale interface, and accepting connections on port 3001. No video generation was started."
+            exit 1
+          fi
+          echo "FreeLLMAPI host responded with HTTP $http_code; continuing to the generation step."
+
       - name: Install pinned PurffleShorts 3.1.0
         run: |
           python -m pip install --upgrade pip
