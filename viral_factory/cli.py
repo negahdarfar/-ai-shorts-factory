@@ -9,7 +9,7 @@ API = "https://commons.wikimedia.org/w/api.php"
 UA = "KoroushViralFactory/1.0 (standalone workflow)"
 TERMS = ["science video", "space video", "wildlife video", "nature video",
          "ocean video", "technology video", "history video", "landscape video"]
-LICENSES = ("cc0", "cc by", "cc by-sa", "public domain")
+LICENSES = ("cc0", "cc by", "public domain")
 MAX_BYTES = 500 * 1024 * 1024
 HOOKS = {"secret","shocking","amazing","never","impossible","truth","mistake",
          "discovered","incredible","surprising","dangerous","why","how",
@@ -26,7 +26,7 @@ def clean(value: Any) -> str:
 
 def allowed_license(name: str) -> bool:
     text = clean(name).lower().replace("_", " ").replace("-", " ")
-    if any(x in text for x in ("noncommercial","non commercial","no derivatives"," nd")):
+    if any(x in text for x in ("noncommercial","non commercial","no derivatives")) or re.search(r"\\b(?:nd|sa)\\b", text):
         return False
     return any(x in text for x in LICENSES)
 
