@@ -63,10 +63,16 @@ jobs:
 
       - name: Select FreeLLMAPI endpoint and validate existing secrets
         shell: bash
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: |
           set -euo pipefail
           if [[ "$PUBLISH_PUBLIC" == "true" ]]; then
-            : "${{ secrets.YOUTUBE_CLIENT_ID != '' && 'ok' || 'missing' }}"
+            : "${YOUTUBE_CLIENT_ID:?Missing YOUTUBE_CLIENT_ID GitHub secret}"
+            : "${YOUTUBE_CLIENT_SECRET:?Missing YOUTUBE_CLIENT_SECRET GitHub secret}"
+            : "${YOUTUBE_REFRESH_TOKEN:?Missing YOUTUBE_REFRESH_TOKEN GitHub secret}"
           fi
           if [[ "${{ inputs.use_phone_gateway }}" == "true" ]]; then
             : "${FREELLMAPI_BASE_URL:?Missing FREELLMAPI_BASE_URL GitHub secret}"
@@ -121,9 +127,9 @@ jobs:
       - name: Generate Shorts with PurffleShorts and publish
         env:
           LLM_PROVIDER: custom
-          LLM_BASE_URL: ${{ env.LLM_BASE_URL }}
-          LLM_API_KEY: ${{ env.LLM_API_KEY }}
-          LLM_MODEL: ${{ env.LLM_MODEL }}
+          LLM_BASE_URL: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_BASE_URL || secrets.FREELLMAPI_CLOUD_BASE_URL }}
+          LLM_API_KEY: ${{ inputs.use_phone_gateway && secrets.FREELLMAPI_API_KEY || secrets.FREELLMAPI_CLOUD_API_KEY }}
+          LLM_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
           LLM_FALLBACKS: ""
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
