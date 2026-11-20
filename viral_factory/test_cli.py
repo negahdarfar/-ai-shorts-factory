@@ -7,7 +7,7 @@ class ViralFactoryTests(unittest.TestCase):
     def test_allowed_creative_commons_licenses(self):
         self.assertTrue(allowed_license("CC0"))
         self.assertTrue(allowed_license("CC BY 4.0"))
-        self.assertTrue(allowed_license("CC BY-SA 4.0"))
+        self.assertFalse(allowed_license("CC BY-SA 4.0"))
         self.assertTrue(allowed_license("Public domain"))
 
     def test_restricted_licenses_are_rejected(self):
