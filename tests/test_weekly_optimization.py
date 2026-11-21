@@ -58,7 +58,20 @@ class WeeklyOptimizationTests(unittest.TestCase):
                                       "rows": [["bad<&id", 123]]},
                 },
             }), encoding="utf-8")
-            optimization.write_text(json.dumps({"recommendations": ["Review top Shorts."]}), encoding="utf-8")
+            optimization.write_text(json.dumps({
+                "recommendations": ["Review top Shorts."],
+                "top_by_engaged_views": [{
+                    "video": "bad<&id",
+                    "title": "bad<&id",
+                    "video_url": "https://www.youtube.com/watch?v=bad%3C%26id",
+                    "topic": "test topic",
+                    "hook_type": "question",
+                    "views": 123,
+                    "engagedViews": 80,
+                    "averageViewPercentage": 75.0,
+                    "engaged_views_over_views_percent": 65.04,
+                }],
+            }), encoding="utf-8")
             with patch.object(sys, "argv", ["build_factory_dashboard.py", "--analytics", str(analytics),
                                             "--optimization", str(optimization), "--output", str(output)]):
                 build_dashboard()
