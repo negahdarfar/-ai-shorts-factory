@@ -54,14 +54,29 @@ class SeoPipelineTests(unittest.TestCase):
             "pinned_comment":"What do you think?","thumbnail_concept":"The Sun releasing a flare",
             "search_intent":"Understand solar storms"
         }
-        response_data = {"candidates":[{"content":{"parts":[{"text":json.dumps({
-            "items":[{"index":i,"metadata":dict(fields),"video_script":long_script(),"video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"]} for i in range(1,5)]
-        })}]}}]}
+        response_data = {
+            "status": "completed",
+            "steps": [{
+                "type": "model_output",
+                "content": [{"type": "text", "text": json.dumps({
+                    "items": [{"index": i, "metadata": dict(fields), "video_script": long_script(),
+                               "video_terms": ["solar storms", "solar flare", "Sun surface", "space weather", "solar activity"]}
+                              for i in range(1, 5)]
+                })}],
+            }],
+        }
         mocked = patch("urllib.request.urlopen")
         with mocked as urlopen:
             urlopen.return_value.__enter__.return_value.read.return_value = json.dumps(response_data).encode()
             result = module.generate_batch(["Topic 1","Topic 2","Topic 3","Topic 4"],"English","gemini-test","test-key")
         self.assertEqual(urlopen.call_count, 1)
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://generativelanguage.googleapis.com/v1beta/interactions")
+        self.assertEqual(request.headers.get("X-goog-api-key"), "test-key")
+        request_payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(request_payload["model"], "gemini-test")
+        self.assertFalse(request_payload["store"])
+        self.assertEqual(request_payload["response_format"]["mime_type"], "application/json")
         self.assertEqual(len(result), 4)
 
     def test_quota_fallback_is_blocked_before_publish(self):
