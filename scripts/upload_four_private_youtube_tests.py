@@ -61,7 +61,10 @@ def load_validated_videos(home: Path) -> list[Path]:
             raise SystemExit(f"Validated video path is missing from storage: {relative_path!r}.")
         if path.stat().st_size < 500_000:
             raise SystemExit(f"Video is unexpectedly small; refusing upload: {relative_path}")
-        videos.append(path)
+        topic = str(item.get("topic", "")).strip()
+        if not topic:
+            raise SystemExit(f"Quality report has no topic mapping for {relative_path!r}.")
+        videos.append({"path": path, "topic": topic, "index": int(item.get("index", len(videos) + 1))})
 
     if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
         raise SystemExit(f"The validation report does not identify {EXPECTED_COUNT} distinct video files.")
@@ -120,7 +123,16 @@ def main() -> None:
     prepared = []
     results_by_index = {}
     new_public_topics = []
-    for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
+    seo_by_topic = {str(record.get("topic", "")).strip().casefold(): record for record in seo_records}
+    if len(seo_by_topic) != EXPECTED_COUNT:
+        raise SystemExit("SEO manifest contains duplicate or missing topic names; refusing upload.")
+    for video_item in videos:
+        index = video_item["index"]
+        video_path = video_item["path"]
+        topic = video_item["topic"]
+        record = seo_by_topic.get(topic.casefold())
+        if record is None:
+            raise SystemExit(f"No SEO metadata record matches rendered topic: {topic}")
         digest = sha256_file(video_path)
         ledger_key = idempotency_key(mode, digest)
         previous = history["uploads"].get(ledger_key)
