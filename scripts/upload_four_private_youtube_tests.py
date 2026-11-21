@@ -68,6 +68,10 @@ def load_validated_videos(home: Path) -> list[Path]:
 
     if len({item["path"].resolve() for item in videos}) != EXPECTED_COUNT:
         raise SystemExit(f"The validation report does not identify {EXPECTED_COUNT} distinct video files.")
+    if len({item["topic"].casefold() for item in videos}) != EXPECTED_COUNT:
+        raise SystemExit("The validation report maps multiple videos to the same topic.")
+    if sorted(item["index"] for item in videos) != list(range(1, EXPECTED_COUNT + 1)):
+        raise SystemExit("The validation report has missing or duplicate task indexes.")
     if len(available) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} final MP4 files in storage, found {len(available)}.")
     return videos
