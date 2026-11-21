@@ -91,17 +91,26 @@ def query_video_rows(api, start, end, video_ids):
     all_rows = []
     for offset in range(0, len(video_ids), VIDEO_BATCH_SIZE):
         batch = video_ids[offset:offset + VIDEO_BATCH_SIZE]
-        result = api.reports().query(
-            ids="channel==MINE",
-            startDate=start.isoformat(),
-            endDate=end.isoformat(),
-            metrics=METRICS,
-            dimensions="video",
-            filters="video==" + ",".join(batch),
-            maxResults=200,
-        ).execute()
-        headers = result.get("columnHeaders", headers)
-        all_rows.extend(result.get("rows") or [])
+        query = {
+            "ids": "channel==MINE",
+            "startDate": start.isoformat(),
+            "endDate": end.isoformat(),
+            "metrics": METRICS,
+            "filters": "video==" + ",".join(batch),
+            "maxResults": 200,
+        }
+        if len(batch) > 1:
+            query["dimensions"] = "video"
+        result = api.reports().query(**query).execute()
+        batch_headers = result.get("columnHeaders", [])
+        batch_rows = result.get("rows") or []
+        if len(batch) == 1:
+            video_header = {"name": "video", "dataType": "STRING", "columnType": "DIMENSION"}
+            headers = [video_header] + (headers or batch_headers)
+            all_rows.extend([[batch[0]] + row for row in batch_rows])
+        else:
+            headers = batch_headers or headers
+            all_rows.extend(batch_rows)
     if headers is None:
         headers = [{"name": "video", "dataType": "STRING", "columnType": "DIMENSION"}]
     return {"columnHeaders": headers, "rows": all_rows}
