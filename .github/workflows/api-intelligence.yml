@@ -24,10 +24,10 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run unit tests
-        run: python -m unittest discover -s tests -p 'test_api_intelligence.py' -v
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Discover API candidates and check selected catalogue links
         run: python scripts/api_intelligence.py --check --check-limit 12 --output-dir api-intelligence-report
-      - name: Upload discovery report
+      - name: Discover relevant open-source GitHub projects\n        run: python scripts/github_project_scout.py\n      - name: Upload discovery report
         uses: actions/upload-artifact@v4
         with:
           name: koroush-api-intelligence
