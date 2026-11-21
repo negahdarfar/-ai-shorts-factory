@@ -12,7 +12,10 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+]
 METRICS = (
     "views,engagedViews,estimatedMinutesWatched,averageViewDuration,"
     "averageViewPercentage,likes,comments,shares,subscribersGained"
@@ -137,14 +140,14 @@ def main():
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.environ["YOUTUBE_CLIENT_ID"].strip(),
         client_secret=os.environ["YOUTUBE_CLIENT_SECRET"].strip(),
-        scopes=[SCOPE],
+        scopes=SCOPES,
     )
     try:
         credentials.refresh(Request())
     except Exception as exc:
         raise SystemExit(
             "Analytics OAuth refresh failed. Create YOUTUBE_ANALYTICS_REFRESH_TOKEN "
-            "with the yt-analytics.readonly scope; do not replace the working upload token. "
+            "with the youtube.readonly and yt-analytics.readonly scopes; do not replace the working upload token. "
             + str(exc)
         ) from exc
 
@@ -198,7 +201,7 @@ def main():
             "impressions": "Shorts-feed exposure is not represented here as ordinary thumbnail impressions."
         },
         "source": "YouTube Analytics API v2",
-        "scope": SCOPE,
+        "scopes": SCOPES,
         "video_report_source": "Completed public video IDs in the durable factory upload ledger.",
         "note": "Shorts daily rows are filtered using creatorContentType=SHORTS. Video rows are restricted to factory-published public Shorts IDs. Data is delayed; the report ends three days before the run date."
     }
