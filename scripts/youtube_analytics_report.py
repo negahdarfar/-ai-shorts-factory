@@ -106,7 +106,8 @@ def query_video_rows(api, start, end, video_ids):
         batch_rows = result.get("rows") or []
         if len(batch) == 1:
             video_header = {"name": "video", "dataType": "STRING", "columnType": "DIMENSION"}
-            headers = [video_header] + (headers or batch_headers)
+            if not headers or headers[0].get("name") != "video":
+                headers = [video_header] + (batch_headers or headers or [])
             all_rows.extend([[batch[0]] + row for row in batch_rows])
         else:
             headers = batch_headers or headers
