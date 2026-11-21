@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from weekly_optimization import as_number, records, total, main
+from build_factory_dashboard import main as build_dashboard
 
 
 class WeeklyOptimizationTests(unittest.TestCase):
@@ -39,6 +40,33 @@ class WeeklyOptimizationTests(unittest.TestCase):
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "BLOCKED")
             self.assertIn("missing analytics token", markdown.read_text(encoding="utf-8"))
+
+    def test_dashboard_is_self_contained_and_escapes_video_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            analytics = root / "analytics.json"
+            optimization = root / "optimization.json"
+            output = root / "dashboard.html"
+            analytics.write_text(json.dumps({
+                "status": "completed",
+                "start_date": "2026-11-01",
+                "end_date": "2026-11-21",
+                "reports": {
+                    "shorts_daily": {"columnHeaders": [{"name": "day"}, {"name": "views"}],
+                                     "rows": [["2026-11-20", 123]]},
+                    "shorts_videos": {"columnHeaders": [{"name": "video"}, {"name": "views"}],
+                                      "rows": [["bad<&id", 123]]},
+                },
+            }), encoding="utf-8")
+            optimization.write_text(json.dumps({"recommendations": ["Review top Shorts."]}), encoding="utf-8")
+            with patch.object(sys, "argv", ["build_factory_dashboard.py", "--analytics", str(analytics),
+                                            "--optimization", str(optimization), "--output", str(output)]):
+                build_dashboard()
+            html = output.read_text(encoding="utf-8")
+            self.assertIn("KOROUSH VIRAL SHORTS FACTORY", html)
+            self.assertIn("Review top Shorts.", html)
+            self.assertIn("bad&lt;&amp;id", html)
+            self.assertNotIn("bad<&id", html)
 
     def test_comparison_and_top_video_are_generated(self):
         with tempfile.TemporaryDirectory() as directory:
