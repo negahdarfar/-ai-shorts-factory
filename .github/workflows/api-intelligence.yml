@@ -1,0 +1,36 @@
+name: KOROUSH API Intelligence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-intelligence-readonly
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run unit tests
+        run: python -m unittest tests.test_api_intelligence -v
+      - name: Discover API candidates and check selected catalogue links
+        run: python scripts/api_intelligence.py --check --check-limit 12 --output-dir api-intelligence-report
+      - name: Upload discovery report
+        uses: actions/upload-artifact@v4
+        with:
+          name: koroush-api-intelligence
+          path: api-intelligence-report/
+          if-no-files-found: error
+          retention-days: 14
