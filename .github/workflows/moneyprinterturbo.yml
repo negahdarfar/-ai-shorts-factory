@@ -25,12 +25,12 @@ name: MoneyPrinterTurbo Shorts Factory
         options: ["4", "5", "6", "7", "8", "9", "10"]
         default: "4"
       publish_four_public:
-        description: 'Publish all four validated videos PUBLIC on YouTube (manual runs only; daily schedule is separate)'
+        description: 'Publish all validated Shorts PUBLIC on YouTube (manual runs only; daily schedule is separate)'
         required: false
         type: boolean
         default: false
       upload_four_private_tests:
-        description: 'Upload all four validated Shorts as PRIVATE QA tests'
+        description: 'Upload all validated Shorts as PRIVATE QA tests'
         required: false
         type: boolean
         default: false
