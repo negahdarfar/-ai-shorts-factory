@@ -39,6 +39,25 @@ def table_rows(report, limit=20):
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rendered)}</tbody></table>" if headers else "<p>No rows returned.</p>"
 
 
+def summary_table(rows, columns, link_field=None):
+    if not rows:
+        return "<p>No attributed rows available yet.</p>"
+    header = "".join(f"<th>{html.escape(str(column))}</th>" for column in columns)
+    body = []
+    for row in rows:
+        cells = []
+        for column in columns:
+            value = row.get(column, "")
+            if column == link_field and value:
+                href = html.escape(str(value), quote=True)
+                label = html.escape(str(row.get("title") or row.get("video") or value))
+                cells.append(f'<td><a href="{href}" target="_blank" rel="noopener">{label}</a></td>')
+            else:
+                cells.append(f"<td>{html.escape(str(value if value is not None else ''))}</td>")
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    return f"<table><thead><tr>{header}</tr></thead><tbody>{''.join(body)}</tbody></table>"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--analytics", default="youtube_analytics.json")
@@ -73,6 +92,19 @@ def main():
         for label, value in kpis
     )
     rec_html = "".join(f"<li>{html.escape(str(item))}</li>" for item in recommendations) or "<li>Analytics authorization or data is not available yet.</li>"
+    topic_table = summary_table(
+        optimization.get("topic_performance", []),
+        ["topic", "sample_count", "views", "engagedViews", "averageViewPercentage", "engaged_views_over_views_percent"],
+    )
+    hook_table = summary_table(
+        optimization.get("hook_performance", []),
+        ["hook_type", "sample_count", "views", "engagedViews", "averageViewPercentage", "engaged_views_over_views_percent"],
+    )
+    top_video_table = summary_table(
+        optimization.get("top_by_engaged_views", []),
+        ["video_url", "topic", "hook_type", "views", "engagedViews", "averageViewPercentage", "engaged_views_over_views_percent"],
+        link_field="video_url",
+    )
     blocked = analytics.get("reason") or "Add YOUTUBE_ANALYTICS_REFRESH_TOKEN with yt-analytics.readonly consent to enable channel analytics."
     body = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -97,8 +129,10 @@ th{{color:var(--muted)}}a{{color:var(--accent)}}li{{margin:8px 0}}footer{{color:
 </div>
 <div class="grid">{kpi_html}</div>
 <section><h2>Weekly recommendations</h2><ul>{rec_html}</ul></section>
+<section><h2>Topic performance</h2>{topic_table}</section>
+<section><h2>Hook category performance</h2>{hook_table}</section>
+<section><h2>Top Shorts by engaged views</h2>{top_video_table}</section>
 <section><h2>Shorts performance by day</h2>{table_rows(daily, 45)}</section>
-<section><h2>Shorts performance by video</h2>{table_rows(videos, 50)}</section>
 {f'<section><h2>Setup required</h2><p>{html.escape(str(blocked))}</p></section>' if status != 'completed' else ''}
 <footer>Generated {datetime.now(timezone.utc).isoformat()} · Engaged views / views is a directional proxy only; it is not the exact YouTube Studio Stayed to watch / Viewed vs swiped away metric. See youtube_analytics.json for metric notes.</footer>
 </main></body></html>"""
