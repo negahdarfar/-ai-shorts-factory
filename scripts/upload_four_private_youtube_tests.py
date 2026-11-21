@@ -137,7 +137,7 @@ def main() -> None:
             continue
 
         publish_at = (first_publish_at + timedelta(hours=3 * (index - 1))) if scheduled else None
-        prepared.append((index, video_path, record, digest, idempotency_key, publish_at))
+        prepared.append((index, video_path, record, digest, ledger_key, publish_at))
         if mode == "public":
             new_public_topics.append(str(record.get("topic", "")).strip())
 
@@ -170,7 +170,7 @@ def main() -> None:
         raise SystemExit("Google did not return a valid access token.")
 
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
-    for index, video_path, record, digest, idempotency_key, publish_at in prepared:
+    for index, video_path, record, digest, ledger_key, publish_at in prepared:
         metadata = record["metadata"]
         description = metadata["description"].strip()
         hashtags = [str(tag).strip().lstrip("#") for tag in metadata.get("hashtags", []) if str(tag).strip()]
