@@ -45,8 +45,8 @@ for path in files:
     if height <= width or abs((width / height) - (9 / 16)) > 0.025:
         raise SystemExit(f"Not a proper 9:16 vertical video ({width}x{height}): {path}")
     duration = float(info["format"]["duration"])
-    if not 45 <= duration <= 60:
-        raise SystemExit(f"Shorts duration must be 45-60 seconds ({duration:.1f}s): {path}")
+    if not 60 <= duration <= 120:
+        raise SystemExit(f"Shorts duration must be 60-120 seconds ({duration:.1f}s): {path}")
     report.append({
         "file": path.name,
         "relative_path": path.relative_to(tasks_root).as_posix(),
