@@ -15,7 +15,7 @@ Do not replace the working upload refresh token. The analytics token is separate
 1. In the Google Cloud project used by the channel, enable YouTube Analytics API.
 2. Complete OAuth consent for the same YouTube channel and request `https://www.googleapis.com/auth/yt-analytics.readonly`.
 3. Store the resulting refresh token as `YOUTUBE_ANALYTICS_REFRESH_TOKEN` in GitHub Actions secrets.
-4. Run **YouTube Analytics** manually once to verify access. Scheduled runs occur weekly on Monday at 05:30 UTC (09:00 Iran time in UTC+03:30).
+4. Run **YouTube Analytics** manually once to verify access. Scheduled analytics runs daily at 05:30 UTC (09:00 Iran time in UTC+03:30). Weekly optimization runs Monday at 06:30 UTC (10:00 Iran time) and downloads the latest completed analytics artifact.
 5. The workflow uploads a 30-day artifact named `youtube-analytics-report`. The weekly optimization workflow runs after scheduled analytics and uploads `weekly-shorts-optimization`.
 
 ## Metrics and limitations
