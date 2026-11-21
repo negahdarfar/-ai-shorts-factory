@@ -24,7 +24,7 @@ def table_rows(report, limit=20):
     headers = [item.get("name", "") for item in report.get("columnHeaders", [])]
     enriched = report.get("rows_with_engagement_proxy") or []
     if enriched:
-        headers = headers + ["engaged_views_over_views_percent"]
+        headers = headers + ["engaged/views proxy (%)"]
         rows = [list(item.get("row", [])) + [item.get("engaged_views_over_views_percent")] for item in enriched]
     else:
         rows = report.get("rows") or []
