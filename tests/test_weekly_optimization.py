@@ -35,8 +35,7 @@ class WeeklyOptimizationTests(unittest.TestCase):
             markdown = root / "optimization.md"
             source.write_text(json.dumps({"status": "BLOCKED", "reason": "missing analytics token"}), encoding="utf-8")
             with patch.object(sys, "argv", ["weekly_optimization.py", "--input", str(source),
-                                            "--output", str(output), "--markdown", str(markdown),
-                                            "--upload-history", str(upload_history)]):
+                                            "--output", str(output), "--markdown", str(markdown)]):
                 main()
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "BLOCKED")
@@ -116,7 +115,8 @@ class WeeklyOptimizationTests(unittest.TestCase):
             }
             source.write_text(json.dumps(payload), encoding="utf-8")
             with patch.object(sys, "argv", ["weekly_optimization.py", "--input", str(source),
-                                            "--output", str(output), "--markdown", str(markdown)]):
+                                            "--output", str(output), "--markdown", str(markdown),
+                                            "--upload-history", str(upload_history)]):
                 main()
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "completed")
