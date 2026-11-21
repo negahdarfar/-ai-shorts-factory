@@ -12,6 +12,7 @@ from pathlib import Path
 
 from topic_history import ensure_new_topics, record_published_topic
 from upload_history import idempotency_key, load_upload_history, save_upload_history, sha256_file
+from content_metadata import classify_hook, extract_hook
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -179,6 +180,8 @@ def main() -> None:
         tags = [str(tag).strip() for tag in metadata.get("tags", []) if str(tag).strip()][:15]
         publish_at_text = publish_at.isoformat(timespec="seconds").replace("+00:00", "Z") if publish_at else None
 
+        hook_text = extract_hook(record["video_script"])
+        hook_type = classify_hook(hook_text)
         pending = {
             "mode": mode,
             "status": "pending",
@@ -186,6 +189,8 @@ def main() -> None:
             "file": video_path.name,
             "topic": str(record["topic"]).strip(),
             "title": metadata["title"][:100],
+            "hook_text": hook_text,
+            "hook_type": hook_type,
             "privacy": privacy,
             "scheduled": scheduled,
             "publish_at_utc": publish_at_text,
@@ -228,6 +233,8 @@ def main() -> None:
             "sha256": digest,
             "topic": str(record["topic"]).strip(),
             "title": metadata["title"][:100],
+            "hook_text": hook_text,
+            "hook_type": hook_type,
             "video_id": video_id,
             "privacy": "scheduled" if scheduled else privacy,
             **({"publish_at_utc": publish_at_text} if publish_at_text else {}),
