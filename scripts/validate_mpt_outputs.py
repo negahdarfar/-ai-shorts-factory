@@ -8,6 +8,8 @@ from pathlib import Path
 
 home = Path(os.environ["MPT_HOME"])
 expected = int(os.environ.get("EXPECTED_COUNT", "4"))
+if not 4 <= expected <= 10:
+    raise SystemExit("EXPECTED_COUNT must be between 4 and 10.")
 tasks_root = home / "storage" / "tasks"
 files = sorted(tasks_root.glob("**/final-*.mp4"))
 if len(files) != expected:
