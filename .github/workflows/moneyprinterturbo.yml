@@ -91,6 +91,13 @@ jobs:
       - name: Merge durable topic and upload history
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         run: python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
+      - name: Validate daily batch size
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        run: |
+          case "$DAILY_COUNT" in
+            4|5|6|7|8|9|10) echo "Daily batch size accepted: $DAILY_COUNT" ;;
+            *) echo "::error::DAILY_COUNT must be between 4 and 10; received '$DAILY_COUNT'."; exit 1 ;;
+          esac
       - name: Connect to private FreeLLMAPI phone gateway
         if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
