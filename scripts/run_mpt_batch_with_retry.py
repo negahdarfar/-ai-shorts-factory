@@ -46,8 +46,8 @@ def attach_prebuilt_content(batch, seo_path):
             raise SystemExit(f"No prebuilt content record found for topic {index}: {topic}")
         script = str(record.get("video_script", "")).strip()
         terms = record.get("video_terms")
-        if not 120 <= len(script.split()) <= 145 or not isinstance(terms, list) or len(terms) < 5:
-            raise SystemExit(f"Prebuilt narration must contain 120-145 words and search terms must be complete for topic {index}.")
+        if not 155 <= len(script.split()) <= 270 or not isinstance(terms, list) or len(terms) < 5:
+            raise SystemExit(f"Prebuilt narration must contain 155-270 words and search terms must be complete for topic {index}.")
         prepared = dict(item)
         prepared["video_script"] = script
         prepared["video_terms"] = terms
