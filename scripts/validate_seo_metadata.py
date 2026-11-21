@@ -14,6 +14,8 @@ def main():
     parser.add_argument("--input", default="seo_metadata.json")
     parser.add_argument("--expected-count", type=int, default=4)
     args = parser.parse_args()
+    if not 1 <= args.expected_count <= 10:
+        raise SystemExit("--expected-count must be between 1 and 10.")
     records = json.loads(Path(args.input).read_text(encoding="utf-8"))
     if not isinstance(records, list) or len(records) != args.expected_count:
         raise SystemExit(f"Expected {args.expected_count} SEO records; got {len(records) if isinstance(records, list) else 'non-list'}.")
@@ -36,7 +38,7 @@ def main():
         tags, hashtags = meta.get("tags", []), meta.get("hashtags", [])
         script = str(record.get("video_script", "")).strip()
         video_terms = record.get("video_terms", [])
-        if not 120 <= len(script.split()) <= 145: errors.append(f"Item {index}: narration script must contain 120-145 words for a 45-60 second Short.")
+        if not 155 <= len(script.split()) <= 270: errors.append(f"Item {index}: narration script must contain 155-270 words for a 60-120 second Short.")
         if any(p in script.casefold() for p in ("let's take a closer look", "what does this subject actually mean", "look beyond the headline")):
             errors.append(f"Item {index}: generic placeholder narration detected.")
         if not isinstance(video_terms, list) or not 5 <= len(video_terms) <= 8 or any(not str(x).strip() for x in video_terms):

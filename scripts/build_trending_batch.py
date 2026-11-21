@@ -20,11 +20,22 @@ FALLBACK = [
     "How the James Webb Space Telescope detects distant planets",
     "The hidden physics behind a rainbow",
     "Why octopuses have three hearts",
+    "How the Antikythera mechanism predicted astronomical events",
+    "Why the Sahara was once covered in lakes and grasslands",
+    "How scientists measure the age of the universe",
+    "The unusual way trees communicate through fungal networks",
+    "Why Venus rotates in the opposite direction to most planets",
+    "How the first computer bug was discovered",
+    "The physics that makes a hummingbird hover",
+    "Why some metals remember their original shape",
+    "How deep ocean pressure changes the behavior of matter",
+    "The surprising origin of the word robot",
+    "How migratory birds navigate across oceans",
 ]
 PROMPT = (
     "Create an original, highly engaging English YouTube Short for a general audience. "
     "Open with a specific curiosity hook in the first 1-2 seconds. Keep the script concise "
-    "for a 45-60 second video. Explain one clear idea, build curiosity, deliver a "
+    "for a 60-120 second video. Explain one clear idea, build curiosity, deliver a "
     "satisfying payoff, and finish naturally. Use accurate, checkable facts; never invent "
     "statistics, quotes, dates, or sources. If a claim is uncertain, qualify it or omit it. "
     "VISUAL MATCHING IS CRITICAL: write narration in short, concrete sentences that can each "
@@ -63,7 +74,7 @@ def main():
     parser.add_argument("--state-dir", default="mpt-state")
     parser.add_argument("--output", default="trending_batch.json")
     args = parser.parse_args()
-    count = max(1, min(4, args.count))
+    count = max(4, min(10, args.count))
     state_dir = Path(args.state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
     try:

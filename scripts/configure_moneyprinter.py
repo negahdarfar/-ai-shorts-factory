@@ -12,7 +12,7 @@ if not template.is_file():
     raise SystemExit(f"MoneyPrinterTurbo config template not found: {template}")
 
 gemini = os.environ.get("GEMINI_API_KEY", "").strip()
-gemini_free_tier_enabled = os.environ.get("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
+gemini_free_tier_enabled = os.environ.get("GEMINI_FREE_TIER_ENABLED", "true").strip().lower() == "true"
 gemini_free_ready = bool(gemini and gemini_free_tier_enabled)
 cloudflare_account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
 cloudflare_api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
@@ -82,18 +82,22 @@ if missing:
 
 config = toml.load(str(template))
 app = config.setdefault("app", {})
-# MoneyPrinterTurbo v1.3.10 supports OpenAI-compatible custom base URLs.
-# Prefer pinned Cloudflare Workers AI, then explicitly free gateway models, then Gemini only when its free-tier flag is enabled.
-if cloudflare_ready:
-    app["llm_provider"] = "openai"
-    app["openai_api_key"] = cloudflare_api_token
-    app["openai_base_url"] = cloudflare_base_url
-    app["openai_model_name"] = cloudflare_model
+# MoneyPrinterTurbo v1.3.10 supports Gemini and OpenAI-compatible custom base URLs.
+# Prefer Gemini 3.8 Flash Standard Free Tier when a key is present; never route to paid tiers.
+if gemini_free_ready:
+    app["llm_provider"] = "gemini"
+    app["gemini_api_key"] = gemini
+    app["gemini_model_name"] = os.environ.get("SEO_GEMINI_MODEL", "gemini-3.8-flash").strip()
 elif freellmapi_base_url and freellmapi_key:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = freellmapi_key
     app["openai_base_url"] = freellmapi_base_url.rstrip("/")
     app["openai_model_name"] = freellmapi_model
+elif cloudflare_ready:
+    app["llm_provider"] = "openai"
+    app["openai_api_key"] = cloudflare_api_token
+    app["openai_base_url"] = cloudflare_base_url
+    app["openai_model_name"] = cloudflare_model
 elif openrouter_free_models:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = openrouter_key
@@ -104,10 +108,6 @@ elif allow_nonfree_fallback and omniroute_base_url and omniroute_key:
     app["openai_api_key"] = omniroute_key
     app["openai_base_url"] = omniroute_base_url.rstrip("/")
     app["openai_model_name"] = omniroute_model
-elif gemini_free_ready:
-    app["llm_provider"] = "gemini"
-    app["gemini_api_key"] = gemini
-    app["gemini_model_name"] = "gemini-3.8-flash"
 else:
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write("ready=false\n")
@@ -117,6 +117,10 @@ app["video_source"] = "pexels" if pexels else "pixabay"
 app["pexels_api_keys"] = [pexels] if pexels else []
 app["pixabay_api_keys"] = [pixabay] if pixabay else []
 app["match_materials_to_script"] = True
+# MoneyPrinterTurbo v1.3.10 ships default music sourced from YouTube videos.
+# Disable BGM until an individually verified, licensed track is supplied.
+app["bgm_type"] = ""
+app["bgm_volume"] = 0
 app["upload_post_enabled"] = False
 app["upload_post_auto_upload"] = False
 
@@ -141,7 +145,8 @@ target = home / "config.toml"
 target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
-print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else freellmapi_model if freellmapi_base_url and freellmapi_key else openrouter_model if openrouter_free_models else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
+selected_model = app.get("gemini_model_name") if app["llm_provider"] == "gemini" else app.get("openai_model_name", "unknown")
+print(f"LLM: {app['llm_provider']} ({selected_model}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
     output.write("video_source=" + app["video_source"] + "\n")

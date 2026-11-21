@@ -4,6 +4,14 @@ name: MoneyPrinterTurbo Shorts Factory
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - feature/koroush-factory-60-120s-4-10
+    paths:
+      - '.github/workflows/moneyprinterturbo.yml'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'data/factory_state/**'
   schedule:
     - cron: "0 14 * * *" # Daily UTC production; release times are staggered after rendering.
   workflow_dispatch:
@@ -18,13 +26,24 @@ name: MoneyPrinterTurbo Shorts Factory
         required: false
         type: boolean
         default: false
+      daily_count:
+        description: 'Number of Shorts to produce (4-10). Scheduled runs use DAILY_SHORTS_COUNT repository variable.'
+        required: true
+        type: choice
+        options: ["4", "5", "6", "7", "8", "9", "10"]
+        default: "4"
+      use_gemini_free_tier:
+        description: 'Use Gemini 3.8 Flash Standard Free Tier; scheduled runs enable it by default.'
+        required: false
+        type: boolean
+        default: true
       publish_four_public:
-        description: 'Publish all four validated videos PUBLIC on YouTube (manual runs only; daily schedule is separate)'
+        description: 'Publish all validated Shorts PUBLIC on YouTube (manual runs only; daily schedule is separate)'
         required: false
         type: boolean
         default: false
       upload_four_private_tests:
-        description: 'Upload all four validated Shorts as PRIVATE QA tests'
+        description: 'Upload all validated Shorts as PRIVATE QA tests'
         required: false
         type: boolean
         default: false
@@ -35,21 +54,22 @@ name: MoneyPrinterTurbo Shorts Factory
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: mpt-shorts-${{ github.ref }}
-  cancel-in-progress: false
+  group: mpt-shorts-${{ github.ref }}-${{ github.event_name == 'push' && 'branch-test' || 'production' }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 300
     env:
       FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
       TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
       MPT_HOME: ${{ github.workspace }}/mpt-runtime
       MPT_SOURCE_DIR: ${{ github.workspace }}/vendor/MoneyPrinterTurbo
+      DAILY_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.daily_count || vars.DAILY_SHORTS_COUNT || '4' }}
     steps:
       - name: Checkout this factory
         uses: actions/checkout@v4
@@ -58,31 +78,41 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install FFmpeg
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-core
       - name: Get MoneyPrinterTurbo v1.3.10
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: git clone --depth 1 --branch v1.3.10 https://github.com/harry0703/MoneyPrinterTurbo.git vendor/MoneyPrinterTurbo
       - name: Install small config helper
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: python -m pip install toml
       - name: Restore previously used topic list
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/mpt-runtime/state
           key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mpt-topics-${{ runner.os }}-
+      - name: Merge durable topic and upload history
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
+        run: python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
+      - name: Validate daily batch size
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
+        run: |
+          case "$DAILY_COUNT" in
+            4|5|6|7|8|9|10) echo "Daily batch size accepted: $DAILY_COUNT" ;;
+            *) echo "::error::DAILY_COUNT must be between 4 and 10; received '$DAILY_COUNT'."; exit 1 ;;
+          esac
       - name: Connect to private FreeLLMAPI phone gateway
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
       - name: Check FreeLLMAPI gateway without inference
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         id: freeapi
         env:
           BASE_URL: ${{ (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && secrets.FREELLMAPI_BASE_URL || '' }}
@@ -114,11 +144,11 @@ jobs:
           fi
           echo "ready=$READY" >> "$GITHUB_OUTPUT"
       - name: Configure free-tier providers
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
+          GEMINI_FREE_TIER_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gemini_free_tier == false && 'false' || 'true' }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/zai-org/glm-4.7-flash' }}
@@ -148,6 +178,8 @@ jobs:
           import json
           import os
           from pathlib import Path
+          if os.environ.get("DAILY_COUNT", "4") != "4":
+              raise SystemExit("The preserved four-topic batch can only be used when DAILY_COUNT=4.")
           topics = json.loads(Path("data/previous_four_topics.json").read_text(encoding="utf-8"))
           if not isinstance(topics, list) or len(topics) != 4:
               raise SystemExit("The preserved topic file must contain exactly four topics.")
@@ -171,7 +203,7 @@ jobs:
           PY
       - name: Discover fresh trending topics
         if: ${{ steps.configure.outputs.ready == 'true' && inputs.use_previous_four_topics != true }}
-        run: python scripts/build_trending_batch.py --count 4 --geo US --state-dir "$MPT_HOME/state"
+        run: python scripts/build_trending_batch.py --count "$DAILY_COUNT" --geo US --state-dir "$MPT_HOME/state"
       - name: Research recent competing YouTube Shorts
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
@@ -187,7 +219,7 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
+          GEMINI_FREE_TIER_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gemini_free_tier == false && 'false' || 'true' }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/zai-org/glm-4.7-flash' }}
@@ -205,14 +237,14 @@ jobs:
         run: python scripts/generate_seo_metadata.py --input trending_batch.json --output seo_metadata.json --language English --research youtube_competitor_research.json --require-ai-batch
       - name: Validate generated SEO metadata
         if: ${{ steps.configure.outputs.ready == 'true' }}
-        run: python scripts/validate_seo_metadata.py --input seo_metadata.json --expected-count 4
+        run: python scripts/validate_seo_metadata.py --input seo_metadata.json --expected-count "$DAILY_COUNT"
       - name: Install Pillow for thumbnail drafts
         if: ${{ steps.configure.outputs.ready == 'true' }}
         run: python -m pip install Pillow
       - name: Render reviewable thumbnail drafts
         if: ${{ steps.configure.outputs.ready == 'true' }}
         run: python scripts/render_seo_thumbnails.py --input seo_metadata.json --output-dir seo_thumbnails
-      - name: Generate four vertical videos with transient-error retries (no upload)
+      - name: Generate daily vertical videos with transient-error retries (no upload)
         if: ${{ steps.configure.outputs.ready == 'true' }}
         working-directory: vendor/MoneyPrinterTurbo
         run: |
@@ -221,7 +253,7 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
+          GEMINI_FREE_TIER_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.use_gemini_free_tier == false && 'false' || 'true' }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/zai-org/glm-4.7-flash' }}
@@ -238,46 +270,49 @@ jobs:
       - name: Validate generated vertical videos
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
-          EXPECTED_COUNT: "4"
+          EXPECTED_COUNT: ${{ env.DAILY_COUNT }}
         run: python scripts/validate_mpt_outputs.py
       - name: Compare sampled frames for visual uniqueness
         if: ${{ steps.configure.outputs.ready == 'true' }}
-        run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count 4 --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
+        run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count "$DAILY_COUNT" --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
       - name: Install YouTube API client
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.configure.outputs.ready == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && steps.configure.outputs.ready == 'true' }}
         run: python -m pip install --upgrade google-api-python-client google-auth-httplib2
       - name: Validate YouTube OAuth refresh token (no upload)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.configure.outputs.ready == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/check_youtube_auth.py
-      - name: Publish all four videos PUBLIC on YouTube
+      - name: Publish validated videos PUBLIC on YouTube
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_four_public == true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          EXPECTED_COUNT: ${{ env.DAILY_COUNT }}
           YOUTUBE_PRIVACY_STATUS: public
           CONFIRM_PUBLIC_PUBLISHING: YES
           YOUTUBE_SCHEDULED_PUBLISH: NO
         run: python scripts/upload_four_private_youtube_tests.py
-      - name: Schedule four videos for staggered PUBLIC release
+      - name: Schedule validated videos for staggered PUBLIC release
         if: ${{ github.event_name == 'schedule' && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          EXPECTED_COUNT: ${{ env.DAILY_COUNT }}
           YOUTUBE_PRIVACY_STATUS: private
           YOUTUBE_SCHEDULED_PUBLISH: YES
         run: python scripts/upload_four_private_youtube_tests.py
-      - name: Upload all four PRIVATE YouTube QA videos
+      - name: Upload validated videos as PRIVATE YouTube QA
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_four_private_tests == true && inputs.publish_four_public != true && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          EXPECTED_COUNT: ${{ env.DAILY_COUNT }}
           YOUTUBE_PRIVACY_STATUS: private
         run: python scripts/upload_four_private_youtube_tests.py
       - name: Upload one PRIVATE YouTube connection test
@@ -287,6 +322,22 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/upload_private_youtube_test.py
+      - name: Persist durable topic and upload history
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
+          if git diff --quiet -- data/factory_state; then
+            echo "Durable factory state is unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/factory_state
+            git commit -m "chore(factory): persist topic and upload ledger [skip ci]"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
       - name: Persist topic and publication history
         if: ${{ always() && steps.configure.outputs.ready == 'true' }}
         uses: actions/cache/save@v4
@@ -300,6 +351,7 @@ jobs:
           if [ -d "$MPT_HOME/storage/tasks" ]; then cp -R "$MPT_HOME/storage/tasks" artifacts/; fi
           if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
           cp trending_batch.json selected_trends.json batch_retry_report.json seo_metadata.json youtube_competitor_research.json 2>/dev/null artifacts/ || true
+          cp -R data/factory_state artifacts/ 2>/dev/null || true
           cp mpt_quality_report.json visual_uniqueness_report.json youtube_private_upload_results.json youtube_public_upload_results.json youtube_scheduled_upload_results.json artifacts/ 2>/dev/null || true
           if [ -d seo_thumbnails ]; then cp -R seo_thumbnails artifacts/; fi
       - name: Save videos, selected topics and logs

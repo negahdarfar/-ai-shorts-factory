@@ -2,8 +2,12 @@ name: Factory lightweight CI
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'data/factory_state/**'
   push:
     branches: [main, feature/youtube-seo-metadata]
+    paths-ignore:
+      - 'data/factory_state/**'
 permissions:
   contents: read
 jobs:

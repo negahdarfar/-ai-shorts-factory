@@ -2,6 +2,8 @@
 """Run each MoneyPrinterTurbo batch item independently with transient-error retries."""
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -46,8 +48,8 @@ def attach_prebuilt_content(batch, seo_path):
             raise SystemExit(f"No prebuilt content record found for topic {index}: {topic}")
         script = str(record.get("video_script", "")).strip()
         terms = record.get("video_terms")
-        if not 120 <= len(script.split()) <= 145 or not isinstance(terms, list) or len(terms) < 5:
-            raise SystemExit(f"Prebuilt narration must contain 120-145 words and search terms must be complete for topic {index}.")
+        if not 155 <= len(script.split()) <= 270 or not isinstance(terms, list) or len(terms) < 5:
+            raise SystemExit(f"Prebuilt narration must contain 155-270 words and search terms must be complete for topic {index}.")
         prepared = dict(item)
         prepared["video_script"] = script
         prepared["video_terms"] = terms
@@ -80,7 +82,16 @@ def validate_distinct_visual_terms(batch):
             if overlap > 0.20:
                 raise SystemExit(f"Videos {i+1} and {j+1} have overly similar stock-footage searches (Jaccard={overlap:.2f}); refusing repetitive visuals.")
 
-def run_one(item, index, total, video_source, attempts, delay, temp_dir):
+def task_output_dirs(tasks_root):
+    if not tasks_root.is_dir():
+        return {}
+    output = {}
+    for path in tasks_root.glob("**/final-*.mp4"):
+        output.setdefault(path.parent.resolve(), []).append(path.resolve())
+    return output
+
+
+def run_one(item, index, total, video_source, attempts, delay, temp_dir, tasks_root):
     topic = item.get("video_subject", f"item-{index}")
     result = {"index": index, "topic": topic, "status": "failed", "attempts": 0, "last_error": ""}
     manifest = Path(temp_dir) / f"item-{index:02d}.json"
@@ -97,12 +108,13 @@ def run_one(item, index, total, video_source, attempts, delay, temp_dir):
         "--subtitle-animation", "pop_spring",
         "--subtitle-position", "bottom",
         "--video-fit-mode", "cover",
-        "--bgm-volume", "0.12",
+        "--bgm-volume", "0",
         "--stop-at", "video",
     ]
 
     print(f"\n=== Topic {index}/{total}: {topic} ===", flush=True)
     for attempt in range(1, attempts + 1):
+        before_dirs = set(task_output_dirs(tasks_root))
         result["attempts"] = attempt
         print(f"Attempt {attempt}/{attempts}", flush=True)
         process = subprocess.Popen(
@@ -122,12 +134,34 @@ def run_one(item, index, total, video_source, attempts, delay, temp_dir):
         return_code = process.wait()
         output = "".join(captured)
 
+        after_outputs = task_output_dirs(tasks_root)
+        created_dirs = set(after_outputs) - before_dirs
         if return_code == 0:
+            if len(created_dirs) != 1:
+                result["last_error"] = (
+                    f"Expected exactly one new task output directory for topic {index}; "
+                    f"found {len(created_dirs)}."
+                )
+                result["status"] = "failed"
+                return result
+            task_dir = next(iter(created_dirs))
+            final_files = after_outputs[task_dir]
+            if len(final_files) != 1:
+                result["last_error"] = (
+                    f"Expected exactly one final MP4 for topic {index}; found {len(final_files)}."
+                )
+                result["status"] = "failed"
+                return result
             result["status"] = "succeeded"
             result["last_error"] = ""
-            print(f"Topic {index} succeeded.", flush=True)
+            result["task_dir"] = task_dir.relative_to(tasks_root.resolve()).as_posix()
+            result["output_file"] = final_files[0].relative_to(tasks_root.resolve()).as_posix()
+            print(f"Topic {index} succeeded: {result['output_file']}", flush=True)
             return result
 
+        # A failed attempt must not leave a partial final MP4 that could be mistaken for a valid batch item.
+        for directory in created_dirs:
+            shutil.rmtree(directory, ignore_errors=True)
         result["last_error"] = output[-6000:]
         if attempt < attempts and is_retryable(output):
             wait_seconds = delay * (2 ** (attempt - 1))
@@ -165,10 +199,11 @@ def main():
     attempts = max(1, min(5, args.max_attempts))
     delay = max(1, args.retry_delay_seconds)
     results = []
+    tasks_root = Path(os.environ.get("MPT_HOME", "mpt-runtime")) / "storage" / "tasks"
     with tempfile.TemporaryDirectory(prefix="mpt-single-tasks-") as temp_dir:
         for index, item in enumerate(batch, 1):
             results.append(
-                run_one(item, index, len(batch), args.video_source, attempts, delay, temp_dir)
+                run_one(item, index, len(batch), args.video_source, attempts, delay, temp_dir, tasks_root)
             )
 
     report = {

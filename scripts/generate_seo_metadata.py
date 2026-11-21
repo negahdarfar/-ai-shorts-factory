@@ -12,8 +12,46 @@ from pathlib import Path
 
 from free_model_router import discover_free_models
 
-API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
+API_ROOT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 SEO_FIELDS = ("primary_keyword", "secondary_keywords", "title", "description", "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent")
+
+
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "integer"},
+                    "video_script": {"type": "string"},
+                    "video_terms": {"type": "array", "items": {"type": "string"}},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "primary_keyword": {"type": "string"},
+                            "secondary_keywords": {"type": "array", "items": {"type": "string"}},
+                            "title": {"type": "string"},
+                            "description": {"type": "string"},
+                            "hashtags": {"type": "array", "items": {"type": "string"}},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                            "pinned_comment": {"type": "string"},
+                            "thumbnail_concept": {"type": "string"},
+                            "search_intent": {"type": "string"},
+                        },
+                        "required": [
+                            "primary_keyword", "secondary_keywords", "title", "description",
+                            "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent"
+                        ],
+                    },
+                },
+                "required": ["index", "video_script", "video_terms", "metadata"],
+            },
+        },
+    },
+    "required": ["items"],
+}
 
 
 def clean(value, limit=None):
@@ -102,8 +140,8 @@ def normalize_item(item, topic):
         raise ValueError("video_terms must be a list")
     terms = list(dict.fromkeys(clean(x, 80) for x in terms if clean(x)))[:8]
     word_count = len(script.split())
-    if word_count < 120 or word_count > 145:
-        raise ValueError(f"video_script must contain 120-145 words for a 45-60 second Short, got {word_count}")
+    if word_count < 155 or word_count > 270:
+        raise ValueError(f"video_script must contain 155-270 words for a 60-120 second Short, got {word_count}")
     if len(terms) < 5:
         raise ValueError("At least five stock-footage search terms are required")
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
@@ -144,8 +182,8 @@ Public YouTube Shorts breakout research (directional sample; not guaranteed vira
 Use the research to identify audience-interest patterns, opening-hook structures, pacing and subject angles that appear in stronger recent Shorts. Do NOT copy competitor titles, scripts, exact phrasing, footage, thumbnails, or distinctive creative expression. Invent a genuinely original angle and narrative for each topic. Prioritize a compelling first 1-2 seconds, fast context, escalating curiosity, concrete visual beats, a satisfying factual payoff, and a natural ending. Do not fabricate performance claims or treat views/day as a guaranteed viral predictor. If research is absent for a topic, say nothing about competitor performance and use editorial judgment.
 
 Return ONLY valid JSON in this structure:
-{{"items":[{{"index":1,"video_script":"120-145 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
-Exactly one indexed item per input topic. Each script MUST contain 130-140 spoken words (never fewer than 120 or more than 145). Count the words before returning each item; aim for 135 words. Script must have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all four topics, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
+{{"items":[{{"index":1,"video_script":"155-270 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
+Exactly one indexed item per input topic. Each script MUST contain 155-270 spoken words (never fewer than 155 or more than 270). Count the words before returning each item; aim for 210-230 words. Script must have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all topics in the batch, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
     if api_base_url and api_key:
         payload = {
             "model": api_model,
@@ -168,11 +206,25 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
         provider = api_provider
     else:
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "model": model,
+            "input": prompt,
+            "store": False,
+            "response_format": {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": GEMINI_RESPONSE_SCHEMA,
+            },
+            "generation_config": {
+                "temperature": 0.25,
+                "thinking_level": "low",
+                "max_output_tokens": 4096,
+            },
         }
-        request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
-        request_headers = {"Content-Type": "application/json"}
+        request_url = API_ROOT
+        request_headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+        }
         provider = "Gemini"
 
     result = {}
@@ -184,7 +236,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
+            with urllib.request.urlopen(req, timeout=120 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 90) as response:
                 data = json.loads(response.read().decode("utf-8"))
             if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
                 choices = data.get("choices", [])
@@ -195,8 +247,30 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                     raw = "\\n".join(part.get("text", "") for part in raw if isinstance(part, dict))
                 raw = str(raw)
             else:
-                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                raw = "\\n".join(p.get("text", "") for p in parts)
+                if data.get("error"):
+                    error = data["error"]
+                    raise RuntimeError(
+                        f"Gemini Interactions API error {error.get('code', '')}: "
+                        f"{error.get('message', 'unspecified error')}"
+                    )
+                if data.get("status") == "failed":
+                    raise RuntimeError(f"Gemini interaction failed: {data.get('error', 'no error detail')}")
+                raw = str(data.get("output_text", "") or "")
+                if not raw:
+                    parts = []
+                    for step in data.get("steps", []):
+                        if step.get("type") == "model_output":
+                            parts.extend(
+                                item.get("text", "")
+                                for item in step.get("content", [])
+                                if item.get("type") == "text"
+                            )
+                    raw = "\\n".join(parts)
+                if not raw:
+                    raise RuntimeError(
+                        "Gemini Interactions API returned no model_output text; "
+                        f"response keys: {sorted(data.keys())}"
+                    )
             parsed = extract_json(raw)
             for row in parsed.get("items", []):
                 try:
@@ -212,7 +286,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                     delay = 2 ** (attempt + 1)
                     print(
                         f"{provider.upper()}_INCOMPLETE_BATCH; retrying full batch in {delay}s "
-                        f"(attempt {attempt + 2}/3).",
+                        f"(attempt {attempt + 2}/{max(1, max_attempts)}).",
                         file=sys.stderr,
                         flush=True,
                     )
@@ -247,8 +321,8 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                     )
             return result
         except (ValueError, KeyError, TypeError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"{provider} returned invalid content after three attempts: {exc}") from exc
+            if attempt == max(1, max_attempts) - 1:
+                raise RuntimeError(f"{provider} returned invalid content after {max(1, max_attempts)} attempt(s): {exc}") from exc
             delay = 2 ** (attempt + 1)
             print(
                 f"{provider.upper()}_INVALID_CONTENT; retrying in {delay}s (attempt {attempt + 2}/3).",
@@ -259,7 +333,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:2000]
             message = f"{provider} HTTP {exc.code}: {detail}"
-            if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == 2:
+            if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == max(1, max_attempts) - 1:
                 raise RuntimeError(message) from exc
             if exc.code == 429 and any(marker in message.lower() for marker in (
                 "generate_content_free_tier_requests", "per_day", "daily limit", "free_tier_requests"
@@ -267,7 +341,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                 raise RuntimeError(message) from exc
             time.sleep(2 ** (attempt + 1))
         except (TimeoutError, urllib.error.URLError) as exc:
-            if attempt == 2:
+            if attempt == max(1, max_attempts) - 1:
                 raise RuntimeError(f"{provider} connection error: {exc}") from exc
             time.sleep(2 ** (attempt + 1))
     return result
@@ -304,7 +378,7 @@ def main():
     generated = {}
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "true").strip().lower() == "true"
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
@@ -372,35 +446,37 @@ def main():
         for selected_model in candidate_models:
             provider_routes.append((provider, base_url, api_key, selected_model))
 
-    # Prefer the private FreeLLMAPI gateway when configured; Cloudflare remains the
-    # unattended fallback if the phone/Tailscale gateway cannot be reached.
-    provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1)
+    # Prefer the verified Gemini Free Tier first, then explicitly free gateways.
+    # FreeLLMAPI is preferred among gateways; Cloudflare and OpenRouter are fallbacks.
+    provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1 if route[0] == "Cloudflare" else 2)
     gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
     for topic_index, topic in enumerate(topics, 1):
         topic_succeeded = False
-        for provider, base_url, api_key, selected_model in provider_routes:
+        if gemini_key and gemini_free_tier_enabled:
             try:
-                one = generate_batch([topic], args.language, args.model, "", research=research,
-                    api_base_url=base_url, api_key=api_key, api_model=selected_model,
-                    api_provider=provider, max_attempts=2, repair_missing=False)
-                if 1 not in one:
-                    raise RuntimeError("Provider returned no validated item.")
-                generated[topic_index] = one[1]
-                print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider={provider} | model={selected_model}", flush=True)
-                topic_succeeded = True
-                break
-            except (RuntimeError, ValueError, OSError) as gateway_error:
-                print(f"{provider.upper()}_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={selected_model} | {gateway_error}", file=sys.stderr, flush=True)
-        if not topic_succeeded and gemini_key and gemini_free_tier_enabled:
-            try:
-                one = generate_batch([topic], args.language, gemini_free_model, gemini_key, research=research, max_attempts=2, repair_missing=False)
+                one = generate_batch([topic], args.language, gemini_free_model, gemini_key,
+                    research=research, max_attempts=1, repair_missing=False)
                 if 1 not in one:
                     raise RuntimeError("Gemini returned no validated item.")
                 generated[topic_index] = one[1]
                 print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider=Gemini_Free_Tier | model={gemini_free_model}", flush=True)
                 topic_succeeded = True
             except (RuntimeError, ValueError, OSError) as gemini_error:
-                print(f"GEMINI_FREE_TIER_ITEM_FAILED | item={topic_index} | {gemini_error}", file=sys.stderr, flush=True)
+                print(f"GEMINI_FREE_TIER_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={gemini_free_model} | {gemini_error}", file=sys.stderr, flush=True)
+        if not topic_succeeded:
+            for provider, base_url, api_key, selected_model in provider_routes:
+                try:
+                    one = generate_batch([topic], args.language, args.model, "", research=research,
+                        api_base_url=base_url, api_key=api_key, api_model=selected_model,
+                        api_provider=provider, max_attempts=1, repair_missing=False)
+                    if 1 not in one:
+                        raise RuntimeError("Provider returned no validated item.")
+                    generated[topic_index] = one[1]
+                    print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider={provider} | model={selected_model}", flush=True)
+                    topic_succeeded = True
+                    break
+                except (RuntimeError, ValueError, OSError) as gateway_error:
+                    print(f"{provider.upper()}_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={selected_model} | {gateway_error}", file=sys.stderr, flush=True)
         if not topic_succeeded:
             print(f"SEO_ITEM_UNAVAILABLE | item={topic_index}/{len(topics)} | no approved free provider produced a valid item.", file=sys.stderr, flush=True)
     if gemini_key and not gemini_free_tier_enabled:
