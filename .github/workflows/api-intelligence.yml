@@ -1,6 +1,16 @@
 name: KOROUSH API Intelligence
 
 on:
+  push:
+    branches:
+      - feature/api-intelligence-v1
+  pull_request:
+    paths:
+      - 'scripts/api_intelligence.py'
+      - 'scripts/github_project_scout.py'
+      - 'tests/test_api_intelligence.py'
+      - 'tests/test_github_project_scout.py'
+      - '.github/workflows/api-intelligence.yml'
   workflow_dispatch:
   schedule:
     - cron: "23 6 * * 1"
@@ -15,7 +25,7 @@ concurrency:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +37,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Discover API candidates and check selected catalogue links
         run: python scripts/api_intelligence.py --check --check-limit 12 --output-dir api-intelligence-report
-      - name: Discover relevant open-source GitHub projects\n        run: python scripts/github_project_scout.py\n      - name: Upload discovery report
+      - name: Discover relevant open-source GitHub projects
+        run: python scripts/github_project_scout.py
+      - name: Upload discovery report
         uses: actions/upload-artifact@v4
         with:
           name: koroush-api-intelligence
