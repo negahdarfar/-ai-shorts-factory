@@ -60,7 +60,7 @@ def load_validated_videos(home: Path) -> list[Path]:
         videos.append(path)
 
     if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
-        raise SystemExit("The validation report does not identify four distinct video files.")
+        raise SystemExit("The validation report does not identify EXPECTED_COUNT distinct video files.")
     if len(available) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} final MP4 files in storage, found {len(available)}.")
     return videos
