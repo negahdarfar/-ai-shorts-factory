@@ -66,7 +66,7 @@ def load_validated_videos(home: Path) -> list[Path]:
             raise SystemExit(f"Quality report has no topic mapping for {relative_path!r}.")
         videos.append({"path": path, "topic": topic, "index": int(item.get("index", len(videos) + 1))})
 
-    if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
+    if len({item["path"].resolve() for item in videos}) != EXPECTED_COUNT:
         raise SystemExit(f"The validation report does not identify {EXPECTED_COUNT} distinct video files.")
     if len(available) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} final MP4 files in storage, found {len(available)}.")
