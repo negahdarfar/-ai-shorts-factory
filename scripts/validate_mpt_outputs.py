@@ -69,6 +69,8 @@ for path in files:
         ],
         capture_output=True, text=True, check=False
     )
+    if scan.returncode != 0:
+        raise SystemExit(f"FFmpeg black-frame/silence scan failed for {path}: {scan.stderr[-1200:]}")
     diagnostics = (scan.stderr or "") + (scan.stdout or "")
     black_durations = [float(value) for value in re.findall(r"black_duration:([0-9.]+)", diagnostics)]
     silence_starts = [float(value) for value in re.findall(r"silence_start: ([0-9.]+)", diagnostics)]
@@ -84,7 +86,7 @@ for path in files:
 
     score = 100
     if width < 1080 or height < 1920:
-        score -= 5
+        score -= 10
     if black_total > 0:
         score -= 5
     if silence_total > 0:
