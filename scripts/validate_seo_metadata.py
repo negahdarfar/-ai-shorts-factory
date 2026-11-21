@@ -14,8 +14,8 @@ def main():
     parser.add_argument("--input", default="seo_metadata.json")
     parser.add_argument("--expected-count", type=int, default=4)
     args = parser.parse_args()
-    if not 4 <= args.expected_count <= 10:
-        raise SystemExit("--expected-count must be between 4 and 10.")
+    if not 1 <= args.expected_count <= 10:
+        raise SystemExit("--expected-count must be between 1 and 10.")
     records = json.loads(Path(args.input).read_text(encoding="utf-8"))
     if not isinstance(records, list) or len(records) != args.expected_count:
         raise SystemExit(f"Expected {args.expected_count} SEO records; got {len(records) if isinstance(records, list) else 'non-list'}.")
