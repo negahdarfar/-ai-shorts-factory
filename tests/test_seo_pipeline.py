@@ -135,7 +135,7 @@ class SeoPipelineTests(unittest.TestCase):
         }
         row = {
             "metadata": metadata,
-            "video_script": "long_script()",
+            "video_script": long_script(),
             "video_terms": ["ancient city", "desert ruins", "stone walls", "archaeology site", "historic settlement"]
         }
         normalized = module.normalize_item(row, "Ancient desert cities")
