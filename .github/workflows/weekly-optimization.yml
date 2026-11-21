@@ -31,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          run_id="$(gh run list --workflow youtube-analytics.yml --branch main --status completed --limit 1 --json databaseId --jq '.[0].databaseId')"
+          run_id="$(gh run list --workflow youtube-analytics.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
           if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
             echo "::error::No completed YouTube Analytics run is available."
             exit 1
