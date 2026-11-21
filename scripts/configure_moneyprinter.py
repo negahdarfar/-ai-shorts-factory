@@ -117,6 +117,10 @@ app["video_source"] = "pexels" if pexels else "pixabay"
 app["pexels_api_keys"] = [pexels] if pexels else []
 app["pixabay_api_keys"] = [pixabay] if pixabay else []
 app["match_materials_to_script"] = True
+# MoneyPrinterTurbo v1.3.10 ships default music sourced from YouTube videos.
+# Disable BGM until an individually verified, licensed track is supplied.
+app["bgm_type"] = ""
+app["bgm_volume"] = 0
 app["upload_post_enabled"] = False
 app["upload_post_auto_upload"] = False
 
