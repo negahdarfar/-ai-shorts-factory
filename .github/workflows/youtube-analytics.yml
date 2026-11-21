@@ -1,0 +1,81 @@
+name: YouTube Analytics
+
+on:
+  schedule:
+    - cron: "30 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Analytics lookback window (1-365 days)"
+        required: false
+        type: number
+        default: 28
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youtube-analytics-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  analytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANALYTICS_DAYS: ${{ inputs.days || 28 }}
+    steps:
+      - name: Checkout factory
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install read-only analytics client
+        run: python -m pip install --disable-pip-version-check google-api-python-client google-auth-httplib2
+
+      - name: Check analytics OAuth without printing secrets
+        id: auth
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET YOUTUBE_ANALYTICS_REFRESH_TOKEN; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            printf '{"status":"BLOCKED","reason":"Missing dedicated read-only analytics credentials: %s"}\n' "$(IFS=', '; echo "${missing[*]}")" > youtube_analytics.json
+            echo "::warning::Analytics is BLOCKED; add the dedicated read-only token secret. Secret values are not displayed."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Analytics credentials are present; values are not displayed."
+          fi
+
+      - name: Fetch Shorts-specific analytics
+        if: steps.auth.outputs.ready == 'true'
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+        run: python scripts/youtube_analytics_report.py --days "$ANALYTICS_DAYS" --output youtube_analytics.json
+
+      - name: Build dashboard
+        if: always()
+        run: python scripts/build_factory_dashboard.py --analytics youtube_analytics.json --output factory_dashboard.html
+
+      - name: Save analytics dashboard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-analytics-report
+          path: |
+            youtube_analytics.json
+            factory_dashboard.html
+          if-no-files-found: warn
+          retention-days: 30
