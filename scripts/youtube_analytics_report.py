@@ -26,7 +26,7 @@ def shorts_only(result):
         return {"columnHeaders": result.get("columnHeaders", []), "rows": [],
                 "unavailable": "creatorContentType was not returned; refusing to mix Shorts with other formats."}
     index = headers.index("creatorContentType")
-    rows = [row for row in result.get("rows", []) if len(row) > index and row[index] == "SHORTS"]
+    rows = [row for row in result.get("rows") or [] if len(row) > index and row[index] == "SHORTS"]
     return {"columnHeaders": result.get("columnHeaders", []), "rows": rows}
 
 
@@ -38,7 +38,7 @@ def add_engagement_proxy(report):
     view_index = headers.index("views")
     engaged_index = headers.index("engagedViews")
     records = []
-    for row in report.get("rows", []):
+    for row in report.get("rows") or []:
         if len(row) <= max(view_index, engaged_index):
             continue
         views = float(row[view_index] or 0)
@@ -112,8 +112,10 @@ def main():
                                "this report combination may not be available for this channel."
             }
 
+    blocked_reports = [name for name, value in reports.items() if value.get("unavailable")]
     payload = {
-        "status": "completed",
+        "status": "BLOCKED" if blocked_reports else "completed",
+        "reason": ("Shorts Analytics reports unavailable: " + ", ".join(blocked_reports)) if blocked_reports else None,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "reports": reports,
