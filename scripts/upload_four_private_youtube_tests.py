@@ -19,7 +19,17 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-EXPECTED_COUNT = 4
+def configured_expected_count():
+    try:
+        count = int(os.environ.get("EXPECTED_COUNT", "4"))
+    except ValueError as exc:
+        raise SystemExit("EXPECTED_COUNT must be an integer from 4 to 10.") from exc
+    if not 4 <= count <= 10:
+        raise SystemExit("EXPECTED_COUNT must be between 4 and 10.")
+    return count
+
+
+EXPECTED_COUNT = configured_expected_count()
 
 
 def load_validated_videos(home: Path) -> list[Path]:
@@ -68,7 +78,7 @@ def load_seo_manifest() -> list[dict]:
         script = str(record.get("video_script", "")).strip()
         terms = record.get("video_terms")
         if (not record.get("topic") or not meta.get("title") or not meta.get("description")
-                or not 120 <= len(script.split()) <= 145 or not isinstance(terms, list) or len(terms) < 5):
+                or not 155 <= len(script.split()) <= 270 or not isinstance(terms, list) or len(terms) < 5):
             raise SystemExit(f"SEO/content manifest record {index} is incomplete; refusing upload.")
     return records
 
@@ -88,7 +98,7 @@ def main() -> None:
         first_publish_at = candidate.replace(minute=0, second=0, microsecond=0)
         if first_publish_at < candidate:
             first_publish_at += timedelta(hours=1)
-        print("SCHEDULING_FOUR_PUBLIC_SHORTS: first slot " + first_publish_at.isoformat())
+        print(f"SCHEDULING_PUBLIC_SHORTS: count={EXPECTED_COUNT} | first slot {first_publish_at.isoformat()}")
 
     required = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     missing = [key for key in required if not os.environ.get(key, "").strip()]
@@ -174,8 +184,8 @@ def main() -> None:
 
     if len(results) != EXPECTED_COUNT:
         raise SystemExit(f"Only {len(results)} of {EXPECTED_COUNT} uploads completed.")
-    print("ALL_FOUR_SCHEDULED_UPLOADS_SUCCEEDED" if scheduled else f"ALL_FOUR_{privacy.upper()}_UPLOADS_SUCCEEDED")
-    print("All four videos were scheduled as private uploads with future public release times." if scheduled else f"All four videos were uploaded with privacy={privacy}.")
+    print(f"ALL_{EXPECTED_COUNT}_SCHEDULED_UPLOADS_SUCCEEDED" if scheduled else f"ALL_{EXPECTED_COUNT}_{privacy.upper()}_UPLOADS_SUCCEEDED")
+    print(f"All {EXPECTED_COUNT} videos were scheduled as private uploads with future public release times." if scheduled else f"All {EXPECTED_COUNT} videos were uploaded with privacy={privacy}.")
 
 
 if __name__ == "__main__":
