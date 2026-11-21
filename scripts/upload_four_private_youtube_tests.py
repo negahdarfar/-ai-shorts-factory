@@ -4,7 +4,6 @@
 Privacy is PRIVATE by default. PUBLIC publishing is possible only when the
 workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public and confirms it.
 """
-import hashlib
 import json
 import os
 import sys
@@ -12,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from topic_history import ensure_new_topics, record_published_topic
+from upload_history import idempotency_key, load_upload_history, save_upload_history, sha256_file
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -33,38 +33,6 @@ def configured_expected_count():
 
 
 EXPECTED_COUNT = configured_expected_count()
-
-
-def load_upload_history(state_dir: Path) -> dict:
-    path = state_dir / "upload_history.json"
-    if not path.exists():
-        return {"schema_version": 1, "uploads": {}}
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise SystemExit(f"Could not read upload history safely: {exc}") from exc
-    if not isinstance(value, dict) or not isinstance(value.get("uploads"), dict):
-        raise SystemExit("Upload history is malformed; refusing to risk duplicate publication.")
-    for key, entry in value["uploads"].items():
-        if not isinstance(key, str) or not isinstance(entry, dict):
-            raise SystemExit("Upload history contains a malformed record; refusing publication.")
-    return value
-
-
-def save_upload_history(state_dir: Path, history: dict) -> None:
-    state_dir.mkdir(parents=True, exist_ok=True)
-    target = state_dir / "upload_history.json"
-    temporary = target.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(target)
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def load_validated_videos(home: Path) -> list[Path]:
@@ -153,8 +121,8 @@ def main() -> None:
     new_public_topics = []
     for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
         digest = sha256_file(video_path)
-        idempotency_key = f"{mode}:{digest}"
-        previous = history["uploads"].get(idempotency_key)
+        ledger_key = idempotency_key(mode, digest)
+        previous = history["uploads"].get(ledger_key)
         if previous:
             status = previous.get("status")
             if status == "pending":
@@ -223,7 +191,7 @@ def main() -> None:
             "publish_at_utc": publish_at_text,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
-        history["uploads"][idempotency_key] = pending
+        history["uploads"][ledger_key] = pending
         save_upload_history(state_dir, history)
 
         body = {
@@ -266,7 +234,7 @@ def main() -> None:
             "seo_source": record.get("metadata_source", "unknown"),
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
-        history["uploads"][idempotency_key] = {
+        history["uploads"][ledger_key] = {
             **pending,
             "status": "completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
