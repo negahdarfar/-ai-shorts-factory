@@ -184,7 +184,7 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
+            with urllib.request.urlopen(req, timeout=120 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 90) as response:
                 data = json.loads(response.read().decode("utf-8"))
             if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
                 choices = data.get("choices", [])
@@ -212,7 +212,7 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
                     delay = 2 ** (attempt + 1)
                     print(
                         f"{provider.upper()}_INCOMPLETE_BATCH; retrying full batch in {delay}s "
-                        f"(attempt {attempt + 2}/3).",
+                        f"(attempt {attempt + 2}/{max(1, max_attempts)}).",
                         file=sys.stderr,
                         flush=True,
                     )
@@ -247,8 +247,8 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
                     )
             return result
         except (ValueError, KeyError, TypeError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"{provider} returned invalid content after three attempts: {exc}") from exc
+            if attempt == max(1, max_attempts) - 1:
+                raise RuntimeError(f"{provider} returned invalid content after {max(1, max_attempts)} attempt(s): {exc}") from exc
             delay = 2 ** (attempt + 1)
             print(
                 f"{provider.upper()}_INVALID_CONTENT; retrying in {delay}s (attempt {attempt + 2}/3).",
@@ -259,7 +259,7 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:2000]
             message = f"{provider} HTTP {exc.code}: {detail}"
-            if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == 2:
+            if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == max(1, max_attempts) - 1:
                 raise RuntimeError(message) from exc
             if exc.code == 429 and any(marker in message.lower() for marker in (
                 "generate_content_free_tier_requests", "per_day", "daily limit", "free_tier_requests"
@@ -267,7 +267,7 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
                 raise RuntimeError(message) from exc
             time.sleep(2 ** (attempt + 1))
         except (TimeoutError, urllib.error.URLError) as exc:
-            if attempt == 2:
+            if attempt == max(1, max_attempts) - 1:
                 raise RuntimeError(f"{provider} connection error: {exc}") from exc
             time.sleep(2 ** (attempt + 1))
     return result
@@ -381,7 +381,7 @@ def main():
         if gemini_key and gemini_free_tier_enabled:
             try:
                 one = generate_batch([topic], args.language, gemini_free_model, gemini_key,
-                    research=research, max_attempts=2, repair_missing=False)
+                    research=research, max_attempts=1, repair_missing=False)
                 if 1 not in one:
                     raise RuntimeError("Gemini returned no validated item.")
                 generated[topic_index] = one[1]
@@ -394,7 +394,7 @@ def main():
                 try:
                     one = generate_batch([topic], args.language, args.model, "", research=research,
                         api_base_url=base_url, api_key=api_key, api_model=selected_model,
-                        api_provider=provider, max_attempts=2, repair_missing=False)
+                        api_provider=provider, max_attempts=1, repair_missing=False)
                     if 1 not in one:
                         raise RuntimeError("Provider returned no validated item.")
                     generated[topic_index] = one[1]
