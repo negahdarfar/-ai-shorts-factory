@@ -78,6 +78,8 @@ def main():
     parser.add_argument("--minimum-matching-frames", type=int, default=2)
     parser.add_argument("--output", default="visual_uniqueness_report.json")
     args = parser.parse_args()
+    if not 4 <= args.expected_count <= 10:
+        raise SystemExit("--expected-count must be between 4 and 10.")
 
     root = Path(args.home) / "storage" / "tasks"
     files = sorted(root.glob("**/final-*.mp4"))
