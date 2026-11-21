@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload exactly four validated Shorts to YouTube.
+"""Upload 4-10 validated Shorts to YouTube.
 
 Privacy is PRIVATE by default. PUBLIC publishing is possible only when the
 workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public.
@@ -62,7 +62,7 @@ def load_validated_videos(home: Path) -> list[Path]:
     if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
         raise SystemExit("The validation report does not identify four distinct video files.")
     if len(available) != EXPECTED_COUNT:
-        raise SystemExit(f"Expected exactly four final MP4 files in storage, found {len(available)}.")
+        raise SystemExit(f"Expected exactly {EXPECTED_COUNT} final MP4 files in storage, found {len(available)}.")
     return videos
 
 
@@ -72,7 +72,7 @@ def load_seo_manifest() -> list[dict]:
         raise SystemExit("Missing seo_metadata.json; refusing upload without SEO metadata.")
     records = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(records, list) or len(records) != EXPECTED_COUNT:
-        raise SystemExit("SEO manifest must contain exactly EXPECTED_COUNT records.")
+        raise SystemExit(f"SEO manifest must contain exactly {EXPECTED_COUNT} records.")
     for index, record in enumerate(records, 1):
         meta = record.get("metadata", {}) if isinstance(record, dict) else {}
         script = str(record.get("video_script", "")).strip()
