@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Upload 4-10 validated Shorts to YouTube.
+"""Idempotent uploader for 4-10 validated YouTube Shorts.
 
 Privacy is PRIVATE by default. PUBLIC publishing is possible only when the
-workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public.
+workflow explicitly sets YOUTUBE_PRIVACY_STATUS=public and confirms it.
 """
+import hashlib
 import json
 import os
 import sys
@@ -19,6 +20,8 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+
+
 def configured_expected_count():
     try:
         count = int(os.environ.get("EXPECTED_COUNT", "4"))
@@ -32,6 +35,38 @@ def configured_expected_count():
 EXPECTED_COUNT = configured_expected_count()
 
 
+def load_upload_history(state_dir: Path) -> dict:
+    path = state_dir / "upload_history.json"
+    if not path.exists():
+        return {"schema_version": 1, "uploads": {}}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Could not read upload history safely: {exc}") from exc
+    if not isinstance(value, dict) or not isinstance(value.get("uploads"), dict):
+        raise SystemExit("Upload history is malformed; refusing to risk duplicate publication.")
+    for key, entry in value["uploads"].items():
+        if not isinstance(key, str) or not isinstance(entry, dict):
+            raise SystemExit("Upload history contains a malformed record; refusing publication.")
+    return value
+
+
+def save_upload_history(state_dir: Path, history: dict) -> None:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    target = state_dir / "upload_history.json"
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(target)
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def load_validated_videos(home: Path) -> list[Path]:
     report_path = Path("mpt_quality_report.json")
     if not report_path.is_file():
@@ -39,7 +74,7 @@ def load_validated_videos(home: Path) -> list[Path]:
     try:
         report = json.loads(report_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise SystemExit(f"Could not read the video quality report: {exc}")
+        raise SystemExit(f"Could not read the video quality report: {exc}") from exc
     if not isinstance(report, list) or len(report) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} validated report entries.")
 
@@ -60,7 +95,7 @@ def load_validated_videos(home: Path) -> list[Path]:
         videos.append(path)
 
     if len({p.resolve() for p in videos}) != EXPECTED_COUNT:
-        raise SystemExit("The validation report does not identify EXPECTED_COUNT distinct video files.")
+        raise SystemExit(f"The validation report does not identify {EXPECTED_COUNT} distinct video files.")
     if len(available) != EXPECTED_COUNT:
         raise SystemExit(f"Expected exactly {EXPECTED_COUNT} final MP4 files in storage, found {len(available)}.")
     return videos
@@ -83,6 +118,11 @@ def load_seo_manifest() -> list[dict]:
     return records
 
 
+def write_results(path: Path, results_by_index: dict[int, dict]) -> None:
+    ordered = [results_by_index[index] for index in sorted(results_by_index)]
+    path.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> None:
     requested_privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", "private").strip().lower()
     scheduled = os.environ.get("YOUTUBE_SCHEDULED_PUBLISH", "NO").strip().upper() == "YES"
@@ -92,6 +132,7 @@ def main() -> None:
         raise SystemExit("Public upload blocked: explicit workflow confirmation is missing.")
 
     privacy = "private" if scheduled else requested_privacy
+    mode = "public" if scheduled or requested_privacy == "public" else "private"
     first_publish_at = None
     if scheduled:
         candidate = datetime.now(timezone.utc) + timedelta(minutes=60)
@@ -100,23 +141,53 @@ def main() -> None:
             first_publish_at += timedelta(hours=1)
         print(f"SCHEDULING_PUBLIC_SHORTS: count={EXPECTED_COUNT} | first slot {first_publish_at.isoformat()}")
 
+    home = Path(os.environ.get("MPT_HOME", "mpt-runtime"))
+    videos = load_validated_videos(home)
+    seo_records = load_seo_manifest()
+    state_dir = home / "state"
+    history = load_upload_history(state_dir)
+    output_path = Path("youtube_scheduled_upload_results.json" if scheduled else f"youtube_{privacy}_upload_results.json")
+
+    prepared = []
+    results_by_index = {}
+    new_public_topics = []
+    for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
+        digest = sha256_file(video_path)
+        idempotency_key = f"{mode}:{digest}"
+        previous = history["uploads"].get(idempotency_key)
+        if previous:
+            status = previous.get("status")
+            if status == "pending":
+                raise SystemExit(
+                    f"UPLOAD_REQUIRES_RECONCILIATION: {video_path.name} has a pending {mode} upload. "
+                    "Check YouTube Studio before clearing the pending ledger entry; do not blindly retry."
+                )
+            if status != "completed" or not isinstance(previous.get("result"), dict) or not previous["result"].get("video_id"):
+                raise SystemExit(f"Upload ledger entry for {video_path.name} is invalid; refusing duplicate upload.")
+            results_by_index[index] = previous["result"]
+            print(f"UPLOAD_ALREADY_COMPLETED; skipping duplicate {mode} upload: {previous['result']['video_id']}")
+            continue
+
+        publish_at = (first_publish_at + timedelta(hours=3 * (index - 1))) if scheduled else None
+        prepared.append((index, video_path, record, digest, idempotency_key, publish_at))
+        if mode == "public":
+            new_public_topics.append(str(record.get("topic", "")).strip())
+
+    if mode == "public" and new_public_topics:
+        try:
+            ensure_new_topics(state_dir, new_public_topics)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc))
+
+    if not prepared:
+        write_results(output_path, results_by_index)
+        print(f"ALL_{EXPECTED_COUNT}_{mode.upper()}_UPLOADS_ALREADY_COMPLETED; no duplicate uploads created.")
+        return
+
     required = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     missing = [key for key in required if not os.environ.get(key, "").strip()]
     if missing:
         raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
-
-    home = Path(os.environ.get("MPT_HOME", "mpt-runtime"))
-    videos = load_validated_videos(home)
-    seo_records = load_seo_manifest()
-
-    # A reused topic must never be published twice. Private QA uploads are
-    # deliberately excluded so a draft can be checked without consuming a topic.
-    if scheduled or requested_privacy == "public":
-        topics = [str(record.get("topic", "")).strip() for record in seo_records]
-        try:
-            ensure_new_topics(home / "state", topics)
-        except RuntimeError as exc:
-            raise SystemExit(str(exc))
 
     credentials = Credentials(
         token=None,
@@ -131,16 +202,30 @@ def main() -> None:
         raise SystemExit("Google did not return a valid access token.")
 
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
-    results = []
-    output_path = Path("youtube_scheduled_upload_results.json" if scheduled else f"youtube_{privacy}_upload_results.json")
-    for index, (video_path, record) in enumerate(zip(videos, seo_records), start=1):
+    for index, video_path, record, digest, idempotency_key, publish_at in prepared:
         metadata = record["metadata"]
         description = metadata["description"].strip()
         hashtags = [str(tag).strip().lstrip("#") for tag in metadata.get("hashtags", []) if str(tag).strip()]
         if hashtags:
             description += "\n\n" + " ".join("#" + tag for tag in hashtags[:3])
         tags = [str(tag).strip() for tag in metadata.get("tags", []) if str(tag).strip()][:15]
-        publish_at = (first_publish_at + timedelta(hours=3 * (index - 1))) if scheduled else None
+        publish_at_text = publish_at.isoformat(timespec="seconds").replace("+00:00", "Z") if publish_at else None
+
+        pending = {
+            "mode": mode,
+            "status": "pending",
+            "sha256": digest,
+            "file": video_path.name,
+            "topic": str(record["topic"]).strip(),
+            "title": metadata["title"][:100],
+            "privacy": privacy,
+            "scheduled": scheduled,
+            "publish_at_utc": publish_at_text,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        history["uploads"][idempotency_key] = pending
+        save_upload_history(state_dir, history)
+
         body = {
             "snippet": {
                 "title": metadata["title"][:100],
@@ -152,11 +237,12 @@ def main() -> None:
             "status": {
                 "privacyStatus": privacy,
                 "selfDeclaredMadeForKids": False,
-                **({"publishAt": publish_at.isoformat(timespec="seconds").replace("+00:00", "Z")} if publish_at else {}),
+                **({"publishAt": publish_at_text} if publish_at_text else {}),
             },
         }
-        media = MediaFileUpload(str(video_path), mimetype="video/mp4",
-                                chunksize=8 * 1024 * 1024, resumable=True)
+        media = MediaFileUpload(
+            str(video_path), mimetype="video/mp4", chunksize=8 * 1024 * 1024, resumable=True
+        )
         request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
         response = None
         while response is None:
@@ -166,26 +252,43 @@ def main() -> None:
 
         video_id = response.get("id")
         if not video_id:
-            raise SystemExit(f"YouTube returned no video ID for upload {index}; upload cannot be confirmed.")
+            raise SystemExit(f"YouTube returned no video ID for upload {index}; pending ledger retained for reconciliation.")
+
         result = {
             "index": index,
             "file": video_path.name,
+            "sha256": digest,
+            "topic": str(record["topic"]).strip(),
+            "title": metadata["title"][:100],
             "video_id": video_id,
             "privacy": "scheduled" if scheduled else privacy,
-            **({"publish_at_utc": publish_at.isoformat(timespec="seconds").replace("+00:00", "Z")} if publish_at else {}),
+            **({"publish_at_utc": publish_at_text} if publish_at_text else {}),
             "seo_source": record.get("metadata_source", "unknown"),
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
-        results.append(result)
-        output_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-        if scheduled or requested_privacy == "public":
-            record_published_topic(home / "state", str(record["topic"]).strip())
+        history["uploads"][idempotency_key] = {
+            **pending,
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "video_id": video_id,
+            "url": result["url"],
+            "result": result,
+        }
+        save_upload_history(state_dir, history)
+        results_by_index[index] = result
+        write_results(output_path, results_by_index)
+
+        if mode == "public":
+            record_published_topic(state_dir, str(record["topic"]).strip())
         print(f"{privacy.upper()}_UPLOAD_SUCCEEDED {index}/{EXPECTED_COUNT}: {video_id}")
 
-    if len(results) != EXPECTED_COUNT:
-        raise SystemExit(f"Only {len(results)} of {EXPECTED_COUNT} uploads completed.")
-    print(f"ALL_{EXPECTED_COUNT}_SCHEDULED_UPLOADS_SUCCEEDED" if scheduled else f"ALL_{EXPECTED_COUNT}_{privacy.upper()}_UPLOADS_SUCCEEDED")
-    print(f"All {EXPECTED_COUNT} videos were scheduled as private uploads with future public release times." if scheduled else f"All {EXPECTED_COUNT} videos were uploaded with privacy={privacy}.")
+    if len(results_by_index) != EXPECTED_COUNT:
+        raise SystemExit(f"Only {len(results_by_index)} of {EXPECTED_COUNT} uploads are complete.")
+    print(f"ALL_{EXPECTED_COUNT}_{mode.upper()}_UPLOADS_SUCCEEDED")
+    print(
+        f"Completed {EXPECTED_COUNT} {mode} upload records. "
+        "Previously completed files were skipped using the SHA-256 upload ledger."
+    )
 
 
 if __name__ == "__main__":
