@@ -12,8 +12,46 @@ from pathlib import Path
 
 from free_model_router import discover_free_models
 
-API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
+API_ROOT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 SEO_FIELDS = ("primary_keyword", "secondary_keywords", "title", "description", "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent")
+
+
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "integer"},
+                    "video_script": {"type": "string"},
+                    "video_terms": {"type": "array", "items": {"type": "string"}},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "primary_keyword": {"type": "string"},
+                            "secondary_keywords": {"type": "array", "items": {"type": "string"}},
+                            "title": {"type": "string"},
+                            "description": {"type": "string"},
+                            "hashtags": {"type": "array", "items": {"type": "string"}},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                            "pinned_comment": {"type": "string"},
+                            "thumbnail_concept": {"type": "string"},
+                            "search_intent": {"type": "string"},
+                        },
+                        "required": [
+                            "primary_keyword", "secondary_keywords", "title", "description",
+                            "hashtags", "tags", "pinned_comment", "thumbnail_concept", "search_intent"
+                        ],
+                    },
+                },
+                "required": ["index", "video_script", "video_terms", "metadata"],
+            },
+        },
+    },
+    "required": ["items"],
+}
 
 
 def clean(value, limit=None):
@@ -168,11 +206,25 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
         provider = api_provider
     else:
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "model": model,
+            "input": prompt,
+            "store": False,
+            "response_format": {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": GEMINI_RESPONSE_SCHEMA,
+            },
+            "generation_config": {
+                "temperature": 0.25,
+                "thinking_level": "low",
+                "max_output_tokens": 4096,
+            },
         }
-        request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
-        request_headers = {"Content-Type": "application/json"}
+        request_url = API_ROOT
+        request_headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+        }
         provider = "Gemini"
 
     result = {}
@@ -195,8 +247,30 @@ Exactly one indexed item per input topic. Each script MUST contain 155-270 spoke
                     raw = "\\n".join(part.get("text", "") for part in raw if isinstance(part, dict))
                 raw = str(raw)
             else:
-                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                raw = "\\n".join(p.get("text", "") for p in parts)
+                if data.get("error"):
+                    error = data["error"]
+                    raise RuntimeError(
+                        f"Gemini Interactions API error {error.get('code', '')}: "
+                        f"{error.get('message', 'unspecified error')}"
+                    )
+                if data.get("status") == "failed":
+                    raise RuntimeError(f"Gemini interaction failed: {data.get('error', 'no error detail')}")
+                raw = str(data.get("output_text", "") or "")
+                if not raw:
+                    parts = []
+                    for step in data.get("steps", []):
+                        if step.get("type") == "model_output":
+                            parts.extend(
+                                item.get("text", "")
+                                for item in step.get("content", [])
+                                if item.get("type") == "text"
+                            )
+                    raw = "\\n".join(parts)
+                if not raw:
+                    raise RuntimeError(
+                        "Gemini Interactions API returned no model_output text; "
+                        f"response keys: {sorted(data.keys())}"
+                    )
             parsed = extract_json(raw)
             for row in parsed.get("items", []):
                 try:
