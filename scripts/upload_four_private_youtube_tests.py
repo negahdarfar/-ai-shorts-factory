@@ -72,7 +72,7 @@ def load_seo_manifest() -> list[dict]:
         raise SystemExit("Missing seo_metadata.json; refusing upload without SEO metadata.")
     records = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(records, list) or len(records) != EXPECTED_COUNT:
-        raise SystemExit("SEO manifest must contain exactly four records.")
+        raise SystemExit("SEO manifest must contain exactly EXPECTED_COUNT records.")
     for index, record in enumerate(records, 1):
         meta = record.get("metadata", {}) if isinstance(record, dict) else {}
         script = str(record.get("video_script", "")).strip()
