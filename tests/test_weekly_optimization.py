@@ -35,7 +35,8 @@ class WeeklyOptimizationTests(unittest.TestCase):
             markdown = root / "optimization.md"
             source.write_text(json.dumps({"status": "BLOCKED", "reason": "missing analytics token"}), encoding="utf-8")
             with patch.object(sys, "argv", ["weekly_optimization.py", "--input", str(source),
-                                            "--output", str(output), "--markdown", str(markdown)]):
+                                            "--output", str(output), "--markdown", str(markdown),
+                                            "--upload-history", str(upload_history)]):
                 main()
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "BLOCKED")
@@ -74,6 +75,22 @@ class WeeklyOptimizationTests(unittest.TestCase):
             source = root / "analytics.json"
             output = root / "optimization.json"
             markdown = root / "optimization.md"
+            upload_history = root / "upload_history.json"
+            upload_history.write_text(json.dumps({
+                "schema_version": 1,
+                "uploads": {
+                    "public:" + "a" * 64: {
+                        "mode": "public", "status": "completed", "topic": "Solar storms",
+                        "title": "Solar storms explained", "hook_text": "Why do solar storms happen?",
+                        "hook_type": "question", "result": {"video_id": "videoA"}
+                    },
+                    "public:" + "b" * 64: {
+                        "mode": "public", "status": "completed", "topic": "Ocean currents",
+                        "title": "Ocean currents explained", "hook_text": "Scientists track ocean currents.",
+                        "hook_type": "direct_fact", "result": {"video_id": "videoB"}
+                    },
+                },
+            }), encoding="utf-8")
             payload = {
                 "status": "completed",
                 "start_date": "2026-10-25",
@@ -107,6 +124,11 @@ class WeeklyOptimizationTests(unittest.TestCase):
             self.assertEqual(result["comparison"]["recent_14_day_views"], 200)
             self.assertEqual(result["comparison"]["views_change_percent"], 100.0)
             self.assertEqual(result["top_by_engaged_views"][0]["video"], "videoA")
+            self.assertEqual(result["top_by_engaged_views"][0]["topic"], "Solar storms")
+            self.assertEqual(result["top_by_engaged_views"][0]["hook_type"], "question")
+            self.assertEqual(result["topic_performance"][0]["topic"], "Solar storms")
+            self.assertEqual(result["hook_performance"][0]["hook_type"], "question")
+            self.assertEqual(result["metadata_join_coverage"]["videos_with_topic_and_hook"], 2)
             self.assertIn("youtube.com/watch?v=videoA", markdown.read_text(encoding="utf-8"))
 
 
