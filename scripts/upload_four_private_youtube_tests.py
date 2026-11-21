@@ -206,17 +206,23 @@ def main() -> None:
                 "tags": tags,
                 "categoryId": "27",
                 "defaultLanguage": "en",
+                "defaultAudioLanguage": "en",
             },
             "status": {
                 "privacyStatus": privacy,
                 "selfDeclaredMadeForKids": False,
+                # Current factory visuals are licensed stock footage, not realistic synthetic scenes.
+                # Revisit this flag if realistic AI-generated depictions are introduced.
+                "containsSyntheticMedia": False,
                 **({"publishAt": publish_at_text} if publish_at_text else {}),
             },
         }
         media = MediaFileUpload(
             str(video_path), mimetype="video/mp4", chunksize=8 * 1024 * 1024, resumable=True
         )
-        request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+        request = youtube.videos().insert(
+            part="snippet,status", body=body, media_body=media, notifySubscribers=False
+        )
         response = None
         while response is None:
             status, response = request.next_chunk()
@@ -239,6 +245,7 @@ def main() -> None:
             "privacy": "scheduled" if scheduled else privacy,
             **({"publish_at_utc": publish_at_text} if publish_at_text else {}),
             "seo_source": record.get("metadata_source", "unknown"),
+            "contains_synthetic_media": False,
             "url": f"https://www.youtube.com/watch?v={video_id}",
         }
         history["uploads"][ledger_key] = {
