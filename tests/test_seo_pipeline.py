@@ -2,6 +2,11 @@ import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[1]
+
+def long_script():
+    return """Solar storms begin when unstable magnetic fields on the Sun suddenly release enormous amounts of stored energy. Some eruptions send charged particles outward, while others launch clouds of magnetized plasma through interplanetary space. When those clouds reach Earth, they interact with the planet's magnetic field and can trigger geomagnetic disturbances. Beautiful auroras may appear far beyond polar regions, creating colorful displays that reveal energy moving through the upper atmosphere. Strong disturbances can also affect satellites, navigation systems, radio communication, and electrical infrastructure on the ground. Scientists track solar activity with spacecraft and ground observatories, measuring speed, direction, density, and magnetic orientation. Those measurements help forecasters estimate whether an eruption will pass harmlessly or produce stronger space weather. A fast cloud aimed toward Earth can arrive in roughly one to three days, depending on its speed. Power grid operators and satellite teams use forecasts to prepare equipment and reduce disruption during severe events. The most important lesson is that solar storms are natural, measurable events, not mysterious warnings of certain disaster. Understanding their causes helps explain why researchers watch the Sun continuously and improve predictions as new observations arrive. Every forecast combines several clues, because the direction of a magnetic field can matter as much as eruption size."""
+
 class SeoPipelineTests(unittest.TestCase):
     def test_valid_manifest_passes(self):
         data=[{"topic":"Solar storms","metadata_source":"gemini_batch","content_source":"gemini_batch","video_script":"Solar storms begin with activity on the Sun. Powerful magnetic fields can twist and reconnect, releasing energy and sometimes sending charged particles toward Earth. When those particles interact with Earth’s magnetic field, they can create auroras and, in stronger events, disrupt satellites or radio communications. Scientists monitor solar activity to understand these risks and improve forecasts. The key point is that solar storms are natural space-weather events, but their effects depend on their strength and direction. That is why forecasters pay attention not only to the size of an eruption, but also to its speed and magnetic orientation. A storm aimed away from Earth may pass with little effect, while a direct hit can produce stronger geomagnetic activity. Power-grid operators, spacecraft teams, and aviation services use space-weather alerts to prepare. Understanding both sides helps explain why scientists keep watching the Sun.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"],"metadata":{"title":"Solar Storms: What Happens When the Sun Erupts?","description":"Learn how solar storms form, how solar flares affect Earth, and why space weather matters.","primary_keyword":"solar storms","tags":["solar storms","space weather","solar flare","Sun activity","Earth magnetosphere"],"hashtags":["space","science"]}}]
@@ -51,7 +56,7 @@ class SeoPipelineTests(unittest.TestCase):
             "search_intent":"Understand solar storms"
         }
         response_data = {"candidates":[{"content":{"parts":[{"text":json.dumps({
-            "items":[{"index":i,"metadata":dict(fields),"video_script":"This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context. Think of this as a short guided investigation: begin with the most reliable clues, connect each detail to the larger picture, and notice where the evidence stops. That approach makes the explanation useful without turning uncertainty into a dramatic claim. It also gives viewers a clear reason to keep learning after the video ends. Careful questions often reveal more than a confident headline.","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"]} for i in range(1,5)]
+            "items":[{"index":i,"metadata":dict(fields),"video_script":"long_script()","video_terms":["solar storms","solar flare","Sun surface","space weather","solar activity"]} for i in range(1,5)]
         })}]}}]}
         mocked = patch("urllib.request.urlopen")
         with mocked as urlopen:
@@ -98,7 +103,7 @@ class SeoPipelineTests(unittest.TestCase):
             root = Path(d)
             records = [{
                 "topic": "Solar storms",
-                "video_script": "This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context. Think of this as a short guided investigation: begin with the most reliable clues, connect each detail to the larger picture, and notice where the evidence stops. That approach makes the explanation useful without turning uncertainty into a dramatic claim. It also gives viewers a clear reason to keep learning after the video ends. Careful questions often reveal more than a confident headline.",
+                "video_script": "long_script()",
                 "video_terms": ["solar storms", "solar flare", "Sun surface", "space weather", "solar activity"],
                 "content_source": "gemini_batch"
             }]
@@ -131,7 +136,7 @@ class SeoPipelineTests(unittest.TestCase):
         }
         row = {
             "metadata": metadata,
-            "video_script": "This is a clear narrated explanation of the topic. It introduces the main question, explains why context matters, and shows viewers how to separate evidence from assumptions. It avoids unsupported claims and ends with a practical takeaway for understanding the subject more carefully. The goal is not to rush to a conclusion. It is to understand the subject using clear language and reliable context. Think of this as a short guided investigation: begin with the most reliable clues, connect each detail to the larger picture, and notice where the evidence stops. That approach makes the explanation useful without turning uncertainty into a dramatic claim. It also gives viewers a clear reason to keep learning after the video ends. Careful questions often reveal more than a confident headline.",
+            "video_script": "long_script()",
             "video_terms": ["ancient city", "desert ruins", "stone walls", "archaeology site", "historic settlement"]
         }
         normalized = module.normalize_item(row, "Ancient desert cities")
