@@ -1,3 +1,4 @@
+import json
 import sys
 import tempfile
 import unittest
@@ -47,6 +48,46 @@ class TopicHistoryTests(unittest.TestCase):
             (state / "published_topics.json").write_text('{"bad":"shape"}', encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "malformed"):
                 load_published_topics(state)
+
+    def test_public_upload_ledger_blocks_topic_even_if_topic_file_was_not_written(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            ledger = {
+                "schema_version": 1,
+                "uploads": {
+                    "public:abc123": {
+                        "mode": "public",
+                        "status": "completed",
+                        "topic": "Solar storms",
+                    }
+                },
+            }
+            (state / "upload_history.json").write_text(json.dumps(ledger), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "PUBLIC_PUBLISH_BLOCKED_DUPLICATE_TOPICS"):
+                ensure_new_topics(state, ["solar STORMS"])
+
+    def test_private_qa_upload_does_not_block_public_topic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            ledger = {
+                "schema_version": 1,
+                "uploads": {
+                    "private:def456": {
+                        "mode": "private",
+                        "status": "completed",
+                        "topic": "Solar storms",
+                    }
+                },
+            }
+            (state / "upload_history.json").write_text(json.dumps(ledger), encoding="utf-8")
+            ensure_new_topics(state, ["Solar storms"])
+
+    def test_malformed_upload_ledger_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            (state / "upload_history.json").write_text('[]', encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "upload history is malformed"):
+                ensure_new_topics(state, ["New topic"])
 
 
 if __name__ == "__main__":
