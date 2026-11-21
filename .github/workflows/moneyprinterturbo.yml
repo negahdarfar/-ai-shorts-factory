@@ -4,6 +4,14 @@ name: MoneyPrinterTurbo Shorts Factory
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - feature/koroush-factory-60-120s-4-10
+    paths:
+      - '.github/workflows/moneyprinterturbo.yml'
+      - 'scripts/**'
+      - 'docs/**'
+      - 'data/factory_state/**'
   schedule:
     - cron: "0 14 * * *" # Daily UTC production; release times are staggered after rendering.
   workflow_dispatch:
@@ -70,18 +78,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install FFmpeg
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-core
       - name: Get MoneyPrinterTurbo v1.3.10
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: git clone --depth 1 --branch v1.3.10 https://github.com/harry0703/MoneyPrinterTurbo.git vendor/MoneyPrinterTurbo
       - name: Install small config helper
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: python -m pip install toml
       - name: Restore previously used topic list
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/mpt-runtime/state
@@ -89,22 +97,22 @@ jobs:
           restore-keys: |
             mpt-topics-${{ runner.os }}-
       - name: Merge durable topic and upload history
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
       - name: Validate daily batch size
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         run: |
           case "$DAILY_COUNT" in
             4|5|6|7|8|9|10) echo "Daily batch size accepted: $DAILY_COUNT" ;;
             *) echo "::error::DAILY_COUNT must be between 4 and 10; received '$DAILY_COUNT'."; exit 1 ;;
           esac
       - name: Connect to private FreeLLMAPI phone gateway
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ env.TAILSCALE_AUTHKEY }}
       - name: Check FreeLLMAPI gateway without inference
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         id: freeapi
         env:
           BASE_URL: ${{ (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && secrets.FREELLMAPI_BASE_URL || '' }}
@@ -136,7 +144,7 @@ jobs:
           fi
           echo "ready=$READY" >> "$GITHUB_OUTPUT"
       - name: Configure free-tier providers
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -268,10 +276,10 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         run: python scripts/validate_visual_uniqueness.py --home "$MPT_HOME" --expected-count "$DAILY_COUNT" --samples 6 --max-hamming-distance 5 --minimum-matching-frames 2
       - name: Install YouTube API client
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.configure.outputs.ready == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && steps.configure.outputs.ready == 'true' }}
         run: python -m pip install --upgrade google-api-python-client google-auth-httplib2
       - name: Validate YouTube OAuth refresh token (no upload)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.configure.outputs.ready == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') && steps.configure.outputs.ready == 'true' }}
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -315,7 +323,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/upload_private_youtube_test.py
       - name: Persist durable topic and upload history
-        if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
