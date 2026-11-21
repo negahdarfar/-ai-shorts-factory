@@ -31,7 +31,7 @@ def ensure_new_topics(state_dir: Path, topics: list[str]) -> None:
         raise RuntimeError(
             "PUBLIC_PUBLISH_BLOCKED_DUPLICATE_TOPICS: "
             + "; ".join(duplicates)
-            + ". Choose four new topics or run private QA."
+            + ". Choose fresh topics or run private QA."
         )
 
 
