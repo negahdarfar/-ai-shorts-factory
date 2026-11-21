@@ -13,13 +13,43 @@ if not 4 <= expected <= 10:
     raise SystemExit("EXPECTED_COUNT must be between 4 and 10.")
 
 tasks_root = home / "storage" / "tasks"
-files = sorted(tasks_root.glob("**/final-*.mp4"))
-if len(files) != expected:
-    raise SystemExit(f"Expected {expected} finished MP4 files, found {len(files)}.")
+retry_report_path = Path("batch_retry_report.json")
+if not retry_report_path.is_file():
+    raise SystemExit("Missing batch_retry_report.json; refusing to guess topic-to-video mapping.")
+try:
+    retry_report = json.loads(retry_report_path.read_text(encoding="utf-8"))
+except (OSError, ValueError) as exc:
+    raise SystemExit(f"Could not read batch_retry_report.json: {exc}")
+tasks = retry_report.get("tasks") if isinstance(retry_report, dict) else None
+if not isinstance(tasks, list) or len(tasks) != expected or retry_report.get("failed") != 0:
+    raise SystemExit(f"Batch retry report must contain {expected} successful task records.")
+
+files_with_topics = []
+seen_task_dirs = set()
+for task in sorted(tasks, key=lambda row: int(row.get("index", 0))):
+    if task.get("status") != "succeeded" or not task.get("topic") or not task.get("task_dir") or not task.get("output_file"):
+        raise SystemExit("Batch retry report contains an incomplete or failed task record.")
+    task_dir = (tasks_root / task["task_dir"]).resolve()
+    output_path = (tasks_root / task["output_file"]).resolve()
+    if tasks_root.resolve() not in task_dir.parents or tasks_root.resolve() not in output_path.parents:
+        raise SystemExit("Batch retry report contains a path outside the MPT task directory.")
+    if task_dir in seen_task_dirs:
+        raise SystemExit("Two topics map to the same MoneyPrinterTurbo task directory.")
+    seen_task_dirs.add(task_dir)
+    if output_path.parent != task_dir or not output_path.is_file() or output_path.suffix.lower() != ".mp4":
+        raise SystemExit(f"Task output path is missing or inconsistent: {task['output_file']}")
+    final_files = list(task_dir.glob("final-*.mp4"))
+    if len(final_files) != 1 or final_files[0].resolve() != output_path:
+        raise SystemExit(f"Task directory must contain exactly one final MP4: {task_dir}")
+    files_with_topics.append((output_path, str(task["topic"]).strip(), int(task["index"])))
+
+all_final_files = list(tasks_root.glob("**/final-*.mp4"))
+if len(all_final_files) != expected:
+    raise SystemExit(f"Expected {expected} finished MP4 files, found {len(all_final_files)}.")
 
 hashes = set()
 report = []
-for path in files:
+for path, topic, task_index in files_with_topics:
     if path.stat().st_size < 500_000:
         raise SystemExit(f"Output is suspiciously small: {path}")
 
@@ -95,6 +125,8 @@ for path in files:
         raise SystemExit(f"QUALITY_GATE_FAILED score={score}/100: {path}")
 
     report.append({
+        "index": task_index,
+        "topic": topic,
         "file": path.name,
         "relative_path": path.relative_to(tasks_root).as_posix(),
         "sha256": digest,
