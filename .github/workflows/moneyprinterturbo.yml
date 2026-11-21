@@ -41,7 +41,7 @@ name: MoneyPrinterTurbo Shorts Factory
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mpt-shorts-${{ github.ref }}
@@ -83,6 +83,9 @@ jobs:
           key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mpt-topics-${{ runner.os }}-
+      - name: Merge durable topic and upload history
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        run: python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
       - name: Connect to private FreeLLMAPI phone gateway
         if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
@@ -299,6 +302,22 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/upload_private_youtube_test.py
+      - name: Persist durable topic and upload history
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
+          if git diff --quiet -- data/factory_state; then
+            echo "Durable factory state is unchanged."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/factory_state
+            git commit -m "chore(factory): persist topic and upload ledger [skip ci]"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
       - name: Persist topic and publication history
         if: ${{ always() && steps.configure.outputs.ready == 'true' }}
         uses: actions/cache/save@v4
@@ -312,6 +331,7 @@ jobs:
           if [ -d "$MPT_HOME/storage/tasks" ]; then cp -R "$MPT_HOME/storage/tasks" artifacts/; fi
           if [ -d "$MPT_HOME/logs" ]; then cp -R "$MPT_HOME/logs" artifacts/; fi
           cp trending_batch.json selected_trends.json batch_retry_report.json seo_metadata.json youtube_competitor_research.json 2>/dev/null artifacts/ || true
+          cp -R data/factory_state artifacts/ 2>/dev/null || true
           cp mpt_quality_report.json visual_uniqueness_report.json youtube_private_upload_results.json youtube_public_upload_results.json youtube_scheduled_upload_results.json artifacts/ 2>/dev/null || true
           if [ -d seo_thumbnails ]; then cp -R seo_thumbnails artifacts/; fi
       - name: Save videos, selected topics and logs
