@@ -105,6 +105,7 @@ jobs:
         shell: bash
         env:
           FREELLMAPI_CLOUD_API_KEY: ${{ secrets.FREELLMAPI_CLOUD_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
