@@ -20,7 +20,7 @@ Do not replace the working upload refresh token. The analytics token is separate
 
 ## Metrics and limitations
 
-The report separates Shorts using YouTube Analytics `creatorContentType=SHORTS` and collects views, engaged views, average view duration, average percentage viewed, likes, comments, shares and subscribers gained.
+The report supports a 1-90 day lookback (default 28 days) and separates Shorts using YouTube Analytics `creatorContentType=SHORTS` and collects views, engaged views, average view duration, average percentage viewed, likes, comments, shares and subscribers gained.
 
 Since YouTube changed public Shorts view counting, `views` includes plays/replays from the first frame. `engagedViews` is also recorded and is more useful for meaningful engagement comparisons. The ratio `engagedViews / views` is labelled as a directional proxy only; it is not the exact Studio "Stayed to watch" / "Viewed vs swiped away" metric.
 
