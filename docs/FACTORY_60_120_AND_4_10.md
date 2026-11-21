@@ -18,7 +18,7 @@ For manual workflow dispatch, select `daily_count` from 4 through 10. The preser
 
 ## Free-only model routing
 
-The workflow uses Gemini 3.8 Flash Standard Free Tier first when `GEMINI_API_KEY` is configured. The `GEMINI_FREE_TIER_ENABLED` variable defaults to true because the Standard tier is listed as free; set it to false to disable Gemini. Free-tier limits can still cause rate-limit errors.
+The workflow uses Gemini 3.8 Flash Standard Free Tier first when `GEMINI_API_KEY` is configured. The scheduled workflow enables Gemini 3.8 Flash Standard Free Tier by default because the Standard tier is listed as free. Manual workflow dispatch exposes a `use_gemini_free_tier` opt-out. Free-tier limits can still cause rate-limit errors. Free-tier limits can still cause rate-limit errors.
 
 Fallback order for SEO generation is:
 
@@ -43,7 +43,7 @@ The state contains topic names, file hashes, video IDs, titles and upload URLs o
 
 ## Quality checks
 
-The technical gate checks file integrity, duplicate hashes, video/audio streams, 9:16 ratio, minimum resolution, duration, Persian subtitle timing/text, detected black frames, detected silence, and a per-video quality score. This does not prove factual accuracy, copyright clearance or creative originality; those checks remain separate.
+The factory disables MoneyPrinterTurbo's bundled background music by default because its sample tracks may originate from YouTube videos. A licensed track can be enabled only after its source and rights are verified. The technical gate checks file integrity, duplicate hashes, video/audio streams, 9:16 ratio, minimum resolution, duration, Persian subtitle timing/text, detected black frames, detected silence, and a per-video quality score. This does not prove factual accuracy, copyright clearance or creative originality; those checks remain separate.
 
 ## YouTube Analytics
 
