@@ -33,7 +33,16 @@ class SeoDurationValidationTests(unittest.TestCase):
     def run_validator(self, record, expected_count=4):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "seo.json"
-            path.write_text(json.dumps([record] * expected_count), encoding="utf-8")
+            batch = []
+            for index in range(expected_count):
+                item = valid_record(len(record["video_script"].split()))
+                topic = f"Solar storms topic {index + 1}"
+                item["topic"] = topic
+                item["metadata"]["title"] = f"Solar storms topic {index + 1} and their effects"
+                item["metadata"]["description"] = f"{topic} can affect satellites and radio signals."
+                item["metadata"]["primary_keyword"] = topic
+                batch.append(item)
+            path.write_text(json.dumps(batch), encoding="utf-8")
             with patch.object(sys, "argv", ["validate_seo_metadata.py", "--input", str(path),
                                             "--expected-count", str(expected_count)]):
                 main()
