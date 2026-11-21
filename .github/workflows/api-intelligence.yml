@@ -1,9 +1,6 @@
 name: KOROUSH API Intelligence
 
 on:
-  push:
-    branches:
-      - feature/api-intelligence-v1
   pull_request:
     paths:
       - 'scripts/api_intelligence.py'
