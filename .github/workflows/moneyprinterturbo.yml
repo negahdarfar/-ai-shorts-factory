@@ -57,8 +57,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: mpt-shorts-${{ github.ref }}
-  cancel-in-progress: false
+  group: mpt-shorts-${{ github.ref }}-${{ github.event_name == 'push' && 'branch-test' || 'production' }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   generate:
