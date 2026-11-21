@@ -12,6 +12,8 @@ if not template.is_file():
     raise SystemExit(f"MoneyPrinterTurbo config template not found: {template}")
 
 gemini = os.environ.get("GEMINI_API_KEY", "").strip()
+gemini_free_tier_enabled = os.environ.get("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
+gemini_free_ready = bool(gemini and gemini_free_tier_enabled)
 cloudflare_account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
 cloudflare_api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
 cloudflare_model = os.environ.get("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
@@ -67,11 +69,9 @@ pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
 if not cloudflare_ready and not (freellmapi_base_url and freellmapi_key) and not openrouter_free_models and not (
-    allow_nonfree_fallback and (
-        gemini or (omniroute_base_url and omniroute_key)
-    )
+    gemini_free_ready or (allow_nonfree_fallback and omniroute_base_url and omniroute_key)
 ):
-    missing.append("Cloudflare Workers AI free route (CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN) or FreeLLMAPI with an explicitly free model")
+    missing.append("a verified-free LLM route: Cloudflare Workers AI, Gemini free tier (GEMINI_API_KEY + GEMINI_FREE_TIER_ENABLED=true), or an explicitly free gateway model")
 if not pexels and not pixabay:
     missing.append("PEXELS_API_KEY or PIXABAY_API_KEY")
 if missing:
@@ -83,7 +83,7 @@ if missing:
 config = toml.load(str(template))
 app = config.setdefault("app", {})
 # MoneyPrinterTurbo v1.3.10 supports OpenAI-compatible custom base URLs.
-# Prefer the pinned Cloudflare Workers AI free model, then FreeLLMAPI.
+# Prefer pinned Cloudflare Workers AI, then explicitly free gateway models, then Gemini only when its free-tier flag is enabled.
 if cloudflare_ready:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = cloudflare_api_token
@@ -104,7 +104,7 @@ elif allow_nonfree_fallback and omniroute_base_url and omniroute_key:
     app["openai_api_key"] = omniroute_key
     app["openai_base_url"] = omniroute_base_url.rstrip("/")
     app["openai_model_name"] = omniroute_model
-elif allow_nonfree_fallback and gemini:
+elif gemini_free_ready:
     app["llm_provider"] = "gemini"
     app["gemini_api_key"] = gemini
     app["gemini_model_name"] = "gemini-3.8-flash"
