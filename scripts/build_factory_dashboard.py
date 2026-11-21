@@ -12,9 +12,22 @@ def load_json(path):
     return json.loads(candidate.read_text(encoding="utf-8")) if candidate.is_file() else {}
 
 
+def metric_total(report, metric):
+    headers = [item.get("name", "") for item in report.get("columnHeaders", [])]
+    if metric not in headers:
+        return 0.0
+    index = headers.index(metric)
+    return sum(float(row[index] or 0) for row in (report.get("rows") or []) if len(row) > index)
+
+
 def table_rows(report, limit=20):
     headers = [item.get("name", "") for item in report.get("columnHeaders", [])]
-    rows = report.get("rows", [])
+    enriched = report.get("rows_with_engagement_proxy") or []
+    if enriched:
+        headers = headers + ["engaged_views_over_views_percent"]
+        rows = [list(item.get("row", [])) + [item.get("engaged_views_over_views_percent")] for item in enriched]
+    else:
+        rows = report.get("rows") or []
     rendered = []
     for row in rows[:limit]:
         values = dict(zip(headers, row))
@@ -40,6 +53,25 @@ def main():
     daily = reports.get("shorts_daily", {})
     videos = reports.get("shorts_videos", {})
     recommendations = optimization.get("recommendations", [])
+    views = metric_total(daily, "views")
+    engaged = metric_total(daily, "engagedViews")
+    likes = metric_total(daily, "likes")
+    comments = metric_total(daily, "comments")
+    shares = metric_total(daily, "shares")
+    subscribers = metric_total(daily, "subscribersGained")
+    proxy = (100 * engaged / views) if views else None
+    kpis = [
+        ("Shorts views", f"{int(views):,}"),
+        ("Engaged views", f"{int(engaged):,}"),
+        ("Engaged/views proxy", f"{proxy:.1f}%" if proxy is not None else "—"),
+        ("Likes", f"{int(likes):,}"),
+        ("Comments + shares", f"{int(comments + shares):,}"),
+        ("Subscribers gained", f"{int(subscribers):,}"),
+    ]
+    kpi_html = "".join(
+        f'<div class="card"><div class="muted">{html.escape(label)}</div><div class="value">{html.escape(value)}</div></div>'
+        for label, value in kpis
+    )
     rec_html = "".join(f"<li>{html.escape(str(item))}</li>" for item in recommendations) or "<li>Analytics authorization or data is not available yet.</li>"
     blocked = analytics.get("reason") or "Add YOUTUBE_ANALYTICS_REFRESH_TOKEN with yt-analytics.readonly consent to enable channel analytics."
     body = f"""<!doctype html>
@@ -63,11 +95,12 @@ th{{color:var(--muted)}}a{{color:var(--accent)}}li{{margin:8px 0}}footer{{color:
 <div class="card"><div class="muted">Shorts daily rows</div><div class="value">{len(daily.get('rows', []))}</div></div>
 <div class="card"><div class="muted">Shorts video rows</div><div class="value">{len(videos.get('rows', []))}</div></div>
 </div>
+<div class="grid">{kpi_html}</div>
 <section><h2>Weekly recommendations</h2><ul>{rec_html}</ul></section>
 <section><h2>Shorts performance by day</h2>{table_rows(daily, 45)}</section>
 <section><h2>Shorts performance by video</h2>{table_rows(videos, 50)}</section>
 {f'<section><h2>Setup required</h2><p>{html.escape(str(blocked))}</p></section>' if status != 'completed' else ''}
-<footer>Generated {datetime.now(timezone.utc).isoformat()} · Public views and engaged views are different metrics. See the metric notes in youtube_analytics.json.</footer>
+<footer>Generated {datetime.now(timezone.utc).isoformat()} · Engaged views / views is a directional proxy only; it is not the exact YouTube Studio Stayed to watch / Viewed vs swiped away metric. See youtube_analytics.json for metric notes.</footer>
 </main></body></html>"""
     Path(args.output).write_text(body, encoding="utf-8")
     print(f"FACTORY_DASHBOARD_SAVED {args.output}")
