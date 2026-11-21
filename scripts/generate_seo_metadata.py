@@ -304,7 +304,7 @@ def main():
     generated = {}
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "true").strip().lower() == "true"
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
@@ -372,35 +372,37 @@ def main():
         for selected_model in candidate_models:
             provider_routes.append((provider, base_url, api_key, selected_model))
 
-    # Prefer the private FreeLLMAPI gateway when configured; Cloudflare remains the
-    # unattended fallback if the phone/Tailscale gateway cannot be reached.
-    provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1)
+    # Prefer the verified Gemini Free Tier first, then explicitly free gateways.
+    # FreeLLMAPI is preferred among gateways; Cloudflare and OpenRouter are fallbacks.
+    provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1 if route[0] == "Cloudflare" else 2)
     gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
     for topic_index, topic in enumerate(topics, 1):
         topic_succeeded = False
-        for provider, base_url, api_key, selected_model in provider_routes:
+        if gemini_key and gemini_free_tier_enabled:
             try:
-                one = generate_batch([topic], args.language, args.model, "", research=research,
-                    api_base_url=base_url, api_key=api_key, api_model=selected_model,
-                    api_provider=provider, max_attempts=2, repair_missing=False)
-                if 1 not in one:
-                    raise RuntimeError("Provider returned no validated item.")
-                generated[topic_index] = one[1]
-                print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider={provider} | model={selected_model}", flush=True)
-                topic_succeeded = True
-                break
-            except (RuntimeError, ValueError, OSError) as gateway_error:
-                print(f"{provider.upper()}_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={selected_model} | {gateway_error}", file=sys.stderr, flush=True)
-        if not topic_succeeded and gemini_key and gemini_free_tier_enabled:
-            try:
-                one = generate_batch([topic], args.language, gemini_free_model, gemini_key, research=research, max_attempts=2, repair_missing=False)
+                one = generate_batch([topic], args.language, gemini_free_model, gemini_key,
+                    research=research, max_attempts=2, repair_missing=False)
                 if 1 not in one:
                     raise RuntimeError("Gemini returned no validated item.")
                 generated[topic_index] = one[1]
                 print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider=Gemini_Free_Tier | model={gemini_free_model}", flush=True)
                 topic_succeeded = True
             except (RuntimeError, ValueError, OSError) as gemini_error:
-                print(f"GEMINI_FREE_TIER_ITEM_FAILED | item={topic_index} | {gemini_error}", file=sys.stderr, flush=True)
+                print(f"GEMINI_FREE_TIER_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={gemini_free_model} | {gemini_error}", file=sys.stderr, flush=True)
+        if not topic_succeeded:
+            for provider, base_url, api_key, selected_model in provider_routes:
+                try:
+                    one = generate_batch([topic], args.language, args.model, "", research=research,
+                        api_base_url=base_url, api_key=api_key, api_model=selected_model,
+                        api_provider=provider, max_attempts=2, repair_missing=False)
+                    if 1 not in one:
+                        raise RuntimeError("Provider returned no validated item.")
+                    generated[topic_index] = one[1]
+                    print(f"SEO_ITEM_GENERATED | item={topic_index}/{len(topics)} | provider={provider} | model={selected_model}", flush=True)
+                    topic_succeeded = True
+                    break
+                except (RuntimeError, ValueError, OSError) as gateway_error:
+                    print(f"{provider.upper()}_ITEM_FAILED_NEXT_ROUTE | item={topic_index} | model={selected_model} | {gateway_error}", file=sys.stderr, flush=True)
         if not topic_succeeded:
             print(f"SEO_ITEM_UNAVAILABLE | item={topic_index}/{len(topics)} | no approved free provider produced a valid item.", file=sys.stderr, flush=True)
     if gemini_key and not gemini_free_tier_enabled:
