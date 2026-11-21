@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       days:
-        description: "Analytics lookback window (1-365 days)"
+        description: "Analytics lookback window (1-90 days)"
         required: false
         type: number
         default: 28
