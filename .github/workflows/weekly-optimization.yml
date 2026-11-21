@@ -1,0 +1,56 @@
+name: Weekly Shorts Optimization
+
+on:
+  workflow_run:
+    workflows: ["YouTube Analytics"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: weekly-shorts-optimization
+  cancel-in-progress: false
+
+jobs:
+  optimize:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout factory at analytics run revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download analytics artifact from completed scheduled run
+        uses: actions/download-artifact@v4
+        with:
+          name: youtube-analytics-report
+          path: .
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate weekly optimization recommendations
+        run: python scripts/weekly_optimization.py --input youtube_analytics.json --output weekly_optimization.json --markdown weekly_optimization.md
+
+      - name: Refresh dashboard with optimization report
+        run: python scripts/build_factory_dashboard.py --analytics youtube_analytics.json --optimization weekly_optimization.json --output factory_dashboard.html
+
+      - name: Save weekly optimization artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-shorts-optimization
+          path: |
+            weekly_optimization.json
+            weekly_optimization.md
+            factory_dashboard.html
+          if-no-files-found: error
+          retention-days: 30
