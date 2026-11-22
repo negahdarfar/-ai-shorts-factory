@@ -5,16 +5,8 @@ from __future__ import annotations
 import os
 
 from avalai_client import AvalAIClient, AvalAIError
-from free_model_router import is_explicitly_free
+from free_model_router import is_explicitly_free, is_chat_capable
 
-# Exclude only modalities/tasks that cannot reasonably serve chat completion.
-# Vision-capable models are retained because many expose ordinary text chat too.
-EXCLUDED = (
-    "embed", "embedding", "whisper", "transcrib", "transcription",
-    "scribe", "diariz", "stt", "tts", "text-to-speech", "audio",
-    "image-generation", "image-gen", "rerank", "ranker", "moderation",
-    "tavily", "browser", "web-search", "search-advanced",
-)
 PREFERRED = ("gpt", "qwen", "llama", "gemma", "deepseek", "mistral", "phi")
 
 
@@ -32,15 +24,14 @@ def free_chat_candidates(rows, requested):
         explicitly_free = is_explicitly_free(model_id, row)
         if explicitly_free:
             free_rows += 1
-        if any(word in model_id.lower() for word in EXCLUDED):
+        if not is_chat_capable(model_id, row):
             excluded_rows += 1
+            architecture = row.get("architecture")
+            if isinstance(architecture, dict):
+                modality = str(architecture.get("modality") or "").lower()
+                if modality and "text" not in modality:
+                    modality_rows += 1
             continue
-        architecture = row.get("architecture")
-        if isinstance(architecture, dict):
-            modality = str(architecture.get("modality") or "").lower()
-            if modality and "text" not in modality:
-                modality_rows += 1
-                continue
         if explicitly_free:
             candidates.append(model_id)
 
@@ -80,7 +71,8 @@ def main():
             f"catalogue_models={len(rows)}; explicitly_free={diagnostics['free_rows']}; "
             f"excluded_task_models={diagnostics['excluded_rows']}; "
             f"non_text_modality_models={diagnostics['non_text_modality_rows']}; "
-            f"free_chat_candidates={len(candidates)}",
+            f"free_chat_candidates={len(candidates)}; "
+            f"max_candidates_to_test={os.getenv('AVALAI_MAX_FREE_CHAT_CANDIDATES', '8')}",
             flush=True,
         )
         if not candidates:
@@ -88,9 +80,14 @@ def main():
                 "No explicitly free text-chat candidate remains after modality filtering."
             )
 
-        # Try at most three catalogue-declared free candidates; never fall back to paid models.
+        # Try several explicitly-free chat models in rank order. A model outage or
+        # unsupported endpoint must not prevent trying the next free model.
+        try:
+            max_candidates = max(1, min(int(os.getenv("AVALAI_MAX_FREE_CHAT_CANDIDATES", "8")), 12))
+        except ValueError:
+            max_candidates = 8
         failures = []
-        for model in candidates[:3]:
+        for model in candidates[:max_candidates]:
             print(f"AVALAI_INFERENCE_ATTEMPT: model={model}", flush=True)
             try:
                 answer = client.chat_completion(
@@ -123,6 +120,11 @@ def main():
                     )
                     return 1
                 failures.append(f"{model}: {message}")
+                print(
+                    f"AVALAI_INFERENCE_NEXT_FREE_MODEL: previous_model_failed={model}; "
+                    "continuing to the next explicitly free chat candidate.",
+                    flush=True,
+                )
 
         print(
             "AVALAI_INFERENCE_FAILED: no tested free candidate completed; "
