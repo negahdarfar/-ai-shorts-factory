@@ -43,6 +43,9 @@ jobs:
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
       VIRAL_REGION: US
+      AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+      AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+      AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
