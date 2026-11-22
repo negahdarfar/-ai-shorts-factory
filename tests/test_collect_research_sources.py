@@ -30,6 +30,28 @@ class ResearchFeedTests(unittest.TestCase):
             with patch("scripts.collect_research_sources.urllib.request.urlopen",return_value=Response()):
                 result=collect(cfg,"Mars",root/"out.json")
             self.assertEqual(result["candidate_count"],1)
+    def test_adds_curated_sources_even_when_feed_list_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); cfg=root/"feeds.json"; research=root/"research.json"; out=root/"out.json"
+            cfg.write_text(json.dumps({"feeds":[]}),encoding="utf-8")
+            research.write_text(json.dumps({"sources":[
+                {"id":"S1","title":"Primary study","publisher":"Lab","url":"https://lab.example/study","published_at":"2026-01-01"},
+                {"id":"S2","title":"Official data","publisher":"Agency","url":"https://agency.example/data"}
+            ]}),encoding="utf-8")
+            result=collect(cfg,"climate",out,research_input=research)
+            self.assertEqual(result["curated_source_count"],2)
+            self.assertEqual({x["source_id"] for x in result["candidates"]},{"S1","S2"})
+            self.assertEqual(result["candidate_count"],2)
+
+    def test_curated_source_requires_https(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); cfg=root/"feeds.json"; research=root/"research.json"
+            cfg.write_text(json.dumps({"feeds":[]}),encoding="utf-8")
+            research.write_text(json.dumps({"sources":[{"id":"S1","url":"http://bad.example/a"}]}),encoding="utf-8")
+            result=collect(cfg,"topic",root/"out.json",research_input=research)
+            self.assertEqual(result["candidate_count"],0)
+            self.assertTrue(result["feed_errors"])
+
     def test_invalid_xml(self):
         with self.assertRaises(FeedError): parse_feed(b"<broken","https://example.org/rss","Example","topic")
 if __name__=="__main__": unittest.main()
