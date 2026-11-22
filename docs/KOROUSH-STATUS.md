@@ -1,23 +1,31 @@
 # Koroush AI — viral-video-factory
 
-This branch is an isolated implementation track for the viral-video-factory production engine.
+This branch is the dedicated trend-led short-video track. It is isolated from the Shorts Factory workflow.
 
 ## Safety defaults
-- CI validates code only; it does not upload or publish videos.
-- No secrets are read, printed, modified, or deleted by this branch's CI.
-- YouTube publishing must remain opt-in and pass media quality gates first.
-- Real media-generation and OAuth upload tests are not considered passed until a run produces an artifact and YouTube confirms its video ID/status.
+- Public publishing remains explicit opt-in through the workflow input; scheduled public publishing is not enabled yet.
+- The process rejects non-English source audio, unapproved licences, invalid vertical video, and clips without Persian subtitles.
+- Source page, creator/credit and licence information are retained for attribution.
+- SHA-256 upload history prevents duplicate uploads and blocks blind retries of pending uploads.
+- CI never reads, prints, modifies or deletes YouTube secrets.
+- A CI pass is not evidence of a real rendered video or a confirmed YouTube upload.
 
-## Shared quality gate
-`koroush_core.quality` uses FFprobe to inspect file integrity, duration, video dimensions, codecs, and audio presence. The validator supports duration limits and portrait/landscape aspect checks.
+## Implemented
+- [x] Wikimedia Commons video discovery with a conservative CC0 / CC BY / public-domain allowlist; non-commercial, no-derivatives and share-alike licences are excluded.
+- [x] Source host, content type, download size and licence revalidation before download.
+- [x] Local faster-whisper transcription with English-language enforcement.
+- [x] Hook/question/number scoring and non-overlapping 20–58 second clip selection.
+- [x] Per-clip English SRT timing derived from Whisper segments.
+- [x] Persian translation through the configured Gemini free tier, with timing/cue preservation.
+- [x] Persian subtitle burn-in using Noto Naskh Arabic typography.
+- [x] FFprobe checks for 9:16 resolution, audio/video streams and duration before publication.
+- [x] Idempotent public upload ledger and retained source attribution.
+- [x] Dedicated CI coverage for the isolated Viral Factory and shared production modules.
 
-## Current implementation status
-- [x] Isolated branch created from the existing main branch.
-- [x] Shared media-inspection and validation module added.
-- [x] Unit tests for missing/empty media rejection added.
-- [x] FFmpeg-generated vertical audio/video fixture validates the real FFprobe quality gate.
-- [x] CI workflow added for compile, tests, and FFmpeg toolchain verification.
-- [ ] Factory-specific scriptwriting, licensed media, English TTS, Persian RTL subtitles, rendering, SEO, and publication workflow.
-- [ ] End-to-end generated-video test and private YouTube upload confirmation.
+## Still required
+- [ ] Original English narration/TTS and more substantial editorial transformation beyond source-audio clips.
+- [ ] Cross-run source-history persistence and automated candidate selection.
+- [ ] Real end-to-end render artifact and private/public upload confirmation.
+- [ ] Analytics-driven weekly optimization and automated public schedule after end-to-end validation.
 
-Do not mark this engine production-ready until the outstanding end-to-end checks are evidenced by workflow artifacts and upload confirmation.
+Do not describe the factory as production-ready until a real video artifact, Persian subtitle burn-in and confirmed YouTube upload have been tested.
