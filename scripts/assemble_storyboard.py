@@ -22,6 +22,15 @@ def run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def media_duration(path: str | Path) -> float:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return float(result.stdout.strip())
+
+
 def load_scenes(manifest_path: str | Path) -> list[dict]:
     try:
         raw = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
@@ -136,10 +145,17 @@ def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | N
         if audio and not audio.is_file():
             raise ValueError(f"Voiceover file not found: {audio}")
         if audio:
+            video_seconds = media_duration(joined)
+            voice_seconds = media_duration(audio)
+            if voice_seconds > video_seconds + 0.5:
+                raise ValueError(
+                    f"Voiceover ({voice_seconds:.1f}s) exceeds storyboard duration "
+                    f"({video_seconds:.1f}s); add scenes rather than truncating narration."
+                )
             run([
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(joined), "-i", str(audio),
                 "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac",
-                "-ar", "48000", "-ac", "2", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", "48000", "-ac", "2", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11,apad",
                 "-shortest", "-movflags", "+faststart", str(out),
             ])
         else:
