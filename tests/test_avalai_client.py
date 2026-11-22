@@ -68,7 +68,7 @@ class AvalAIClientTests(unittest.TestCase):
         self.assertTrue(is_explicitly_free("avalai-catalogue-model", metadata))
 
     def test_search_and_tool_models_are_not_chat_capable(self):
-        for model in ("serper-search", "perplexity-search", "parallel_ai-search-pro", "tavily-search", "scribe_v2", "scribe_v1", "muse-image-1.0"):
+        for model in ("serper-search", "perplexity-search", "parallel_ai-search-pro", "tavily-search", "scribe_v2", "scribe_v1", "muse-image-1.0", "eleven_v4_turbo", "eleven_flash_v2", "voice-chat-model"):
             with self.subTest(model=model):
                 self.assertFalse(is_chat_capable(model, {}))
 
