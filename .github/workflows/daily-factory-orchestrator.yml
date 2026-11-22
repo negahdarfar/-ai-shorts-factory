@@ -26,19 +26,19 @@ concurrency:
 
 jobs:
   dispatch-viral:
-    if: \${{ github.event_name == 'schedule' || inputs.run_viral == true }}
+    if: ${{ github.event_name == 'schedule' || inputs.run_viral == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch Viral Factory on its production branch
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_PUBLIC: \${{ github.event_name == 'schedule' || inputs.publish_public == true }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_PUBLIC: ${{ (github.event_name == 'schedule' && vars.VIRAL_PUBLIC_PUBLISH_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish_public == true) }}
         run: |
           set -euo pipefail
           gh workflow run viral-factory.yml \
-            --ref viral-video-factory \
+            --ref viral-video-studio \
             -f mode=process \
             -f candidate_index=auto \
             -f clip_count=2 \
             -f publish_public="$PUBLISH_PUBLIC"
-          echo "VIRAL_FACTORY_DISPATCHED ref=viral-video-factory public=$PUBLISH_PUBLIC"
+          echo "VIRAL_FACTORY_DISPATCHED ref=viral-video-studio public=$PUBLISH_PUBLIC"
