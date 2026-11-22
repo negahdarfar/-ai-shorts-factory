@@ -111,7 +111,7 @@ The workflow:
 
 ## Important limitations
 
-- This workflow assembles supplied footage; it does not yet research a topic, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
+- This workflow validates a supplied, curated research dossier and assembles supplied footage; it does not yet discover/read sources automatically, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
 - No YouTube upload or public publishing is performed by this workflow.
 - A passed technical QA or rights-metadata report is not legal advice, proof of ownership, factuality review, editorial review, or a guarantee of audience retention.
 - GitHub-hosted runners have time, storage, and artifact limits. Large footage collections may exceed those limits.
