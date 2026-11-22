@@ -23,7 +23,9 @@ class PlanTests(unittest.TestCase):
              "claim_ids": ["C1", "C2"], "scenes": [
                  {"visual_query": "archival laboratory research interior", "media_type": "image", "duration_seconds": 30},
                  {"visual_query": "documentary field research footage", "media_type": "video", "duration_seconds": 30},
-                 {"visual_query": "historical scientific research archive", "media_type": "image", "duration_seconds": 30}]}
+                 {"visual_query": "historical scientific research archive", "media_type": "image", "duration_seconds": 30},
+                 {"visual_query": "scientific instrument closeup archival", "media_type": "image", "duration_seconds": 30},
+                 {"visual_query": "historical laboratory equipment details", "media_type": "image", "duration_seconds": 30}]}
             for i in range(chapters)]}
 
     def test_only_confirmed_claims_with_two_domains(self):
@@ -37,7 +39,7 @@ class PlanTests(unittest.TestCase):
     def test_valid_plan_and_review_flag(self):
         result = validate_plan(self.plan(), self.dossier, 480)
         self.assertGreaterEqual(result["narration_word_count"], 960)
-        self.assertGreaterEqual(result["planned_visual_seconds"], 480)
+        self.assertGreaterEqual(result["planned_visual_seconds"], 576)
         self.assertIn("REQUIRES_SOURCE_AND_EDITORIAL_REVIEW", result["editorial_status"])
 
     def test_rejects_unknown_claim_ids(self):
