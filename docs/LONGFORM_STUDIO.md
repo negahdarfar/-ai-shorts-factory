@@ -47,7 +47,7 @@ Optional inputs:
 
 ## Candidate source discovery
 
-The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library. Configure data/longform/research_feeds.json with trusted publisher feed URLs. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
+The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library and also queues every HTTPS URL already listed in the curated research dossier. Configure data/longform/research_feeds.json with trusted publisher feed URLs. Curated source URLs are included even when the feed list is empty, so the evidence audit can inspect the actual cited sources rather than only newly discovered RSS links. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
 
 Candidates are discovery leads only: the collector does not download full articles, infer facts, create claims, or mark sources confirmed. A human/editorial research step must read the linked material and curate the evidence in research.json. An empty feed list is allowed and produces zero candidates; replace the empty list with real official RSS/Atom feed URLs to activate discovery.
 
