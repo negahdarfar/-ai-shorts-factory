@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: longform-studio-\${{ github.ref }}
+  group: longform-studio-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -54,10 +54,10 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-core
       - name: Validate source paths and clip manifest
         env:
-          CLIPS_MANIFEST: \${{ inputs.clips_manifest }}
-          VOICEOVER: \${{ inputs.voiceover_path }}
-          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
-          OUTPUT_NAME: \${{ inputs.output_name }}
+          CLIPS_MANIFEST: ${{ inputs.clips_manifest }}
+          VOICEOVER: ${{ inputs.voiceover_path }}
+          PERSIAN_SRT: ${{ inputs.persian_srt_path }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -86,33 +86,33 @@ jobs:
           PY
       - name: Assemble English narration with Persian subtitles
         env:
-          CLIPS_MANIFEST: \${{ inputs.clips_manifest }}
-          VOICEOVER: \${{ inputs.voiceover_path }}
-          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
-          OUTPUT_NAME: \${{ inputs.output_name }}
+          CLIPS_MANIFEST: ${{ inputs.clips_manifest }}
+          VOICEOVER: ${{ inputs.voiceover_path }}
+          PERSIAN_SRT: ${{ inputs.persian_srt_path }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
           python scripts/assemble_documentary.py --clips "$CLIPS_MANIFEST" --voiceover "$VOICEOVER" --subtitles "$PERSIAN_SRT" --burn-subtitles --output "$OUTPUT_NAME"
       - name: Enforce longform technical quality gate
         env:
-          OUTPUT_NAME: \${{ inputs.output_name }}
-          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
-          MINUTES: \${{ inputs.minimum_minutes }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
+          PERSIAN_SRT: ${{ inputs.persian_srt_path }}
+          MINUTES: ${{ inputs.minimum_minutes }}
         run: |
           python scripts/validate_documentary.py --input "$OUTPUT_NAME" --min-duration-seconds "$((MINUTES * 60))" --subtitles "$PERSIAN_SRT"
       - name: Validate YouTube chapters
-        if: \${{ inputs.chapters_path != '' }}
+        if: ${{ inputs.chapters_path != '' }}
         env:
-          CHAPTERS: \${{ inputs.chapters_path }}
+          CHAPTERS: ${{ inputs.chapters_path }}
         run: |
           test -f "$CHAPTERS"
           python scripts/validate_chapters.py "$CHAPTERS"
       - name: Save documentary and QC reports
         uses: actions/upload-artifact@v4
         with:
-          name: longform-documentary-\${{ github.run_number }}
+          name: longform-documentary-${{ github.run_number }}
           path: |
-            \${{ inputs.output_name }}
+            ${{ inputs.output_name }}
             documentary_quality_report.json
-            \${{ inputs.persian_srt_path }}
+            ${{ inputs.persian_srt_path }}
           if-no-files-found: error
           retention-days: 30
