@@ -51,7 +51,7 @@ def parse_feed(payload,feed_url,publisher,topic,limit=30):
         rows.append({"title":title[:500],"url":link,"publisher":publisher,"feed_url":feed_url,"published_at":entry_date(published),"topic_match_score":score,"discovery_only":True,"editorial_status":"needs_source_reading_and_review"})
     rows.sort(key=lambda x:(-x["topic_match_score"],x["published_at"] or ""))
     return rows[:limit]
-def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_input=None):
+def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_input=None,topic_candidates=None):
     try: config=json.loads(Path(feeds_path).read_text(encoding="utf-8"))
     except (OSError,json.JSONDecodeError) as exc: raise FeedError(f"Cannot read feed configuration: {exc}") from exc
     feeds=config.get("feeds") if isinstance(config,dict) else None
@@ -99,15 +99,43 @@ def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_i
                     "editorial_status":"curated_reference_requires_page_review",
                 })
                 curated_count+=1
-    rows=curated_rows+rows
+    discovered_rows=[]
+    if topic_candidates:
+        try:
+            discovery=json.loads(Path(topic_candidates).read_text(encoding="utf-8"))
+        except (OSError,json.JSONDecodeError) as exc:
+            raise FeedError(f"Cannot read topic discovery results: {exc}") from exc
+        candidates=discovery.get("candidates") if isinstance(discovery,dict) else None
+        if not isinstance(candidates,list):
+            raise FeedError("Topic discovery file must contain a candidates array.")
+        for candidate in candidates:
+            if not isinstance(candidate,dict):
+                continue
+            url=str(candidate.get("url","")).strip()
+            parsed=urlparse(url)
+            if parsed.scheme!="https" or not parsed.hostname or parsed.username or parsed.password or url in seen:
+                continue
+            seen.add(url)
+            discovered_rows.append({
+                "title":str(candidate.get("title",""))[:500],
+                "url":url,
+                "publisher":str(candidate.get("publisher","")),
+                "published_at":candidate.get("published_at"),
+                "source_id":str(candidate.get("source_id","")),
+                "discovery_provider":str(candidate.get("discovery_provider","")),
+                "source_type":str(candidate.get("source_type","discovery")),
+                "discovery_only":True,
+                "editorial_status":str(candidate.get("editorial_status","needs_source_review")),
+            })
+    rows=curated_rows+discovered_rows+rows
     result={"schema_version":1,"topic":topic,"collected_at":datetime.now(timezone.utc).isoformat(),"candidate_count":len(rows),"curated_source_count":curated_count,"candidates":rows,"feed_errors":errors,"warning":"RSS items are discovery leads. Curated source URLs are fetched for evidence review but extracted text remains unverified."}
     target=Path(output_path); target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     return result
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument("--feeds",required=True); parser.add_argument("--topic",required=True); parser.add_argument("--output",default="longform-output/research-candidates.json"); parser.add_argument("--timeout",type=int,default=15); parser.add_argument("--limit-per-feed",type=int,default=30); parser.add_argument("--research-input"); args=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument("--feeds",required=True); parser.add_argument("--topic",required=True); parser.add_argument("--output",default="longform-output/research-candidates.json"); parser.add_argument("--timeout",type=int,default=15); parser.add_argument("--limit-per-feed",type=int,default=30); parser.add_argument("--research-input"); parser.add_argument("--topic-candidates"); args=parser.parse_args()
     if not 1<=args.timeout<=60 or not 1<=args.limit_per_feed<=100: raise SystemExit("Timeout must be 1–60 seconds and limit-per-feed 1–100.")
-    try: result=collect(args.feeds,args.topic,args.output,args.timeout,args.limit_per_feed,args.research_input)
+    try: result=collect(args.feeds,args.topic,args.output,args.timeout,args.limit_per_feed,args.research_input,args.topic_candidates)
     except FeedError as exc: raise SystemExit(f"RESEARCH_DISCOVERY_FAILED: {exc}") from exc
     print(f"RESEARCH_CANDIDATES_COLLECTED {result['candidate_count']}")
     if result["feed_errors"]: print(f"FEED_WARNINGS {len(result['feed_errors'])}")
