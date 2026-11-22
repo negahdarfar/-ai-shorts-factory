@@ -2,7 +2,7 @@ name: AvalAI safe connection check
 
 on:
   push:
-    branches: [main, shorts-factory, longform-studio, viral-video-factory]
+    branches: [main]
     paths:
       - 'scripts/avalai_client.py'
       - 'scripts/free_model_router.py'
