@@ -206,8 +206,8 @@ jobs:
       - name: Assemble long-form documentary
         env:
           MANIFEST: ${{ steps.commons.outputs.manifest || inputs.clips_manifest }}
-          SUBTITLES: ${{ inputs.subtitles_srt }}
-          VOICEOVER: ${{ inputs.voiceover_audio }}
+          SUBTITLES: ${{ steps.narration.outputs.srt || inputs.subtitles_srt }}
+          VOICEOVER: ${{ steps.narration.outputs.audio || inputs.voiceover_audio }}
           BURN: ${{ inputs.burn_subtitles }}
         run: |
           set -euo pipefail
