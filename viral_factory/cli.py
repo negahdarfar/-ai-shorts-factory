@@ -260,8 +260,8 @@ def process(index: int | str,out: Path,limit: int,model: str) -> None:
     (out/"transcript.json").write_text(json.dumps(transcript,ensure_ascii=False,indent=2),encoding="utf-8")
     clips=select(transcript,duration,limit)
     (out/"selected_clips.json").write_text(json.dumps(clips,ensure_ascii=False,indent=2),encoding="utf-8")
-    if not os.getenv("GEMINI_API_KEY","").strip():
-        raise RuntimeError("GEMINI_API_KEY is required for free-tier Persian subtitle translation; no uncaptioned clip will be released.")
+    if not os.getenv("GEMINI_API_KEY","").strip() and not os.getenv("AVALAI_API_KEY","").strip():
+        raise RuntimeError("Configure AVALAI_API_KEY (free models only) or the existing GEMINI_API_KEY fallback; no uncaptioned clip will be released.")
     translator=Path(__file__).resolve().parents[1]/"scripts"/"translate_srt_to_persian.py"
     if not translator.is_file(): raise FileNotFoundError("Shared Persian SRT translator is missing.")
     quality=[]
