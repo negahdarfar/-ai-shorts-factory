@@ -1,0 +1,255 @@
+name: Koroush Longform Studio - render and QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      clips_manifest:
+        description: JSON storyboard with image stills and/or trimmed video clips
+        required: true
+        default: data/longform/clips.json
+        type: string
+      research_feeds:
+        description: JSON registry of trusted RSS or Atom feed URLs
+        required: true
+        default: data/longform/research_feeds.json
+        type: string
+      research_input:
+        description: Curated JSON evidence dossier input with source records and cited claims
+        required: true
+        default: data/longform/research.json
+        type: string
+      rights_ledger:
+        description: JSON rights ledger with one record per source clip
+        required: true
+        default: data/longform/rights.json
+        type: string
+      subtitles_srt:
+        description: Optional Persian SRT path in the repository
+        required: false
+        default: ""
+        type: string
+      voiceover_audio:
+        description: Optional narration audio path in the repository
+        required: false
+        default: ""
+        type: string
+      burn_subtitles:
+        description: Burn the supplied Persian subtitles into the video
+        required: true
+        default: true
+        type: boolean
+      minimum_duration_seconds:
+        description: Minimum documentary duration (default 8 minutes)
+        required: true
+        default: "480"
+        type: string
+      storyboard_plan:
+        description: Optional AI storyboard plan JSON; when set, discover and download free Commons media automatically
+        required: false
+        default: ""
+        type: string
+      auto_generate_plan:
+        description: Generate the documentary script and storyboard from confirmed research claims using explicitly free AI models
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: koroush-longform-render-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  render-and-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg and Persian fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra espeak-ng
+      - name: Validate manifest and optional assets
+        env:
+          MANIFEST: ${{ inputs.clips_manifest }}
+          RIGHTS_LEDGER: ${{ inputs.rights_ledger }}
+          RESEARCH_INPUT: ${{ inputs.research_input }}
+          RESEARCH_FEEDS: ${{ inputs.research_feeds }}
+          SUBTITLES: ${{ steps.narration.outputs.srt || inputs.subtitles_srt }}
+          VOICEOVER: ${{ steps.narration.outputs.audio || inputs.voiceover_audio }}
+          STORYBOARD_PLAN: ${{ inputs.storyboard_plan }}
+          AUTO_GENERATE_PLAN: ${{ inputs.auto_generate_plan }}
+        run: |
+          set -euo pipefail
+          test -f "$RESEARCH_INPUT"
+          test -f "$RESEARCH_FEEDS"
+          if [[ -n "$STORYBOARD_PLAN" ]]; then
+            test -f "$STORYBOARD_PLAN"
+            python - "$STORYBOARD_PLAN" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          p=Path(sys.argv[1]).resolve()
+          if root not in p.parents: raise SystemExit("Storyboard plan must be inside repository.")
+          data=json.loads(p.read_text(encoding="utf-8"))
+          if not isinstance(data,dict) or not isinstance(data.get("chapters"),list) or not data["chapters"]:
+              raise SystemExit("Storyboard plan must contain non-empty chapters.")
+          PY
+            exit 0
+          fi
+          if [[ "$AUTO_GENERATE_PLAN" == "true" ]]; then
+            exit 0
+          fi
+          test -f "$MANIFEST"
+          test -f "$RIGHTS_LEDGER"
+          test -f "$RESEARCH_INPUT"
+          test -f "$RESEARCH_FEEDS"
+          python - "$MANIFEST" "$RIGHTS_LEDGER" "$RESEARCH_INPUT" "$RESEARCH_FEEDS" "$SUBTITLES" "$VOICEOVER" <<'PY'
+          import json, sys
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          manifest = Path(sys.argv[1]).resolve()
+          if root not in manifest.parents:
+              raise SystemExit("Manifest must be inside the checked-out repository.")
+          rows = json.loads(manifest.read_text(encoding="utf-8"))
+          if not isinstance(rows, list) or not rows:
+              raise SystemExit("Manifest must be a non-empty JSON array.")
+          for index, item in enumerate(rows):
+              asset = item if isinstance(item, str) else item.get("path") if isinstance(item, dict) else None
+              if not isinstance(asset, str) or not asset.strip():
+                  raise SystemExit(f"Storyboard scene {index} must be a path or an object with a path.")
+              p = (root / asset).resolve()
+              if root not in p.parents or not p.is_file():
+                  raise SystemExit(f"Missing or unsafe storyboard asset: {asset}")
+          for item in sys.argv[2:]:
+              if item:
+                  p = (root / item).resolve()
+                  if root not in p.parents or not p.is_file():
+                      raise SystemExit(f"Missing or unsafe optional asset: {item}")
+          PY
+      - name: Discover candidate sources from configured RSS and Atom feeds
+        env:
+          RESEARCH_INPUT: ${{ inputs.research_input }}
+          RESEARCH_FEEDS: ${{ inputs.research_feeds }}
+        run: |
+          mkdir -p longform-output
+          TOPIC="$(python -c 'import json,os; print(json.load(open(os.environ["RESEARCH_INPUT"], encoding="utf-8"))["topic"])')"
+          if [[ "$TOPIC" == REPLACE_WITH_DOCUMENTARY_TOPIC || -z "$TOPIC" ]]; then
+            echo "Set a real topic in the research dossier before running topic discovery."
+            exit 1
+          fi
+          python scripts/discover_topic_sources.py --topic "$TOPIC" --output longform-output/topic-candidates.json --limit 10
+          python scripts/collect_research_sources.py --feeds "$RESEARCH_FEEDS" --topic "$TOPIC" --research-input "$RESEARCH_INPUT" --topic-candidates longform-output/topic-candidates.json --output longform-output/research-candidates.json
+      - name: Extract readable text from discovered research pages
+        run: |
+          python scripts/extract_research_pages.py --input longform-output/research-candidates.json --output longform-output/research-extracts.json --max-pages 20
+      - name: Validate factual research and citations
+        env:
+          RESEARCH_INPUT: ${{ inputs.research_input }}
+        run: |
+          mkdir -p longform-output
+          python scripts/build_research_dossier.py --input "$RESEARCH_INPUT" --output longform-output/research-dossier.json --report longform-output/research-dossier.md
+      - name: Audit extracted text against curated research claims
+        run: |
+          python scripts/audit_research_evidence.py --dossier longform-output/research-dossier.json --extracts longform-output/research-extracts.json --output longform-output/research-evidence-audit.json --report longform-output/research-evidence-audit.md
+      - name: Generate documentary script and storyboard with explicitly free AI models
+        if: inputs.auto_generate_plan
+        id: plan
+        env:
+          RESEARCH_DOSSIER: longform-output/research-dossier.json
+          TARGET_SECONDS: ${{ inputs.minimum_duration_seconds }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          python scripts/generate_longform_plan.py --research "$RESEARCH_DOSSIER" --output longform-output/longform-plan.json --target-duration-seconds "$TARGET_SECONDS"
+          echo "path=longform-output/longform-plan.json" >> "$GITHUB_OUTPUT"
+      - name: Evaluate documentary script quality with free AI providers
+        if: inputs.auto_generate_plan
+        env:
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
+        run: python scripts/evaluate_content_quality.py --input longform-output/longform-plan.json --output longform-output/content-quality-report.json
+      - name: Generate English narration and Persian subtitles
+        if: inputs.auto_generate_plan
+        id: narration
+        env:
+          PLAN_PATH: ${{ steps.plan.outputs.path }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check edge-tts
+          python scripts/generate_narration_audio.py --plan "$PLAN_PATH" --audio longform-output/narration.mp3 --srt longform-output/narration.en.srt
+          python scripts/translate_subtitles_free.py --input longform-output/narration.en.srt --output longform-output/narration.fa.srt
+          echo "audio=longform-output/narration.mp3" >> "$GITHUB_OUTPUT"
+          echo "srt=longform-output/narration.fa.srt" >> "$GITHUB_OUTPUT"
+      - name: Download openly licensed Commons visuals for AI storyboard
+        if: inputs.auto_generate_plan || inputs.storyboard_plan != ''
+        id: commons
+        env:
+          STORYBOARD_PLAN: ${{ steps.plan.outputs.path || inputs.storyboard_plan }}
+        run: |
+          set -euo pipefail
+          python scripts/discover_commons_media.py --plan "$STORYBOARD_PLAN" --manifest data/longform/generated-storyboard.json --ledger data/longform/generated-rights.json --assets assets/longform/generated --max-video-seconds 30
+          echo "manifest=data/longform/generated-storyboard.json" >> "$GITHUB_OUTPUT"
+          echo "ledger=data/longform/generated-rights.json" >> "$GITHUB_OUTPUT"
+      - name: Enforce source rights ledger
+        env:
+          MANIFEST: ${{ steps.commons.outputs.manifest || inputs.clips_manifest }}
+          RIGHTS_LEDGER: ${{ steps.commons.outputs.ledger || inputs.rights_ledger }}
+        run: |
+          mkdir -p longform-output
+          python scripts/validate_rights_ledger.py --manifest "$MANIFEST" --ledger "$RIGHTS_LEDGER" --report longform-output/rights-qa-report.json
+      - name: Assemble long-form documentary
+        env:
+          MANIFEST: ${{ steps.commons.outputs.manifest || inputs.clips_manifest }}
+          SUBTITLES: ${{ steps.narration.outputs.srt || inputs.subtitles_srt }}
+          VOICEOVER: ${{ steps.narration.outputs.audio || inputs.voiceover_audio }}
+          BURN: ${{ inputs.burn_subtitles }}
+        run: |
+          set -euo pipefail
+          args=(--manifest "$MANIFEST" --output longform-output/documentary.mp4)
+          if [[ -n "$SUBTITLES" ]]; then args+=(--subtitles "$SUBTITLES"); fi
+          if [[ -n "$VOICEOVER" ]]; then args+=(--voiceover "$VOICEOVER"); fi
+          if [[ "$BURN" == "true" && -n "$SUBTITLES" ]]; then args+=(--burn-subtitles); fi
+          mkdir -p longform-output
+          python scripts/assemble_storyboard.py "${args[@]}"
+      - name: Run long-form media quality gate
+        env:
+          MIN_DURATION: ${{ inputs.minimum_duration_seconds }}
+        run: |
+          python scripts/validate_longform.py --input longform-output/documentary.mp4 --min-duration-seconds "$MIN_DURATION" --report longform-output/qa-report.json
+      - name: Upload rendered video and QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koroush-longform-render-${{ github.run_number }}
+          path: longform-output/
+          if-no-files-found: warn
+          retention-days: 14
