@@ -109,7 +109,7 @@ def render_scene(scene: dict, source: Path, target: Path) -> None:
     run(command)
 
 
-def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | None = None) -> dict:
+def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | None = None, subtitles: str | Path | None = None, burn_subtitles: bool = False) -> dict:
     scenes = load_scenes(manifest)
     root = Path(manifest).resolve().parent.parent
     sources = []
@@ -149,6 +149,19 @@ def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | N
                 "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac",
                 "-shortest", "-movflags", "+faststart", str(out),
             ])
+        if subtitles and burn_subtitles:
+            subtitle_path = Path(subtitles).resolve()
+            if not subtitle_path.is_file():
+                raise ValueError(f"Subtitle file not found: {subtitle_path}")
+            escaped = str(subtitle_path).replace(chr(92), chr(92) * 2).replace(":", chr(92) + ":").replace("'", chr(92) + "'")
+            filter_arg = f"subtitles='{escaped}':force_style='FontName=Noto Naskh Arabic,FontSize=28,Outline=2,Shadow=1,Alignment=2,MarginV=42,WrapStyle=2'"
+            subtitled = temp / "subtitled.mp4"
+            run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(out),
+                "-vf", filter_arg, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", str(subtitled),
+            ])
+            subtitled.replace(out)
     return {
         "status": "assembled",
         "scene_count": len(scenes),
@@ -164,9 +177,11 @@ def main() -> None:
     parser.add_argument("--manifest", "--clips", dest="manifest", required=True)
     parser.add_argument("--output", default="longform-output/documentary.mp4")
     parser.add_argument("--voiceover")
+    parser.add_argument("--subtitles")
+    parser.add_argument("--burn-subtitles", action="store_true")
     args = parser.parse_args()
     try:
-        result = assemble(args.manifest, args.output, args.voiceover)
+        result = assemble(args.manifest, args.output, args.voiceover, args.subtitles, args.burn_subtitles)
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         raise SystemExit(f"STORYBOARD_ASSEMBLY_FAILED: {exc}") from exc
     print("STORYBOARD_ASSEMBLY_SUCCEEDED")
