@@ -33,6 +33,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Restore factory upload ledger
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/mpt-runtime/state
+          key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mpt-topics-${{ runner.os }}-
       - name: Install read-only analytics client
         run: python -m pip install --disable-pip-version-check google-api-python-client google-auth-httplib2
 
@@ -63,7 +70,7 @@ jobs:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
-        run: python scripts/youtube_analytics_report.py --days "$ANALYTICS_DAYS" --output youtube_analytics.json
+        run: python scripts/youtube_analytics_report.py --days "$ANALYTICS_DAYS" --upload-history "$GITHUB_WORKSPACE/mpt-runtime/state/upload_history.json" --output youtube_analytics.json
 
       - name: Build dashboard
         if: always()
