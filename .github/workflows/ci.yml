@@ -1,9 +1,9 @@
 name: Factory lightweight CI
 on:
   pull_request:
-    branches: [main]
+    branches: [longform-studio]
   push:
-    branches: [main, feature/youtube-seo-metadata]
+    branches: [longform-studio]
 permissions:
   contents: read
 jobs:
