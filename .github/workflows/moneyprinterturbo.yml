@@ -3,7 +3,7 @@ name: MoneyPrinterTurbo Shorts Factory
 "on":
   pull_request:
     branches:
-      - shorts-factory
+      - short-video-studio
   schedule:
     - cron: "0 14 * * *" # Daily UTC production; release times are staggered after rendering.
   workflow_dispatch:
