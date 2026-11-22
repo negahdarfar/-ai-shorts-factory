@@ -36,9 +36,41 @@ def _is_zero_price(value):
         return False
 
 
+def _contains_nonzero_price(value, in_pricing=False):
+    """Reject any positive advertised charge, including per-query/per-image fees."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            name = str(key).lower()
+            pricing_context = in_pricing or name in {"pricing", "prices", "cost", "costs", "fees", "charges"}
+            if any(token in name for token in ("cost", "price", "fee", "charge")) and not isinstance(child, (dict, list, tuple)):
+                if child is None:
+                    continue
+                try:
+                    if float(child) > 0:
+                        return True
+                except (TypeError, ValueError):
+                    import re
+                    match = re.search(r"-?\\d+(?:\\.\\d+)?", str(child))
+                    if not match or float(match.group(0)) > 0:
+                        return True
+            if isinstance(child, (dict, list, tuple)):
+                if _contains_nonzero_price(child, pricing_context):
+                    return True
+            elif pricing_context and isinstance(child, (int, float)) and not isinstance(child, bool) and child > 0:
+                return True
+            elif pricing_context and isinstance(child, str):
+                import re
+                match = re.fullmatch(r"\\s*\\$?(-?\\d+(?:\\.\\d+)?)\\s*", child)
+                if match and float(match.group(1)) > 0:
+                    return True
+    elif isinstance(value, (list, tuple)):
+        return any(_contains_nonzero_price(item, in_pricing) for item in value)
+    return False
+
+
 def _metadata_is_free(metadata):
     """Recognize only unambiguous, machine-readable free-tier declarations."""
-    if not isinstance(metadata, dict):
+    if not isinstance(metadata, dict) or _contains_nonzero_price(metadata):
         return False
 
     for key in ("is_free", "free", "free_tier"):
@@ -60,10 +92,9 @@ def _metadata_is_free(metadata):
 
 def is_explicitly_free(model_id, metadata=None):
     value = str(model_id or "").strip().lower()
-    return bool(value) and (
-        any(marker in value for marker in FREE_MARKERS)
-        or _metadata_is_free(metadata)
-    )
+    if not value or (isinstance(metadata, dict) and _contains_nonzero_price(metadata)):
+        return False
+    return any(marker in value for marker in FREE_MARKERS) or _metadata_is_free(metadata)
 
 
 NON_CHAT_MARKERS = (
