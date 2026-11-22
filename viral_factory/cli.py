@@ -26,7 +26,7 @@ def clean(value: Any) -> str:
 
 def allowed_license(name: str) -> bool:
     text = clean(name).lower().replace("_", " ").replace("-", " ")
-    if any(x in text for x in ("noncommercial","non commercial","no derivatives")) or re.search(r"\b(?:nd|sa)\b", text):
+    if any(x in text for x in ("noncommercial","non commercial","no derivatives")) or re.search(r"\b(?:nc|nd|sa)\b", text):
         return False
     return any(x in text for x in LICENSES)
 
