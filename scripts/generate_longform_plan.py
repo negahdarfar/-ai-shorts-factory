@@ -3,7 +3,8 @@
 import argparse, json, os, re, sys, time, urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
-from free_model_router import discover_free_models\nfrom avalai_client import AvalAIClient
+from free_model_router import discover_free_models
+from avalai_client import AvalAIClient
 
 
 def confirmed_claims(dossier):
