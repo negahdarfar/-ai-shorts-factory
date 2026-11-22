@@ -45,6 +45,58 @@ Optional inputs:
 - Narration audio, for example `assets/longform/narration.wav`
 - Burn subtitles: enabled only when an SRT path is supplied
 
+## Factual research input
+
+The render workflow now requires `data/longform/research.json` (or another repository path supplied at dispatch). It is a curated evidence file, not a search engine. Use this structure:
+
+```json
+{
+  "topic": "A documentary topic",
+  "research_date": "2026-11-22",
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Original research paper",
+      "publisher": "Research institution",
+      "url": "https://example.org/paper",
+      "source_type": "academic",
+      "published_at": "2025-06-01",
+      "accessed_at": "2026-11-20"
+    },
+    {
+      "id": "S2",
+      "title": "Official data release",
+      "publisher": "Public agency",
+      "url": "https://agency.example.org/data",
+      "source_type": "primary",
+      "published_at": "2025-07-01",
+      "accessed_at": "2026-11-20"
+    },
+    {
+      "id": "S3",
+      "title": "Independent review",
+      "publisher": "Journal",
+      "url": "https://journal.example.org/review",
+      "source_type": "academic",
+      "published_at": "2025-08-01",
+      "accessed_at": "2026-11-21"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "claim": "A concise factual statement supported by the sources.",
+      "status": "confirmed",
+      "source_ids": ["S1", "S2"]
+    }
+  ]
+}
+```
+
+The validator requires at least three source records from three distinct host domains. Every claim must cite known source IDs. A claim marked `confirmed` needs sources from at least two domains; a `disputed` claim needs two domains and an editorial explanation. `unverified` claims block the research gate and are never marked usable in narration. The generated JSON and Markdown dossier are attached to the render artifact.
+
+Important: this is a citation-structure and metadata check, not automatic fact-checking. It does not download/read the linked pages, prove that sources are independent, or determine whether a claim is true. Research sources must be read and curated by a human or a separately configured research agent. The workflow will not infer facts from titles or snippets.
+
 ## Run
 
 Open **Actions → Koroush Longform Studio - render and QA → Run workflow** on the `longform-studio` branch. Supply the manifest path and optional assets. The default minimum duration is 480 seconds (8 minutes).
