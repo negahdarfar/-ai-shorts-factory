@@ -50,7 +50,7 @@ def _contains_nonzero_price(value, in_pricing=False):
                         return True
                 except (TypeError, ValueError):
                     import re
-                    match = re.search(r"-?\\d+(?:\\.\\d+)?", str(child))
+                    match = re.search(r"-?\d+(?:\\.\d+)?", str(child))
                     if not match or float(match.group(0)) > 0:
                         return True
             if isinstance(child, (dict, list, tuple)):
@@ -60,7 +60,7 @@ def _contains_nonzero_price(value, in_pricing=False):
                 return True
             elif pricing_context and isinstance(child, str):
                 import re
-                match = re.fullmatch(r"\\s*\\$?(-?\\d+(?:\\.\\d+)?)\\s*", child)
+                match = re.fullmatch(r"\s*\\$?(-?\d+(?:\\.\d+)?)\s*", child)
                 if match and float(match.group(1)) > 0:
                     return True
     elif isinstance(value, (list, tuple)):
