@@ -1,9 +1,9 @@
 name: Factory lightweight CI
 on:
   pull_request:
-    branches: [main]
+    branches: [viral-video-factory]
   push:
-    branches: [main, feature/youtube-seo-metadata]
+    branches: [viral-video-factory]
 permissions:
   contents: read
 jobs:
