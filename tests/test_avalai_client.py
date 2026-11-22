@@ -82,6 +82,26 @@ class AvalAIClientTests(unittest.TestCase):
             {"task": "web_search", "description": "Search the web and return sources"}
         ))
 
+    def test_per_query_fee_disqualifies_zero_token_price_model(self):
+        metadata = {
+            "pricing": {
+                "input": 0,
+                "output": 0,
+                "input_cost_per_query": 0.001,
+            }
+        }
+        self.assertFalse(is_explicitly_free("serper-search", metadata))
+
+    def test_all_advertised_costs_must_be_zero(self):
+        self.assertTrue(is_explicitly_free(
+            "free-chat-model",
+            {"pricing": {"input": 0, "output": 0, "cached_input": 0}}
+        ))
+        self.assertFalse(is_explicitly_free(
+            "model:free",
+            {"pricing": {"input": 0, "output": 0, "image": 0.02}}
+        ))
+
     def test_unknown_or_paid_model_is_never_assumed_free(self):
         self.assertFalse(is_explicitly_free("catalogue-model", {"pricing": {"prompt": "0.1", "completion": "0.2"}}))
         self.assertFalse(is_explicitly_free("catalogue-model", {}))
