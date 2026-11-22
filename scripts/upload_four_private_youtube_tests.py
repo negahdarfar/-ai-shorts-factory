@@ -153,7 +153,7 @@ def main() -> None:
             print(f"UPLOAD_ALREADY_COMPLETED; skipping duplicate {mode} upload: {previous['result']['video_id']}")
             continue
 
-        publish_at = (first_publish_at + timedelta(hours=3 * (index - 1))) if scheduled else None
+        publish_at = (first_publish_at + timedelta(hours=2 * (index - 1))) if scheduled else None
         prepared.append((index, video_path, record, digest, ledger_key, publish_at))
         if mode == "public":
             new_public_topics.append(str(record.get("topic", "")).strip())
