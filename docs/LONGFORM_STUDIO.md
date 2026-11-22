@@ -79,6 +79,14 @@ The downloader is bounded to 8 Commons results per scene and 80 MB per downloade
 
 To run the automated path, open **Actions → Koroush Longform Studio - render and QA → Run workflow**, enable `auto_generate_plan`, and provide a curated research dossier containing enough confirmed claims. Set `minimum_duration_seconds` to the desired target runtime (for example 480 for eight minutes). Ensure the AI provider secrets above are configured. The manual `storyboard_plan` input can be used instead when a plan already exists.
 
+## Free narration and Persian subtitles
+
+For AI-generated plans, the workflow creates English narration with Edge TTS using the `en-US-AriaNeural` voice. This service is free to use but is an online dependency with no availability guarantee. If it fails, the runner falls back to locally installed `espeak-ng`; the fallback is fully offline but its voice quality is more synthetic. The generated chapter audio is joined into one MP3.
+
+English subtitle cues are split from narration into readable short lines and timed proportionally across each chapter's measured audio duration. A free, explicitly priced-zero model from FreeLLMAPI or OpenRouter then translates the cues into Persian while preserving cue count and timestamps. Translation failures stop the pipeline rather than silently publishing English-only captions. Persian subtitles are burned into the final video when `burn_subtitles` is enabled.
+
+The timing distribution is an approximation at sentence/phrase level, not word-level forced alignment. Review subtitle timing and Persian phrasing before publication. The plan generator also requires the storyboard's planned visual duration to exceed the target runtime by 20% to provide headroom for slower speech; actual downloaded clips may be shorter, so the final duration and audio QA gates remain authoritative.
+
 ## Candidate source discovery
 
 The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library and also queues every HTTPS URL already listed in the curated research dossier. Configure data/longform/research_feeds.json with trusted publisher feed URLs. Curated source URLs are included even when the feed list is empty, so the evidence audit can inspect the actual cited sources rather than only newly discovered RSS links. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
