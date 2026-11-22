@@ -87,6 +87,8 @@ def build_research_dossier(input_path: str | Path, output_path: str | Path,
         domain = _domain(url)
         published_at = _date(item.get("published_at"), f"{sid}.published_at")
         accessed_at = _date(item.get("accessed_at"), f"{sid}.accessed_at", required=True)
+        if published_at and date.fromisoformat(published_at) > date.fromisoformat(research_date):
+            raise ResearchError(f"Source {sid} published_at cannot be after research_date.")
         if date.fromisoformat(accessed_at) > date.fromisoformat(research_date):
             raise ResearchError(f"Source {sid} accessed_at cannot be after research_date.")
         row = {
