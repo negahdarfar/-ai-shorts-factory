@@ -177,6 +177,18 @@ jobs:
           set -euo pipefail
           python scripts/generate_longform_plan.py --research "$RESEARCH_DOSSIER" --output longform-output/longform-plan.json --target-duration-seconds "$TARGET_SECONDS"
           echo "path=longform-output/longform-plan.json" >> "$GITHUB_OUTPUT"
+      - name: Evaluate documentary script quality with free AI providers
+        if: inputs.auto_generate_plan
+        env:
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
+        run: python scripts/evaluate_content_quality.py --input longform-output/longform-plan.json --output longform-output/content-quality-report.json
       - name: Generate English narration and Persian subtitles
         if: inputs.auto_generate_plan
         id: narration
