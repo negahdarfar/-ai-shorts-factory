@@ -43,7 +43,20 @@ class ResearchFeedTests(unittest.TestCase):
             self.assertEqual({x["source_id"] for x in result["candidates"]},{"S1","S2"})
             self.assertEqual(result["candidate_count"],2)
 
-    def test_curated_source_requires_https(self):
+
+    def test_merges_topic_discovery_candidates_before_rss(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); cfg=root/"feeds.json"; discovery=root/"topic.json"
+            cfg.write_text(json.dumps({"feeds":[]}),encoding="utf-8")
+            discovery.write_text(json.dumps({"candidates":[
+                {"source_id":"OA-1","title":"OpenAlex paper","url":"https://journal.example/paper",
+                 "publisher":"Journal","discovery_provider":"OpenAlex","source_type":"scholarly"}
+            ]}),encoding="utf-8")
+            result=collect(cfg,"climate",root/"out.json",topic_candidates=discovery)
+            self.assertEqual(result["candidate_count"],1)
+            self.assertEqual(result["candidates"][0]["source_id"],"OA-1")
+            self.assertEqual(result["candidates"][0]["discovery_provider"],"OpenAlex")
+\n    def test_curated_source_requires_https(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); cfg=root/"feeds.json"; research=root/"research.json"
             cfg.write_text(json.dumps({"feeds":[]}),encoding="utf-8")
