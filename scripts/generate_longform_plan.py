@@ -103,7 +103,7 @@ def request_json(base, key, model, prompt):
         {"role": "system", "content": "Write accurate documentary narration. Return only JSON. Never invent facts."},
         {"role": "user", "content": prompt}],
         "temperature": 0.2, "max_tokens": 12000, "response_format": {"type": "json_object"}}
-    if base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
+    if base.rstrip("/") == os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").rstrip("/") or base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
         content = AvalAIClient(api_key=key, base_url=base).chat_completion(
             model, payload["messages"], temperature=0.2, max_tokens=12000,
             response_format={"type": "json_object"})
