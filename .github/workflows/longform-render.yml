@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           test -f "$MANIFEST"
           test -f "$RIGHTS_LEDGER"
-          python - "$MANIFEST" "$SUBTITLES" "$VOICEOVER" <<'PY'
+          python - "$MANIFEST" "$RIGHTS_LEDGER" "$SUBTITLES" "$VOICEOVER" <<'PY'
           import json, sys
           from pathlib import Path
           root = Path.cwd().resolve()
