@@ -45,6 +45,12 @@ Optional inputs:
 - Narration audio, for example `assets/longform/narration.wav`
 - Burn subtitles: enabled only when an SRT path is supplied
 
+## Candidate source discovery
+
+The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library. Configure data/longform/research_feeds.json with trusted publisher feed URLs. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
+
+Candidates are discovery leads only: the collector does not download full articles, infer facts, create claims, or mark sources confirmed. A human/editorial research step must read the linked material and curate the evidence in research.json. An empty feed list is allowed and produces zero candidates; replace the empty list with real official RSS/Atom feed URLs to activate discovery.
+
 ## Factual research input
 
 The render workflow now requires `data/longform/research.json` (or another repository path supplied at dispatch). It is a curated evidence file, not a search engine. Use this structure:
@@ -111,7 +117,7 @@ The workflow:
 
 ## Important limitations
 
-- This workflow validates a supplied, curated research dossier and assembles supplied footage; it does not yet discover/read sources automatically, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
+- This workflow validates a supplied, curated research dossier and assembles supplied footage; it discovers candidate links from configured RSS/Atom feeds but does not read full articles, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
 - No YouTube upload or public publishing is performed by this workflow.
 - A passed technical QA or rights-metadata report is not legal advice, proof of ownership, factuality review, editorial review, or a guarantee of audience retention.
 - GitHub-hosted runners have time, storage, and artifact limits. Large footage collections may exceed those limits.
