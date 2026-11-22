@@ -1,8 +1,8 @@
-name: Koroush AI - viral-video-factory validation
+name: Koroush AI - viral-video-studio validation
 
 on:
   push:
-    branches: ["viral-video-factory"]
+    branches: ["viral-video-studio"]
     paths:
       - "koroush_core/**"
       - "scripts/**"
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: koroush-viral-video-factory-ci-${{ github.ref }}
+  group: koroush-viral-video-studio-ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
