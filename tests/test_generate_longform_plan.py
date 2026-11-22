@@ -13,6 +13,7 @@ class PlanTests(unittest.TestCase):
             "claims": [
                 {"id": "C1", "claim": "Verified fact one.", "status": "confirmed", "source_ids": ["S1", "S2"]},
                 {"id": "C2", "claim": "Verified fact two.", "status": "confirmed", "source_ids": ["S2", "S3"]},
+                {"id": "C4", "claim": "Verified fact three.", "status": "confirmed", "source_ids": ["S1", "S3"]},
                 {"id": "C3", "claim": "Unverified fact.", "status": "unverified", "source_ids": ["S1", "S2"]}]}
 
     def plan(self, chapters=6):
@@ -25,7 +26,7 @@ class PlanTests(unittest.TestCase):
             for i in range(chapters)]}
 
     def test_only_confirmed_claims_with_two_domains(self):
-        self.assertEqual({x["id"] for x in confirmed_claims(self.dossier)}, {"C1", "C2"})
+        self.assertEqual({x["id"] for x in confirmed_claims(self.dossier)}, {"C1", "C2", "C4"})
 
     def test_prompt_excludes_unverified_claim(self):
         prompt = build_prompt(self.dossier, 480)
