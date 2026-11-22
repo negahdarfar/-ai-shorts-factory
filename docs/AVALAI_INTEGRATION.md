@@ -41,3 +41,8 @@ AvalAI is an optional route. Existing free routes remain in place (FreeLLMAPI, O
 ## Important limitation
 
 AvalAI's model catalogue and prices can change. The live catalogue check is the source of model eligibility; documentation examples, account tier, signup credits, and temporary promotions are not treated as a promise of ongoing free usage. A real model inference test is intentionally not part of the safe connection workflow.
+
+
+## Rate-limit behavior
+
+AvalAI documents tier-based RPM/RPD/TPM limits. A 429 response is reported as `AVALAI_CONNECTION_RATE_LIMITED`; it does not count as a successful authentication or model-catalogue check. The connection workflow uses only `GET /models`, and no inference request is sent during that check. See https://docs.avalai.org/en/rate-limits.
