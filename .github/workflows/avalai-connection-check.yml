@@ -1,0 +1,28 @@
+name: AvalAI safe connection check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+      AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+      AVALAI_MODEL: ${{ vars.AVALAI_MODEL || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile and test AvalAI client
+        run: |
+          python -m py_compile scripts/avalai_client.py scripts/test_avalai_connection.py
+          python -m unittest discover -s tests -p 'test_avalai_client.py' -v
+      - name: Check AvalAI authentication and model catalogue (no inference)
+        run: |
+          PYTHONPATH=scripts python scripts/test_avalai_connection.py
