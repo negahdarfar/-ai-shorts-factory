@@ -3,7 +3,7 @@ name: MoneyPrinterTurbo Shorts Factory
 "on":
   pull_request:
     branches:
-      - main
+      - shorts-factory
   schedule:
     - cron: "0 14 * * *" # Daily UTC production; release times are staggered after rendering.
   workflow_dispatch:
@@ -64,6 +64,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Validate configured 4–10 video batch size
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        run: |
+          case "$EXPECTED_COUNT" in
+            4|5|6|7|8|9|10) echo "BATCH_SIZE=$EXPECTED_COUNT" ;;
+            *) echo "::error::EXPECTED_COUNT must be between 4 and 10"; exit 1 ;;
+          esac
       - name: Install FFmpeg
         if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         run: |
