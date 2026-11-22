@@ -69,9 +69,8 @@ def is_explicitly_free(model_id, metadata=None):
 NON_CHAT_MARKERS = (
     "search", "serper", "perplexity", "parallel_ai", "tavily", "exa-",
     "browser", "crawler", "scrape", "rerank", "ranker", "embedding",
-    "embed", "moderation", "transcrib", "transcription", "tts",
-    "text-to-speech", "speech", "audio", "image-generation",
-    "text-to-image", "video-generation", "ocr", "stt", "asr",
+    "embed", "moderation", "scribe", "transcrib", "transcription", "tts",
+    "text-to-speech", "speech", "audio", "image", "video", "ocr", "stt", "asr",
 )
 
 
