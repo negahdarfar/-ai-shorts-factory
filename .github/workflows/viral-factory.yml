@@ -95,6 +95,14 @@ jobs:
           CANDIDATE_INDEX: ${{ inputs.candidate_index || 'auto' }}
           CLIP_COUNT: ${{ inputs.clip_count || '2' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
           SEO_GEMINI_MODEL: ${{ vars.SEO_GEMINI_MODEL || 'gemini-2.5-flash' }}
         run: |
           python viral_factory/cli.py process \
