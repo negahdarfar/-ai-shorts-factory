@@ -1,0 +1,114 @@
+name: KOROUSH Viral Factory (standalone)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Discover trends only, or render Shorts from licensed material"
+        required: true
+        type: choice
+        options: [discover, process]
+        default: process
+      candidate_index:
+        description: "Use auto to skip previously processed sources, or choose a zero-based candidate index"
+        required: true
+        default: "auto"
+        type: string
+      clip_count:
+        description: "Number of Shorts to render"
+        required: true
+        type: choice
+        options: ["1", "2", "3", "4"]
+        default: "2"
+      publish_public:
+        description: "Upload the rendered Shorts publicly (explicit opt-in)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: koroush-viral-factory-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  standalone-viral-factory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      VIRAL_REGION: US
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: viral_factory/requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core
+      - name: Install isolated dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r viral_factory/requirements.txt
+      - name: Restore used licensed-source history
+        uses: actions/cache/restore@v4
+        with:
+          path: viral_factory/work/used_sources.json
+          key: viral-sources-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            viral-sources-${{ runner.os }}-
+      - name: Validate existing YouTube OAuth secrets for public upload
+        if: ${{ inputs.publish_public == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${YOUTUBE_CLIENT_ID:?Missing existing YOUTUBE_CLIENT_ID secret}"
+          : "${YOUTUBE_CLIENT_SECRET:?Missing existing YOUTUBE_CLIENT_SECRET secret}"
+          : "${YOUTUBE_REFRESH_TOKEN:?Missing existing YOUTUBE_REFRESH_TOKEN secret}"
+      - name: Compile and test the isolated Viral Factory
+        run: |
+          python -m py_compile viral_factory/cli.py
+          python -m unittest discover -s viral_factory -p 'test_*.py' -v
+      - name: Discover Commons sources and optional YouTube trend metadata
+        if: ${{ inputs.mode == 'discover' || inputs.mode == 'process' }}
+        run: python viral_factory/cli.py discover --output-dir viral_factory/work
+      - name: Render Shorts from selected Creative Commons source
+        if: ${{ inputs.mode == 'process' }}
+        env:
+          CANDIDATE_INDEX: ${{ inputs.candidate_index }}
+          CLIP_COUNT: ${{ inputs.clip_count }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SEO_GEMINI_MODEL: ${{ vars.SEO_GEMINI_MODEL || 'gemini-2.5-flash' }}
+        run: |
+          python viral_factory/cli.py process \
+            --candidate-index "$CANDIDATE_INDEX" \
+            --limit "$CLIP_COUNT" \
+            --model tiny \
+            --output-dir viral_factory/work
+      - name: Upload publicly to YouTube (explicit opt-in only)
+        if: ${{ inputs.mode == 'process' && inputs.publish_public == true }}
+        run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
+      - name: Persist processed-source history
+        if: ${{ always() && hashFiles('viral_factory/work/used_sources.json') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: viral_factory/work/used_sources.json
+          key: viral-sources-${{ runner.os }}-${{ github.run_id }}
+      - name: Save reports, rendered Shorts and upload confirmation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koroush-viral-factory-${{ github.run_number }}
+          path: viral_factory/work/
+          if-no-files-found: warn
+          retention-days: 7
