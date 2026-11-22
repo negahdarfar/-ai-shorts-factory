@@ -70,7 +70,8 @@ def crossref_candidates(topic, limit=10):
         if not url:
             continue
         title = (item.get("title") or ["Untitled scholarly work"])[0]
-        published = item.get("published", {}).get("date-parts", [[None]])[0]
+        published_meta = item.get("published") or item.get("published-print") or item.get("published-online") or {}
+        published = published_meta.get("date-parts", [[None]])[0]
         year = str(published[0]) if published and published[0] else ""
         authors = item.get("author") or []
         creator = " ".join(str(authors[0].get(k, "")) for k in ("given", "family")).strip() if authors else ""
