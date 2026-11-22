@@ -118,9 +118,9 @@ def render_scene(scene: dict, source: Path, target: Path) -> None:
     run(command)
 
 
-def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | None = None, subtitles: str | Path | None = None, burn_subtitles: bool = False) -> dict:
+def assemble(manifest: str | Path, output: str | Path, voiceover: str | Path | None = None, subtitles: str | Path | None = None, burn_subtitles: bool = False, root_dir: str | Path | None = None) -> dict:
     scenes = load_scenes(manifest)
-    root = Path(manifest).resolve().parent.parent
+    root = Path(root_dir or Path.cwd()).resolve()
     sources = []
     for index, scene in enumerate(scenes):
         source = (root / scene["path"]).resolve()
