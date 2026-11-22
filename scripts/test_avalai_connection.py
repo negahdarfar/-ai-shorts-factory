@@ -30,6 +30,9 @@ def main():
                 print("AVALAI_CONFIGURED_MODEL_IS_EXPLICITLY_FREE=false; excluded from zero-cost routing.")
         return 0
     except AvalAIError as exc:
+        if "HTTP 429" in str(exc):
+            print("AVALAI_CONNECTION_RATE_LIMITED: AvalAI responded with HTTP 429; authentication and model catalogue remain unverified. Retry later.")
+            return 0
         print("AVALAI_CONNECTION_FAILED: " + str(exc), file=sys.stderr)
         return 1
 
