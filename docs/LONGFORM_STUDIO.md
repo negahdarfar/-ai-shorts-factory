@@ -55,6 +55,12 @@ Candidates are discovery leads only: the collector does not download full articl
 
 After RSS discovery, the workflow now attempts to fetch up to 20 candidate pages and extract bounded readable HTML text into `longform-output/research-extracts.json`. It accepts HTTPS HTML pages only, blocks non-public IP destinations and unsafe redirects, limits each response to 1.5 MB, and records individual failures without losing other candidates. Script/style/navigation/footer content is excluded where identifiable. JavaScript-rendered pages, PDFs, paywalls, and pages requiring login are not handled. Extraction is not fact-checking: the output is unverified material for editorial review, and the separate curated `research.json` dossier remains the only research-gate input.
 
+## Research evidence audit
+
+After the dossier is validated, the workflow runs `scripts/audit_research_evidence.py` against the curated dossier and extracted page text. It links dossier sources to extracted pages by normalized exact HTTPS URL, then searches claim wording for lexical overlaps and records short matching excerpts in `research-evidence-audit.json` and `research-evidence-audit.md`. Sources that were not extracted or failed extraction are reported separately.
+
+This is an evidence locator, not an automated fact-checker. Keyword overlap can miss paraphrases and can also produce misleading matches when context differs. It does not assess whether a source truly supports a claim, detect contradictions reliably, verify dates or numbers, change claim status, or promote any claim to confirmed. Editors must inspect the cited source and surrounding context. The curated dossier remains unchanged and remains the only research-gate input.
+
 ## Factual research input
 
 The render workflow now requires `data/longform/research.json` (or another repository path supplied at dispatch). It is a curated evidence file, not a search engine. Use this structure:
