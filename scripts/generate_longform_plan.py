@@ -83,8 +83,8 @@ def validate_plan(plan, dossier, target_seconds):
     minimum = max(600, target_seconds * 2)
     if words < minimum:
         raise ValueError(f"Only {words} narration words; at least {minimum} are required.")
-    if visual_seconds < target_seconds:
-        raise ValueError(f"Planned visuals cover only {visual_seconds:.1f}s; at least {target_seconds}s are required.")
+    if visual_seconds < target_seconds * 1.2:
+        raise ValueError(f"Planned visuals cover only {visual_seconds:.1f}s; at least {target_seconds * 1.2:.1f}s are required for narration timing headroom.")
     if not str(plan.get("title", "")).strip() or not str(plan.get("logline", "")).strip():
         raise ValueError("Plan requires title and logline.")
     return {
