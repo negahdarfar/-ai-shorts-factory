@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 from io import BytesIO
 
 from avalai_client import AvalAIClient, AvalAIError, DEFAULT_BASE_URL
+from free_model_router import is_explicitly_free
 
 
 class FakeResponse:
@@ -56,6 +57,14 @@ class AvalAIClientTests(unittest.TestCase):
                 client.list_models()
         self.assertNotIn("secret-value", str(caught.exception))
         self.assertIn("401", str(caught.exception))
+
+    def test_zero_price_catalogue_model_is_explicitly_free(self):
+        metadata = {"pricing": {"prompt": "0", "completion": "0"}}
+        self.assertTrue(is_explicitly_free("catalogue-model", metadata))
+
+    def test_unknown_or_paid_model_is_never_assumed_free(self):
+        self.assertFalse(is_explicitly_free("catalogue-model", {"pricing": {"prompt": "0.1", "completion": "0.2"}}))
+        self.assertFalse(is_explicitly_free("catalogue-model", {}))
 
     def test_rejects_non_https_base(self):
         with self.assertRaises(ValueError):
