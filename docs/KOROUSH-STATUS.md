@@ -15,6 +15,7 @@ This branch is an isolated implementation track for the shorts-factory productio
 - [x] Isolated branch created from the existing main branch.
 - [x] Shared media-inspection and validation module added.
 - [x] Unit tests for missing/empty media rejection added.
+- [x] FFmpeg-generated vertical audio/video fixture validates the real FFprobe quality gate.
 - [x] CI workflow added for compile, tests, and FFmpeg toolchain verification.
 - [ ] Factory-specific scriptwriting, licensed media, English TTS, Persian RTL subtitles, rendering, SEO, and publication workflow.
 - [ ] End-to-end generated-video test and private YouTube upload confirmation.
