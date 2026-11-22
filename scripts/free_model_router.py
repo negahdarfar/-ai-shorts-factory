@@ -36,37 +36,40 @@ def _is_zero_price(value):
         return False
 
 
+def _parse_numeric_price(value):
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace("$", "").replace(",", "")
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
 def _contains_nonzero_price(value, in_pricing=False):
     """Reject any positive advertised charge, including per-query/per-image fees."""
+    charge_tokens = ("cost", "price", "fee", "charge")
     if isinstance(value, dict):
         for key, child in value.items():
             name = str(key).lower()
             pricing_context = in_pricing or name in {"pricing", "prices", "cost", "costs", "fees", "charges"}
-            if any(token in name for token in ("cost", "price", "fee", "charge")) and not isinstance(child, (dict, list, tuple)):
-                if child is None:
-                    continue
-                try:
-                    if float(child) > 0:
-                        return True
-                except (TypeError, ValueError):
-                    import re
-                    match = re.search(r"-?\d+(?:\\.\d+)?", str(child))
-                    if not match or float(match.group(0)) > 0:
-                        return True
+            is_charge_field = any(token in name for token in charge_tokens)
+            if is_charge_field and not isinstance(child, (dict, list, tuple)):
+                parsed = _parse_numeric_price(child)
+                if parsed is None or parsed > 0:
+                    return True
             if isinstance(child, (dict, list, tuple)):
                 if _contains_nonzero_price(child, pricing_context):
                     return True
-            elif pricing_context and isinstance(child, (int, float)) and not isinstance(child, bool) and child > 0:
-                return True
-            elif pricing_context and isinstance(child, str):
-                import re
-                match = re.fullmatch(r"\s*\\$?(-?\d+(?:\\.\d+)?)\s*", child)
-                if match and float(match.group(1)) > 0:
+            elif pricing_context:
+                parsed = _parse_numeric_price(child)
+                if parsed is not None and parsed > 0:
                     return True
     elif isinstance(value, (list, tuple)):
         return any(_contains_nonzero_price(item, in_pricing) for item in value)
     return False
-
 
 def _metadata_is_free(metadata):
     """Recognize only unambiguous, machine-readable free-tier declarations."""
