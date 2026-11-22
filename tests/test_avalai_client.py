@@ -66,6 +66,17 @@ class AvalAIClientTests(unittest.TestCase):
         self.assertFalse(is_explicitly_free("catalogue-model", {"pricing": {"prompt": "0.1", "completion": "0.2"}}))
         self.assertFalse(is_explicitly_free("catalogue-model", {}))
 
+    def test_retries_rate_limit_then_succeeds(self):
+        client = AvalAIClient(api_key="dummy", max_retries=1)
+        rate_limit = HTTPError("https://api.avalai.ir/v1/models", 429, "rate limited",
+                               {"Retry-After": "0"}, BytesIO(b""))
+        with patch("urllib.request.urlopen", side_effect=[rate_limit, FakeResponse({"data": [{"id": "free-model"}]})]) as call:
+            with patch("time.sleep") as sleep:
+                rows = client.list_models()
+        self.assertEqual(rows[0]["id"], "free-model")
+        self.assertEqual(call.call_count, 2)
+        sleep.assert_called_once()
+
     def test_rejects_non_https_base(self):
         with self.assertRaises(ValueError):
             AvalAIClient(api_key="x", base_url="http://example.com/v1")
