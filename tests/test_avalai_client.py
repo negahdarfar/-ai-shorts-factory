@@ -62,6 +62,11 @@ class AvalAIClientTests(unittest.TestCase):
         metadata = {"pricing": {"prompt": "0", "completion": "0"}}
         self.assertTrue(is_explicitly_free("catalogue-model", metadata))
 
+    def test_avalai_catalogue_zero_input_output_prices_are_free(self):
+        metadata = {"min_tier": 0, "pricing": {"input": 0, "output": 0, "cached_input": 0}}
+        self.assertTrue(is_explicitly_free("cf-free-example", metadata))
+        self.assertTrue(is_explicitly_free("avalai-catalogue-model", metadata))
+
     def test_unknown_or_paid_model_is_never_assumed_free(self):
         self.assertFalse(is_explicitly_free("catalogue-model", {"pricing": {"prompt": "0.1", "completion": "0.2"}}))
         self.assertFalse(is_explicitly_free("catalogue-model", {}))
