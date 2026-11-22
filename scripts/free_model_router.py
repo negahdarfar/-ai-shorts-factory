@@ -7,6 +7,11 @@ all advertised input/output token prices are exactly zero. Unknown pricing is
 never assumed free.
 """
 import json
+import hashlib
+import os
+import tempfile
+import time
+from pathlib import Path
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
@@ -113,8 +118,29 @@ def discover_free_models(base_url, api_key, task="general", preferred="auto", ti
     host = (urlparse(base_url).hostname or "").lower()
     try:
         if host in {"api.avalai.ir", "api.avalapis.ir", "api.avalai.org"}:
-            # Use the dedicated client for bounded retries and sanitized provider errors.
-            payload = {"data": AvalAIClient(api_key=api_key, base_url=base_url, timeout=timeout).list_models()}
+            # Cache only the public model/pricing catalogue briefly to stay within
+            # AvalAI's low account-tier RPM limits across sequential pipeline steps.
+            ttl = max(0, min(int(os.getenv("AVALAI_MODEL_CACHE_TTL_SECONDS", "300")), 3600))
+            key_hash = hashlib.sha256((base_url.rstrip("/") + "\\0" + api_key).encode("utf-8")).hexdigest()[:20]
+            cache_path = Path(os.getenv("AVALAI_MODEL_CACHE_PATH", str(Path(tempfile.gettempdir()) / ("avalai-models-" + key_hash + ".json"))))
+            cached = None
+            if ttl and cache_path.is_file() and time.time() - cache_path.stat().st_mtime <= ttl:
+                try:
+                    cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    cached = None
+            if isinstance(cached, dict) and isinstance(cached.get("data"), list):
+                payload = cached
+            else:
+                payload = {"data": AvalAIClient(api_key=api_key, base_url=base_url, timeout=timeout).list_models()}
+                if ttl:
+                    try:
+                        cache_path.parent.mkdir(parents=True, exist_ok=True)
+                        temporary = cache_path.with_suffix(cache_path.suffix + ".tmp")
+                        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                        temporary.replace(cache_path)
+                    except OSError:
+                        pass
         else:
             url = base_url.rstrip("/") + "/models"
             request = urllib.request.Request(
