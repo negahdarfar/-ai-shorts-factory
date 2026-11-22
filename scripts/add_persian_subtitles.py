@@ -260,7 +260,7 @@ def translate_avalai(rows, base_url, key, model):
     return parse_translation_json(content, rows, "AvalAI")
 
 
-def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
+def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, avalai=None):
     avalai = avalai or ("", "", "auto")
     cloudflare = cloudflare or ("", "", "")
     failures = []
