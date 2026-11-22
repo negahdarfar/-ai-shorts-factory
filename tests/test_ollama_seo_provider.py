@@ -8,7 +8,7 @@ from scripts import generate_seo_metadata as seo
 class OllamaSeoProviderTests(unittest.TestCase):
     def test_local_ollama_generates_valid_item_without_authorization_header(self):
         script = " ".join(
-            ["A clear factual narration sentence explains the subject with useful context and a practical takeaway."] * 14
+            ["Solar storms can affect Earth magnetic field and create bright auroras across the night sky."] * 9
         )
         item = {
             "index": 1,
