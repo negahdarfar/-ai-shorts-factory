@@ -7,7 +7,7 @@ import os
 from avalai_client import AvalAIClient, AvalAIError
 from free_model_router import is_explicitly_free
 
-EXCLUDED = ("embed", "whisper", "tts", "text-to-speech", "image", "rerank", "moderation")
+EXCLUDED = ("embed", "embedding", "whisper", "transcrib", "tts", "text-to-speech", "audio", "image", "rerank", "moderation", "search", "tavily", "browser", "web-search")
 PREFERRED = ("gpt", "qwen", "llama", "gemma", "deepseek", "mistral", "phi")
 
 
