@@ -3,7 +3,7 @@
 import argparse, json, os, re, sys, time, urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
-from free_model_router import discover_free_models
+from free_model_router import discover_free_models\nfrom avalai_client import AvalAIClient
 
 
 def confirmed_claims(dossier):
@@ -102,11 +102,17 @@ def request_json(base, key, model, prompt):
         {"role": "system", "content": "Write accurate documentary narration. Return only JSON. Never invent facts."},
         {"role": "user", "content": prompt}],
         "temperature": 0.2, "max_tokens": 12000, "response_format": {"type": "json_object"}}
-    req = urllib.request.Request(base.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=240) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    if base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
+        content = AvalAIClient(api_key=key, base_url=base).chat_completion(
+            model, payload["messages"], temperature=0.2, max_tokens=12000,
+            response_format={"type": "json_object"})
+        data = {"choices": [{"message": {"content": content}}]}
+    else:
+        req = urllib.request.Request(base.rstrip("/") + "/chat/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=240) as response:
+            data = json.loads(response.read().decode("utf-8"))
     choices = data.get("choices", [])
     if not choices:
         raise RuntimeError("Model returned no choices.")
@@ -136,6 +142,14 @@ def routes():
                 base, key, task="general", preferred=os.getenv("FREELLMAPI_MODEL", "auto"))]
         except Exception as exc:
             print("FREELLMAPI discovery failed:", type(exc).__name__, file=sys.stderr)
+    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
+    if avalai_key:
+        base = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
+        try:
+            result += [("AvalAI", base, avalai_key, m) for m in discover_free_models(
+                base, avalai_key, task="general", preferred=os.getenv("AVALAI_MODEL", "auto"))]
+        except Exception as exc:
+            print("AvalAI discovery failed:", type(exc).__name__, file=sys.stderr)
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if key:
         base = "https://openrouter.ai/api/v1"
