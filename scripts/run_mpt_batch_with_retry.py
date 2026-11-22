@@ -80,70 +80,89 @@ def validate_distinct_visual_terms(batch):
             if overlap > 0.20:
                 raise SystemExit(f"Videos {i+1} and {j+1} have overly similar stock-footage searches (Jaccard={overlap:.2f}); refusing repetitive visuals.")
 
-def run_one(item, index, total, video_source, attempts, delay, temp_dir):
+def run_one(item, index, total, video_sources, attempts, delay, temp_dir):
     topic = item.get("video_subject", f"item-{index}")
     result = {"index": index, "topic": topic, "status": "failed", "attempts": 0, "last_error": ""}
     manifest = Path(temp_dir) / f"item-{index:02d}.json"
     manifest.write_text(json.dumps([item], ensure_ascii=False, indent=2), encoding="utf-8")
 
-    command = [
-        "mpt", "cli", "--batch-file", str(manifest),
-        "--video-source", video_source,
-        "--video-aspect", "9:16",
-        "--video-language", "en-US",
-        "--voice-name", "en-US-GuyNeural",
-        "--subtitle-enabled",
-        "--subtitle-display-mode", "sentence",
-        "--subtitle-animation", "pop_spring",
-        "--subtitle-position", "bottom",
-        "--video-fit-mode", "cover",
-        "--bgm-volume", "0.12",
-        "--stop-at", "video",
-    ]
-
     print(f"\n=== Topic {index}/{total}: {topic} ===", flush=True)
     for attempt in range(1, attempts + 1):
         result["attempts"] = attempt
-        print(f"Attempt {attempt}/{attempts}", flush=True)
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-        )
-        captured = []
-        assert process.stdout is not None
-        for line in process.stdout:
-            print(line, end="", flush=True)
-            captured.append(line)
-        return_code = process.wait()
-        output = "".join(captured)
+        retryable_seen = False
+        for source_index, video_source in enumerate(video_sources):
+            command = [
+                "mpt", "cli", "--batch-file", str(manifest),
+                "--video-source", video_source,
+                "--video-aspect", "9:16",
+                "--video-language", "en-US",
+                "--voice-name", "en-US-GuyNeural",
+                "--subtitle-enabled",
+                "--subtitle-display-mode", "sentence",
+                "--subtitle-animation", "pop_spring",
+                "--subtitle-position", "bottom",
+                "--video-fit-mode", "cover",
+                "--bgm-volume", "0.12",
+                "--stop-at", "video",
+            ]
+            print(
+                f"Attempt {attempt}/{attempts} | footage_source={video_source}",
+                flush=True,
+            )
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+            captured = []
+            assert process.stdout is not None
+            for line in process.stdout:
+                print(line, end="", flush=True)
+                captured.append(line)
+            return_code = process.wait()
+            output = "".join(captured)
 
-        if return_code == 0:
-            result["status"] = "succeeded"
-            result["last_error"] = ""
-            print(f"Topic {index} succeeded.", flush=True)
-            return result
+            if return_code == 0:
+                result["status"] = "succeeded"
+                result["last_error"] = ""
+                result["footage_source"] = video_source
+                print(
+                    f"Topic {index} succeeded using {video_source}.",
+                    flush=True,
+                )
+                return result
 
-        result["last_error"] = output[-6000:]
-        if attempt < attempts and is_retryable(output):
+            result["last_error"] = output[-6000:]
+            if is_retryable(output):
+                retryable_seen = True
+            if source_index + 1 < len(video_sources):
+                print(
+                    f"FOOTAGE_SOURCE_FAILED_NEXT_SOURCE | failed={video_source} | "
+                    f"next={video_sources[source_index + 1]}",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"Footage source {video_source} failed for topic {index}.",
+                    flush=True,
+                )
+
+        if attempt < attempts and retryable_seen:
             wait_seconds = delay * (2 ** (attempt - 1))
             print(
-                f"Transient provider error for topic {index}; retrying in {wait_seconds}s.",
+                f"Transient errors persisted across footage sources; "
+                f"retrying all sources in {wait_seconds}s.",
                 flush=True,
             )
             time.sleep(wait_seconds)
             continue
+        break
 
-        if not is_retryable(output):
-            print(f"Topic {index} failed with a non-retryable error.", flush=True)
-        else:
-            print(f"Topic {index} exhausted {attempts} attempts.", flush=True)
-        return result
-
+    print(f"Topic {index} failed after trying all configured footage sources.", flush=True)
     return result
 
 
@@ -151,6 +170,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-file", required=True)
     parser.add_argument("--video-source", choices=("pexels", "pixabay"), required=True)
+    parser.add_argument("--fallback-video-source", choices=("pexels", "pixabay"), default="")
     parser.add_argument("--max-attempts", type=int, default=3)
     parser.add_argument("--retry-delay-seconds", type=int, default=20)
     args = parser.parse_args()
@@ -162,13 +182,16 @@ def main():
     batch = attach_prebuilt_content(batch, batch_path.parent / "seo_metadata.json")
     validate_distinct_visual_terms(batch)
 
+    video_sources = [args.video_source]
+    if args.fallback_video_source and args.fallback_video_source != args.video_source:
+        video_sources.append(args.fallback_video_source)
     attempts = max(1, min(5, args.max_attempts))
     delay = max(1, args.retry_delay_seconds)
     results = []
     with tempfile.TemporaryDirectory(prefix="mpt-single-tasks-") as temp_dir:
         for index, item in enumerate(batch, 1):
             results.append(
-                run_one(item, index, len(batch), args.video_source, attempts, delay, temp_dir)
+                run_one(item, index, len(batch), video_sources, attempts, delay, temp_dir)
             )
 
     report = {
