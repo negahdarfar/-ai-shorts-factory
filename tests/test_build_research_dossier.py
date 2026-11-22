@@ -42,7 +42,6 @@ class ResearchDossierTests(unittest.TestCase):
         self.assertTrue(result["claims"][0]["usable_in_narration"])
 
     def test_confirmed_claim_needs_two_domains(self):
-        self.data["claims"][0]["source_ids"] = ["S1", "S1"]
         self.data["claims"][0]["source_ids"] = ["S1"]
         with self.assertRaisesRegex(ResearchError, "two distinct domains"):
             self.run_dossier()
