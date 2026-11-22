@@ -8,7 +8,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
-from free_model_router import discover_free_models
+from free_model_router import discover_free_models\nfrom avalai_client import AvalAIClient
 
 BLOCK = re.compile(r"^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n([\s\S]*?)\s*$")
 
@@ -38,11 +38,17 @@ def translate_batch(rows, base, key, model):
         {"role": "system", "content": "You are a professional English-to-Persian subtitle translator. Output valid JSON only."},
         {"role": "user", "content": prompt}],
         "temperature": 0.1, "max_tokens": 5000, "response_format": {"type": "json_object"}}
-    request = urllib.request.Request(base.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(request, timeout=180) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    if base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
+        content = AvalAIClient(api_key=key, base_url=base).chat_completion(
+            model, payload["messages"], temperature=0.1, max_tokens=5000,
+            response_format={"type": "json_object"})
+        data = {"choices": [{"message": {"content": content}}]}
+    else:
+        request = urllib.request.Request(base.rstrip("/") + "/chat/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=180) as response:
+            data = json.loads(response.read().decode("utf-8"))
     choices = data.get("choices", [])
     if not choices:
         raise RuntimeError("Translation model returned no choices.")
@@ -78,6 +84,14 @@ def configured_routes():
                 base, key, task="translation", preferred=os.getenv("FREELLMAPI_MODEL", "auto"))]
         except Exception as exc:
             print("FreeLLMAPI translation discovery failed:", type(exc).__name__, file=sys.stderr)
+    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
+    if avalai_key:
+        base = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
+        try:
+            result += [(base, avalai_key, model) for model in discover_free_models(
+                base, avalai_key, task="translation", preferred=os.getenv("AVALAI_MODEL", "auto"))]
+        except Exception as exc:
+            print("AvalAI translation discovery failed:", type(exc).__name__, file=sys.stderr)
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if key:
         base = "https://openrouter.ai/api/v1"
