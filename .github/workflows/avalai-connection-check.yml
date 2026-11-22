@@ -8,6 +8,7 @@ on:
       - 'scripts/free_model_router.py'
       - 'scripts/test_avalai_connection.py'
       - 'scripts/test_avalai_inference.py'
+      - 'scripts/avalai_moderation.py'
       - 'tests/test_avalai_client.py'
       - '.github/workflows/avalai-connection-check.yml'
   workflow_dispatch:
@@ -35,3 +36,11 @@ jobs:
       - name: Run one minimal inference using an explicitly free model
         run: |
           PYTHONPATH=scripts python scripts/test_avalai_inference.py
+      - name: Smoke-test the dedicated free moderation endpoint
+        env:
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+        run: |
+          printf '[{"topic":"moderation-smoke-test","video_script":"A person walks through a sunny park and waves to a friend.","metadata":{"title":"A Peaceful Day in the Park","description":"A short, neutral everyday scene.","tags":["nature","friendship"]}}]\n' > /tmp/avalai-moderation-smoke.json
+          python scripts/avalai_moderation.py --input /tmp/avalai-moderation-smoke.json --output /tmp/avalai-moderation-report.json
+          cat /tmp/avalai-moderation-report.json
