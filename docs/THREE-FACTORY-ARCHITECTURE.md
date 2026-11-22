@@ -22,8 +22,9 @@ This repository is organized around exactly three production tracks. Keep produc
 
 - All three production branches have isolated CI and a shared FFprobe-based quality module.
 - Shorts has the most complete production workflow, including per-topic rendering retries, 9:16 media validation, Persian subtitle checks, duplicate protection, analytics and weekly optimization.
-- Viral has a separate Wikimedia Commons discovery/rendering pipeline with conservative licence filtering and a dedicated test suite. Its complete English narration/Persian subtitle/automatic-publication pipeline is still under development.
-- Longform has reusable documentary assembly, chapter validation, free-provider routing and shared quality/upload components. Its end-to-end research-to-narration-to-render workflow is still under development.
+- Viral has a separate Wikimedia Commons discovery/rendering pipeline, conservative licence filtering, English-only Whisper transcription, Persian SRT translation/burn-in, FFprobe QC, SHA-256 upload idempotency and a default-branch dispatch scheduler. Original narration/TTS and real end-to-end publication evidence are still outstanding.
+- Longform has an assembly workflow, English voiceover handling, Noto Naskh Arabic subtitle burn-in, chapter validation, 16:9/duration/audio QC, free-provider routing and shared upload safeguards. Automated research, long-form script generation, licensed scene discovery and TTS remain outstanding.
+- Shorts retains its daily public-release workflow. Viral's scheduler is ready but runs only after `shorts-factory` becomes the repository default branch. Longform remains assembly/QC-only and does not auto-publish.
 - A passing unit/CI run is not evidence of a completed real-world video render or YouTube upload. End-to-end readiness requires an actual rendered artifact and a confirmed YouTube video ID.
 
 ## Branch cleanup
