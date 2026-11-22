@@ -42,9 +42,9 @@ def manifest_assets(manifest: list) -> list[str]:
         if Path(asset).is_absolute() or ".." in Path(asset).parts:
             raise RightsError(f"Manifest asset path must be relative and cannot traverse parent directories: {asset}")
         assets.append(asset)
-    if len(set(assets)) != len(assets):
-        raise RightsError("Manifest contains duplicate asset paths; use a distinct file or deduplicate the scene list.")
-    return assets
+    # A source file may appear in multiple timeline scenes with different trims.
+    # Rights are recorded once per unique underlying asset.
+    return list(dict.fromkeys(assets))
 
 
 def validate_rights_ledger(manifest_path: str | Path, ledger_path: str | Path) -> dict:
