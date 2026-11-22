@@ -71,7 +71,11 @@ async def synthesize(plan, output_audio, output_srt, voice, rate):
                     last_error = exc
                     await asyncio.sleep(1 + attempt * 2)
             if last_error:
-                raise RuntimeError(f"TTS failed on chapter {index}: {type(last_error).__name__}") from last_error
+                fallback = temp / f"chapter_{index:03d}.wav"
+                if not shutil.which("espeak-ng"):
+                    raise RuntimeError(f"TTS failed on chapter {index}; no offline espeak-ng fallback is installed.") from last_error
+                subprocess.run(["espeak-ng", "-v", "en-us", "-s", "150", "-w", str(fallback), narration], check=True)
+                target = fallback
             duration = probe_duration(target)
             audio_files.append(target)
             cue_groups.append((split_cues(narration), duration))
