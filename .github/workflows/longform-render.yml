@@ -8,6 +8,11 @@ on:
         required: true
         default: data/longform/clips.json
         type: string
+      rights_ledger:
+        description: JSON rights ledger with one record per source clip
+        required: true
+        default: data/longform/rights.json
+        type: string
       subtitles_srt:
         description: Optional Persian SRT path in the repository
         required: false
@@ -54,11 +59,13 @@ jobs:
       - name: Validate manifest and optional assets
         env:
           MANIFEST: ${{ inputs.clips_manifest }}
+          RIGHTS_LEDGER: ${{ inputs.rights_ledger }}
           SUBTITLES: ${{ inputs.subtitles_srt }}
           VOICEOVER: ${{ inputs.voiceover_audio }}
         run: |
           set -euo pipefail
           test -f "$MANIFEST"
+          test -f "$RIGHTS_LEDGER"
           python - "$MANIFEST" "$SUBTITLES" "$VOICEOVER" <<'PY'
           import json, sys
           from pathlib import Path
@@ -79,6 +86,10 @@ jobs:
                   if root not in p.parents or not p.is_file():
                       raise SystemExit(f"Missing or unsafe optional asset: {item}")
           PY
+      - name: Enforce source rights ledger
+        run: |
+          mkdir -p longform-output
+          python scripts/validate_rights_ledger.py --manifest "${{ inputs.clips_manifest }}" --ledger "${{ inputs.rights_ledger }}" --report longform-output/rights-qa-report.json
       - name: Assemble long-form documentary
         env:
           MANIFEST: ${{ inputs.clips_manifest }}
