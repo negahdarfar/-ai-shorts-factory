@@ -76,6 +76,9 @@ jobs:
           key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             mpt-topics-${{ runner.os }}-
+      - name: Merge durable factory state into restored runtime
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        run: python scripts/merge_factory_state.py --runtime "$MPT_HOME/state" --durable data/factory_state --direction both
       - name: Connect to private FreeLLMAPI phone gateway
         if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && (inputs.use_phone_gateway == true || vars.USE_PHONE_FREELLMAPI == 'true') && env.FREELLMAPI_BASE_URL != '' && env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
