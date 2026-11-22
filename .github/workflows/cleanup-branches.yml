@@ -1,0 +1,66 @@
+name: Archive and remove non-production branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_archive_and_delete:
+        description: "Archive every non-production branch as a tag, then delete its branch ref"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: ${{ inputs.confirm_archive_and_delete == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production branches and default branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          default_branch="$(gh api "repos/$repo" --jq '.default_branch')"
+          case "$default_branch" in
+            shorts-factory|viral-video-factory|longform-studio) ;;
+            *) echo "::error::Change the repository default branch to shorts-factory first. Current: $default_branch"; exit 1 ;;
+          esac
+          for branch in shorts-factory viral-video-factory longform-studio; do
+            gh api "repos/$repo/branches/$branch" >/dev/null
+          done
+          echo "Default branch: $default_branch"
+          echo "All three production branches exist."
+
+      - name: Archive and delete every other branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          keep='["shorts-factory","viral-video-factory","longform-studio"]'
+          count=0
+          while IFS= read -r branch; do
+            [ -n "$branch" ] || continue
+            if printf '%s' "$keep" | jq -e --arg b "$branch" 'index($b) != null' >/dev/null; then
+              echo "KEEP $branch"
+              continue
+            fi
+            sha="$(gh api "repos/$repo/branches/$branch" --jq '.commit.sha')"
+            tag="archive/branches/$branch"
+            if gh api "repos/$repo/git/ref/tags/$tag" >/dev/null 2>&1; then
+              existing="$(gh api "repos/$repo/git/ref/tags/$tag" --jq '.object.sha')"
+              if [ "$existing" != "$sha" ]; then
+                echo "::error::Archive tag $tag already exists at a different commit; refusing to overwrite."
+                exit 1
+              fi
+            else
+              gh api --method POST "repos/$repo/git/refs" -f "ref=refs/tags/$tag" -f "sha=$sha" >/dev/null
+            fi
+            gh api --method DELETE "repos/$repo/git/refs/heads/$branch" >/dev/null
+            echo "ARCHIVED_AND_DELETED $branch -> $tag ($sha)"
+            count=$((count+1))
+          done < <(gh api --paginate "repos/$repo/branches?per_page=100" --jq '.[].name')
+          echo "CLEANUP_COMPLETE deleted=$count"
