@@ -9,6 +9,8 @@ never assumed free.
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
+from avalai_client import AvalAIClient
 
 FREE_MARKERS = (":free", "/free", "-free", "_free")
 ROUTER_MARKERS = ("kilo-auto/free", "openrouter/free")
@@ -108,17 +110,22 @@ def discover_free_models(base_url, api_key, task="general", preferred="auto", ti
     """Return best-first explicitly free model IDs from the live gateway catalogue."""
     if not base_url or not api_key:
         return []
-    url = base_url.rstrip("/") + "/models"
-    request = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-        method="GET",
-    )
+    host = (urlparse(base_url).hostname or "").lower()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"FreeLLMAPI model discovery failed: {exc}") from exc
+        if host in {"api.avalai.ir", "api.avalapis.ir", "api.avalai.org"}:
+            # Use the dedicated client for bounded retries and sanitized provider errors.
+            payload = {"data": AvalAIClient(api_key=api_key, base_url=base_url, timeout=timeout).list_models()}
+        else:
+            url = base_url.rstrip("/") + "/models"
+            request = urllib.request.Request(
+                url,
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                method="GET",
+            )
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, RuntimeError) as exc:
+        raise RuntimeError(f"Model catalogue discovery failed ({type(exc).__name__}).") from None
 
     rows = _model_rows(payload)
     models = _model_ids(payload)
