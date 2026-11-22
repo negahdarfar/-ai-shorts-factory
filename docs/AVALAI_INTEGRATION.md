@@ -32,7 +32,7 @@ Run **Actions → AvalAI safe connection check → Run workflow**. This performs
 - Shorts: topic-aware English scripts and SEO title/description/tags.
 - Shorts and long-form: Persian SRT translation while preserving cue order and timestamps.
 - Long-form: English documentary script and storyboard generation.
-- Content-quality review can use the same provider client for future rubric-based checks; current publishing/rights gates remain unchanged.
+- Content-quality evaluation is wired into the Shorts SEO, selected-clip, and long-form script workflows. It reports editorial scores but never verifies facts or authorizes publication.
 
 ## Free-provider fallback order
 
