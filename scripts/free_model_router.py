@@ -70,7 +70,10 @@ NON_CHAT_MARKERS = (
     "search", "serper", "perplexity", "parallel_ai", "tavily", "exa-",
     "browser", "crawler", "scrape", "rerank", "ranker", "embedding",
     "embed", "moderation", "scribe", "transcrib", "transcription", "tts",
-    "text-to-speech", "speech", "audio", "image", "video", "ocr", "stt", "asr",
+    "text-to-speech", "speech", "audio", "voice", "eleven_", "elevenlabs",
+    "cartesia", "playht", "deepgram", "assemblyai", "speechmatics",
+    "resemble", "kokoro", "piper", "dubbing", "music", "sound",
+    "image", "video", "ocr", "stt", "asr",
 )
 
 
