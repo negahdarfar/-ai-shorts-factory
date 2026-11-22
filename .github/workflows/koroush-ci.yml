@@ -1,8 +1,8 @@
-name: Koroush AI - longform-studio validation
+name: Koroush AI - long-video-studio validation
 
 on:
   push:
-    branches: ["longform-studio"]
+    branches: ["long-video-studio"]
     paths:
       - "koroush_core/**"
       - "scripts/**"
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: koroush-longform-studio-ci-${{ github.ref }}
+  group: koroush-long-video-studio-ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
