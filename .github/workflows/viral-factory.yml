@@ -24,7 +24,7 @@ on:
         description: "Upload the rendered Shorts publicly (explicit opt-in)"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
