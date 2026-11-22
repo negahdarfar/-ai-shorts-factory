@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 from avalai_client import AvalAIClient, AvalAIError
@@ -54,6 +55,27 @@ def translate_avalai(rows, base, key, model):
     return parse_translations(content, rows)
 
 
+def translate_openai_compatible(rows, base, key, model):
+    payload = {"model": model,
+               "messages": [{"role": "system", "content": "Translate English subtitles into concise, natural Persian. Return valid JSON only."},
+                            {"role": "user", "content": prompt_for(rows)}],
+               "temperature": 0.15, "max_tokens": 5000,
+               "response_format": {"type": "json_object"}}
+    request = urllib.request.Request(base.rstrip("/") + "/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        method="POST")
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    choices = data.get("choices", [])
+    if not choices:
+        raise RuntimeError("Free provider returned no chat completion choices.")
+    content = choices[0].get("message", {}).get("content", "")
+    if isinstance(content, list):
+        content = "\\n".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return parse_translations(str(content), rows)
+
+
 def translate_gemini(rows, key, model):
     payload = {"contents": [{"parts": [{"text": prompt_for(rows)}]}],
                "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}}
@@ -78,33 +100,53 @@ def main():
     if not rows:
         raise SystemExit("No subtitle entries found.")
     batch_size = max(1, min(args.batch_size, 50))
-    avalai_routes = []
+    provider_routes = []
     avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
     avalai_base = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
     if avalai_key:
         try:
             models = discover_free_models(avalai_base, avalai_key, task="translation",
                                           preferred=os.getenv("AVALAI_MODEL", "auto"))
-            avalai_routes = [(avalai_base, avalai_key, model) for model in models]
+            provider_routes.extend((\"AvalAI\", avalai_base, avalai_key, model) for model in models)
         except Exception as exc:
             print("AVALAI_DISCOVERY_FAILED; continuing to existing free fallback: " + type(exc).__name__, file=sys.stderr)
+    free_base = os.getenv("FREELLMAPI_BASE_URL", "").strip()
+    free_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
+    if free_base and free_key:
+        try:
+            provider_routes.extend(("FreeLLMAPI", free_base, free_key, model) for model in
+                discover_free_models(free_base, free_key, task="translation",
+                                     preferred=os.getenv("FREELLMAPI_MODEL", "auto")))
+        except Exception as exc:
+            print("FREELLMAPI_DISCOVERY_FAILED: " + type(exc).__name__, file=sys.stderr)
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if openrouter_key:
+        try:
+            provider_routes.extend(("OpenRouter", "https://openrouter.ai/api/v1", openrouter_key, model) for model in
+                discover_free_models("https://openrouter.ai/api/v1", openrouter_key, task="translation",
+                                     preferred=os.getenv("OPENROUTER_MODEL", "auto")))
+        except Exception as exc:
+            print("OPENROUTER_DISCOVERY_FAILED: " + type(exc).__name__, file=sys.stderr)
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     translated = []
     for start in range(0, len(rows), batch_size):
         batch = rows[start:start + batch_size]
         values = None
-        for base, key, model in avalai_routes:
+        for provider, base, key, model in provider_routes:
             try:
-                values = translate_avalai(batch, base, key, model)
-                print(f"SUBTITLE_PROVIDER=AVALAI model={model}")
+                if provider == "AvalAI":
+                    values = translate_avalai(batch, base, key, model)
+                else:
+                    values = translate_openai_compatible(batch, base, key, model)
+                print(f"SUBTITLE_PROVIDER={provider} model={model}")
                 break
             except Exception as exc:
-                print(f"AVALAI_SUBTITLE_ROUTE_FAILED model={model} error={type(exc).__name__}", file=sys.stderr)
+                print(f"{provider.upper()}_SUBTITLE_ROUTE_FAILED model={model} error={type(exc).__name__}", file=sys.stderr)
         if values is None and gemini_key:
             values = translate_gemini(batch, gemini_key, args.model)
             print(f"SUBTITLE_PROVIDER=GEMINI model={args.model}")
         if values is None:
-            raise RuntimeError("No explicitly free AvalAI model was available and GEMINI_API_KEY fallback is not configured.")
+            raise RuntimeError("No explicitly free AvalAI, FreeLLMAPI or OpenRouter model was available and GEMINI_API_KEY fallback is not configured.")
         translated.extend({**row, "text": value} for row, value in zip(batch, values))
         print(f"Translated {len(translated)}/{len(rows)} subtitle cues.")
         time.sleep(0.2)
