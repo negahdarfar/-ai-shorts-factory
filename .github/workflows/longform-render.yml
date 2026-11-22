@@ -94,13 +94,18 @@ jobs:
                       raise SystemExit(f"Missing or unsafe optional asset: {item}")
           PY
       - name: Validate factual research and citations
+        env:
+          RESEARCH_INPUT: ${{ inputs.research_input }}
         run: |
           mkdir -p longform-output
-          python scripts/build_research_dossier.py --input "${{ inputs.research_input }}" --output longform-output/research-dossier.json --report longform-output/research-dossier.md
+          python scripts/build_research_dossier.py --input "$RESEARCH_INPUT" --output longform-output/research-dossier.json --report longform-output/research-dossier.md
       - name: Enforce source rights ledger
+        env:
+          MANIFEST: ${{ inputs.clips_manifest }}
+          RIGHTS_LEDGER: ${{ inputs.rights_ledger }}
         run: |
           mkdir -p longform-output
-          python scripts/validate_rights_ledger.py --manifest "${{ inputs.clips_manifest }}" --ledger "${{ inputs.rights_ledger }}" --report longform-output/rights-qa-report.json
+          python scripts/validate_rights_ledger.py --manifest "$MANIFEST" --ledger "$RIGHTS_LEDGER" --report longform-output/rights-qa-report.json
       - name: Assemble long-form documentary
         env:
           MANIFEST: ${{ inputs.clips_manifest }}
