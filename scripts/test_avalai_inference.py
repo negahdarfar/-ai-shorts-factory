@@ -75,6 +75,8 @@ def main():
             f"max_candidates_to_test={os.getenv('AVALAI_MAX_FREE_CHAT_CANDIDATES', '12')}",
             flush=True,
         )
+        if candidates:
+            print("AVALAI_CHAT_CANDIDATE_IDS: " + ", ".join(candidates[:max(1, min(int(os.getenv("AVALAI_MAX_FREE_CHAT_CANDIDATES", "12")), 12))]), flush=True)
         if not candidates:
             raise AvalAIError(
                 "No explicitly free text-chat candidate remains after modality filtering."
