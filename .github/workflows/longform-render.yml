@@ -1,0 +1,108 @@
+name: Koroush Longform Studio - render and QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      clips_manifest:
+        description: Repository JSON file containing ordered source clip paths
+        required: true
+        default: data/longform/clips.json
+        type: string
+      subtitles_srt:
+        description: Optional Persian SRT path in the repository
+        required: false
+        default: ""
+        type: string
+      voiceover_audio:
+        description: Optional narration audio path in the repository
+        required: false
+        default: ""
+        type: string
+      burn_subtitles:
+        description: Burn the supplied Persian subtitles into the video
+        required: true
+        default: true
+        type: boolean
+      minimum_duration_seconds:
+        description: Minimum documentary duration (default 8 minutes)
+        required: true
+        default: "480"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: koroush-longform-render-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  render-and-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg and Persian fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra
+      - name: Validate manifest and optional assets
+        env:
+          MANIFEST: ${{ inputs.clips_manifest }}
+          SUBTITLES: ${{ inputs.subtitles_srt }}
+          VOICEOVER: ${{ inputs.voiceover_audio }}
+        run: |
+          set -euo pipefail
+          test -f "$MANIFEST"
+          python - "$MANIFEST" "$SUBTITLES" "$VOICEOVER" <<'PY'
+          import json, sys
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          manifest = Path(sys.argv[1]).resolve()
+          if root not in manifest.parents:
+              raise SystemExit("Manifest must be inside the checked-out repository.")
+          rows = json.loads(manifest.read_text(encoding="utf-8"))
+          if not isinstance(rows, list) or not rows:
+              raise SystemExit("Manifest must be a non-empty JSON array.")
+          for item in rows:
+              p = (root / item).resolve()
+              if root not in p.parents or not p.is_file():
+                  raise SystemExit(f"Missing or unsafe clip path: {item}")
+          for item in sys.argv[2:]:
+              if item:
+                  p = (root / item).resolve()
+                  if root not in p.parents or not p.is_file():
+                      raise SystemExit(f"Missing or unsafe optional asset: {item}")
+          PY
+      - name: Assemble long-form documentary
+        env:
+          MANIFEST: ${{ inputs.clips_manifest }}
+          SUBTITLES: ${{ inputs.subtitles_srt }}
+          VOICEOVER: ${{ inputs.voiceover_audio }}
+          BURN: ${{ inputs.burn_subtitles }}
+        run: |
+          set -euo pipefail
+          args=(--clips "$MANIFEST" --output longform-output/documentary.mp4)
+          if [[ -n "$SUBTITLES" ]]; then args+=(--subtitles "$SUBTITLES"); fi
+          if [[ -n "$VOICEOVER" ]]; then args+=(--voiceover "$VOICEOVER"); fi
+          if [[ "$BURN" == "true" && -n "$SUBTITLES" ]]; then args+=(--burn-subtitles); fi
+          mkdir -p longform-output
+          python scripts/assemble_documentary.py "${args[@]}"
+      - name: Run long-form media quality gate
+        env:
+          MIN_DURATION: ${{ inputs.minimum_duration_seconds }}
+        run: |
+          python scripts/validate_longform.py --input longform-output/documentary.mp4 --min-duration-seconds "$MIN_DURATION" --report longform-output/qa-report.json
+      - name: Upload rendered video and QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koroush-longform-render-${{ github.run_number }}
+          path: longform-output/
+          if-no-files-found: warn
+          retention-days: 14
