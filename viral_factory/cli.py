@@ -181,6 +181,46 @@ def render(source: Path,clip: dict[str,Any],target: Path) -> None:
       "-c:v","libx264","-preset","veryfast","-crf","23","-c:a","aac",
       "-b:a","128k","-movflags","+faststart",str(target)],check=True)
 
+def srt_time(seconds: float) -> str:
+    milliseconds=max(0,round(seconds*1000))
+    hours,rem=divmod(milliseconds,3600000); minutes,rem=divmod(rem,60000)
+    seconds_part,millis=divmod(rem,1000)
+    return "%02d:%02d:%02d,%03d" % (hours,minutes,seconds_part,millis)
+
+def write_clip_srt(transcript: list[dict[str,Any]],clip: dict[str,Any],target: Path) -> int:
+    rows=[]
+    for segment in transcript:
+        start=max(float(segment["start"]),float(clip["start"]))
+        end=min(float(segment["end"]),float(clip["end"]))
+        text=clean(segment.get("text",""))
+        if end<=start or not text: continue
+        rows.append((start-float(clip["start"]),end-float(clip["start"]),text))
+    if not rows: return 0
+    target.parent.mkdir(parents=True,exist_ok=True)
+    target.write_text("\n\n".join(
+        "%d\n%s --> %s\n%s" % (i,srt_time(start),srt_time(end),text)
+        for i,(start,end,text) in enumerate(rows,1))+"\n",encoding="utf-8")
+    return len(rows)
+
+def add_persian_captions(video: Path,english_srt: Path,persian_srt: Path) -> bool:
+    env=os.environ.copy()
+    env["PYTHONPATH"]="scripts"+(os.pathsep+env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    try:
+        subprocess.run([sys.executable,"scripts/translate_subtitles_free.py",
+          "--input",str(english_srt),"--output",str(persian_srt),"--batch-size","20"],
+          check=True,env=env,timeout=900)
+        subtitle_path=persian_srt.as_posix().replace(":","\\:")
+        vf="subtitles="+subtitle_path+":force_style='FontName=Noto Sans Arabic,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00101010,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=150'"
+        temp=video.with_name(video.stem+".captioned.mp4")
+        subprocess.run(["ffmpeg","-y","-i",str(video),"-vf",vf,"-c:v","libx264",
+          "-preset","veryfast","-crf","23","-c:a","copy","-movflags","+faststart",str(temp)],check=True)
+        temp.replace(video)
+        return True
+    except Exception as exc:
+        print("PERSIAN_CAPTION_SKIPPED:",type(exc).__name__,
+              "- English SRT retained; no paid model will be used.",flush=True)
+        return False
+
 def process(index: int,out: Path,limit: int,model: str) -> None:
     candidates=out/"commons_candidates.json"
     if not candidates.exists(): raise FileNotFoundError("Run discover first.")
@@ -192,9 +232,17 @@ def process(index: int,out: Path,limit: int,model: str) -> None:
     (out/"transcript.json").write_text(json.dumps(transcript,ensure_ascii=False,indent=2),encoding="utf-8")
     clips=select(transcript,duration,limit)
     (out/"selected_clips.json").write_text(json.dumps(clips,ensure_ascii=False,indent=2),encoding="utf-8")
+    caption_report=[]
     for n,clip in enumerate(clips,1):
         target=out/"shorts"/("viral_short_%02d.mp4"%n); render(source,clip,target)
+        english_srt=out/"shorts"/("viral_short_%02d.en.srt"%n)
+        persian_srt=out/"shorts"/("viral_short_%02d.fa.srt"%n)
+        cue_count=write_clip_srt(transcript,clip,english_srt)
+        persian_ready=add_persian_captions(target,english_srt,persian_srt) if cue_count else False
+        caption_report.append({"video":target.name,"english_cues":cue_count,
+          "persian_srt":persian_ready,"burned_in_persian":persian_ready})
         print("Rendered:",target)
+    (out/"caption_report.json").write_text(json.dumps(caption_report,ensure_ascii=False,indent=2),encoding="utf-8")
     description=("Edited short from a Creative Commons-licensed source.\n\n"
       +"Source: "+attribution.get("source_page","")+"\n"
       +"Creator: "+(attribution.get("artist") or "Not stated")+"\n"
