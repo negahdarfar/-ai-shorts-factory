@@ -82,8 +82,8 @@ jobs:
           RIGHTS_LEDGER: ${{ inputs.rights_ledger }}
           RESEARCH_INPUT: ${{ inputs.research_input }}
           RESEARCH_FEEDS: ${{ inputs.research_feeds }}
-          SUBTITLES: ${{ inputs.subtitles_srt }}
-          VOICEOVER: ${{ inputs.voiceover_audio }}
+          SUBTITLES: ${{ steps.narration.outputs.srt || inputs.subtitles_srt }}
+          VOICEOVER: ${{ steps.narration.outputs.audio || inputs.voiceover_audio }}
           STORYBOARD_PLAN: ${{ inputs.storyboard_plan }}
           AUTO_GENERATE_PLAN: ${{ inputs.auto_generate_plan }}
         run: |
@@ -169,6 +169,23 @@ jobs:
           set -euo pipefail
           python scripts/generate_longform_plan.py --research "$RESEARCH_DOSSIER" --output longform-output/longform-plan.json --target-duration-seconds "$TARGET_SECONDS"
           echo "path=longform-output/longform-plan.json" >> "$GITHUB_OUTPUT"
+      - name: Generate English narration and Persian subtitles
+        if: inputs.auto_generate_plan
+        id: narration
+        env:
+          PLAN_PATH: ${{ steps.plan.outputs.path }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check edge-tts
+          python scripts/generate_narration_audio.py --plan "$PLAN_PATH" --audio longform-output/narration.mp3 --srt longform-output/narration.en.srt
+          python scripts/translate_subtitles_free.py --input longform-output/narration.en.srt --output longform-output/narration.fa.srt
+          echo "audio=longform-output/narration.mp3" >> "$GITHUB_OUTPUT"
+          echo "srt=longform-output/narration.fa.srt" >> "$GITHUB_OUTPUT"
       - name: Download openly licensed Commons visuals for AI storyboard
         if: inputs.auto_generate_plan || inputs.storyboard_plan != ''
         id: commons
@@ -176,7 +193,7 @@ jobs:
           STORYBOARD_PLAN: ${{ steps.plan.outputs.path || inputs.storyboard_plan }}
         run: |
           set -euo pipefail
-          python scripts/discover_commons_media.py --plan "$STORYBOARD_PLAN" --manifest data/longform/generated-storyboard.json --ledger data/longform/generated-rights.json --assets assets/longform/generated
+          python scripts/discover_commons_media.py --plan "$STORYBOARD_PLAN" --manifest data/longform/generated-storyboard.json --ledger data/longform/generated-rights.json --assets assets/longform/generated --max-video-seconds 30
           echo "manifest=data/longform/generated-storyboard.json" >> "$GITHUB_OUTPUT"
           echo "ledger=data/longform/generated-rights.json" >> "$GITHUB_OUTPUT"
       - name: Enforce source rights ledger
