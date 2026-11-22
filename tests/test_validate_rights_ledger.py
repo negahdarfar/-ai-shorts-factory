@@ -52,9 +52,8 @@ class RightsLedgerTests(unittest.TestCase):
     def test_manifest_assets_extracts_object_paths(self):
         self.assertEqual(manifest_assets([{"path": "a.jpg", "type": "image"}, "b.mp4"]), ["a.jpg", "b.mp4"])
 
-    def test_rejects_duplicate_asset_paths(self):
-        with self.assertRaisesRegex(RightsError, "duplicate"):
-            manifest_assets(["a.mp4", {"path": "a.mp4"}])
+    def test_reused_source_asset_needs_only_one_rights_record(self):
+        self.assertEqual(manifest_assets(["a.mp4", {"path": "a.mp4"}]), ["a.mp4"])
 
     def test_rejects_missing_asset_record(self):
         self.write_ledger([])
