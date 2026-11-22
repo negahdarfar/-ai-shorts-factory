@@ -1,0 +1,118 @@
+name: Longform Studio — documentary assembly and QC
+
+on:
+  workflow_dispatch:
+    inputs:
+      clips_manifest:
+        description: "Repository path to a JSON array of ordered video clip paths"
+        required: true
+        type: string
+        default: "assets/longform/clips.json"
+      voiceover_path:
+        description: "Repository path to the English narration audio"
+        required: true
+        type: string
+      persian_srt_path:
+        description: "Repository path to the synchronized Persian SRT file"
+        required: true
+        type: string
+      chapters_path:
+        description: "Optional repository path to YouTube chapter timestamps"
+        required: false
+        type: string
+      minimum_minutes:
+        description: "Minimum final documentary length"
+        required: true
+        type: choice
+        options: ["5", "8", "10", "12", "15", "20"]
+        default: "10"
+      output_name:
+        description: "Final MP4 filename"
+        required: true
+        type: string
+        default: "koroush_documentary.mp4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: longform-studio-\${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg and Persian fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core
+      - name: Validate source paths and clip manifest
+        env:
+          CLIPS_MANIFEST: \${{ inputs.clips_manifest }}
+          VOICEOVER: \${{ inputs.voiceover_path }}
+          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
+          OUTPUT_NAME: \${{ inputs.output_name }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path.cwd().resolve()
+          def safe_file(value,label):
+              path=(root/value).resolve()
+              if root not in path.parents or not path.is_file():
+                  raise SystemExit(f"{label} must be an existing file inside the repository: {value}")
+              return path
+          name=os.environ["OUTPUT_NAME"]
+          if not name.endswith(".mp4") or "/" in name or "\\" in name:
+              raise SystemExit("output_name must be a plain .mp4 filename.")
+          manifest=safe_file(os.environ["CLIPS_MANIFEST"],"clips_manifest")
+          voice=safe_file(os.environ["VOICEOVER"],"voiceover_path")
+          srt=safe_file(os.environ["PERSIAN_SRT"],"persian_srt_path")
+          clips=json.loads(manifest.read_text(encoding="utf-8"))
+          if not isinstance(clips,list) or len(clips)<3:
+              raise SystemExit("The clip manifest must contain at least three ordered clips.")
+          for item in clips:
+              safe_file(str(item),"clip")
+          if srt.stat().st_size<20 or voice.stat().st_size<1000:
+              raise SystemExit("Voiceover or Persian subtitle file is empty.")
+          print(f"Validated {len(clips)} source clips.")
+          PY
+      - name: Assemble English narration with Persian subtitles
+        env:
+          CLIPS_MANIFEST: \${{ inputs.clips_manifest }}
+          VOICEOVER: \${{ inputs.voiceover_path }}
+          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
+          OUTPUT_NAME: \${{ inputs.output_name }}
+        run: |
+          python scripts/assemble_documentary.py --clips "$CLIPS_MANIFEST" --voiceover "$VOICEOVER" --subtitles "$PERSIAN_SRT" --burn-subtitles --output "$OUTPUT_NAME"
+      - name: Enforce longform technical quality gate
+        env:
+          OUTPUT_NAME: \${{ inputs.output_name }}
+          PERSIAN_SRT: \${{ inputs.persian_srt_path }}
+          MINUTES: \${{ inputs.minimum_minutes }}
+        run: |
+          python scripts/validate_documentary.py --input "$OUTPUT_NAME" --min-duration-seconds "$((MINUTES * 60))" --subtitles "$PERSIAN_SRT"
+      - name: Validate YouTube chapters
+        if: \${{ inputs.chapters_path != '' }}
+        env:
+          CHAPTERS: \${{ inputs.chapters_path }}
+        run: |
+          test -f "$CHAPTERS"
+          python scripts/validate_chapters.py "$CHAPTERS"
+      - name: Save documentary and QC reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: longform-documentary-\${{ github.run_number }}
+          path: |
+            \${{ inputs.output_name }}
+            documentary_quality_report.json
+            \${{ inputs.persian_srt_path }}
+          if-no-files-found: error
+          retention-days: 30
