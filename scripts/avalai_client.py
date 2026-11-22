@@ -93,3 +93,17 @@ class AvalAIClient:
         if not str(content).strip():
             raise AvalAIError("AvalAI returned an empty completion.")
         return str(content)
+
+    def moderate(self, model, inputs):
+        """Classify text with AvalAI's dedicated /moderations endpoint."""
+        if not str(model or "").strip():
+            raise AvalAIError("A moderation model ID is required.")
+        if not isinstance(inputs, (str, list)) or (isinstance(inputs, list) and not inputs):
+            raise AvalAIError("Moderation input must be a non-empty string or list.")
+        result = self._request("moderations", {"model": model, "input": inputs})
+        rows = result.get("results") if isinstance(result, dict) else None
+        if not isinstance(rows, list) or not rows:
+            raise AvalAIError("AvalAI returned no moderation results.")
+        if isinstance(inputs, list) and len(rows) != len(inputs):
+            raise AvalAIError("AvalAI moderation result count does not match input count.")
+        return result
