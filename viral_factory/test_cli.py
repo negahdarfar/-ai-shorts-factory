@@ -1,6 +1,8 @@
 import unittest
+import tempfile
+from pathlib import Path
 
-from cli import allowed_license, score, select
+from cli import allowed_license, score, select, write_clip_srt
 
 
 class ViralFactoryTests(unittest.TestCase):
@@ -29,6 +31,21 @@ class ViralFactoryTests(unittest.TestCase):
         for i, left in enumerate(clips):
             for right in clips[i + 1:]:
                 self.assertTrue(left["end"] <= right["start"] or right["end"] <= left["start"])
+
+    def test_clip_srt_uses_relative_timestamps(self):
+        segments = [
+            {"start": 10.0, "end": 11.0, "text": "Hello"},
+            {"start": 11.0, "end": 12.0, "text": "world"},
+            {"start": 12.0, "end": 13.0, "text": "again"},
+        ]
+        clip = {"start": 10.5, "end": 13.0}
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "clip.en.srt"
+            count = write_clip_srt(segments, clip, output)
+            self.assertEqual(count, 3)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("00:00:00,500 --> 00:00:01,000", rendered)
+            self.assertIn("00:00:01,500 --> 00:00:02,500", rendered)
 
 
 if __name__ == "__main__":
