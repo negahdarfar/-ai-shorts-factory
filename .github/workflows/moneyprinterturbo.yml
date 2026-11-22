@@ -237,6 +237,7 @@ jobs:
       - name: Translate and burn Persian subtitles
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
+          EXPECTED_COUNT: ${{ env.EXPECTED_COUNT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
