@@ -82,7 +82,7 @@ omniroute_model = os.environ.get("OMNIROUTE_MODEL", "auto").strip() or "auto"
 pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
-if not cloudflare_ready and not (freellmapi_base_url and freellmapi_key) and not openrouter_free_models and not (
+if not cloudflare_ready and not (freellmapi_base_url and freellmapi_key) and not openrouter_free_models and not avalai_free_models and not (
     gemini_free_ready or (allow_nonfree_fallback and omniroute_base_url and omniroute_key)
 ):
     missing.append("a verified-free LLM route: Cloudflare Workers AI, Gemini free tier (GEMINI_API_KEY + GEMINI_FREE_TIER_ENABLED=true), or an explicitly free gateway model")
