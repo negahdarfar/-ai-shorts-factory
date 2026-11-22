@@ -342,7 +342,7 @@ def main():
     cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
     cloudflare_base_url = f"https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1" if cloudflare_account_id else ""
     cloudflare = (cloudflare_base_url, cloudflare_api_token, cloudflare_model)
-    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1").strip()
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
     ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip()
     ollama = (ollama_base_url, ollama_model)
     if not (
