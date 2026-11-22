@@ -80,7 +80,7 @@ jobs:
           test -f "$RIGHTS_LEDGER"
           test -f "$RESEARCH_INPUT"
           test -f "$RESEARCH_FEEDS"
-          python - "$MANIFEST" "$RIGHTS_LEDGER" "$RESEARCH_INPUT" "$SUBTITLES" "$VOICEOVER" <<'PY'
+          python - "$MANIFEST" "$RIGHTS_LEDGER" "$RESEARCH_INPUT" "$RESEARCH_FEEDS" "$SUBTITLES" "$VOICEOVER" <<'PY'
           import json, sys
           from pathlib import Path
           root = Path.cwd().resolve()
