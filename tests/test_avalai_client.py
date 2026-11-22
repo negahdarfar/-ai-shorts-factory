@@ -10,7 +10,7 @@ from urllib.error import HTTPError
 from io import BytesIO
 
 from avalai_client import AvalAIClient, AvalAIError, DEFAULT_BASE_URL
-from free_model_router import is_explicitly_free
+from free_model_router import is_explicitly_free, is_chat_capable
 
 
 class FakeResponse:
@@ -66,6 +66,21 @@ class AvalAIClientTests(unittest.TestCase):
         metadata = {"min_tier": 0, "pricing": {"input": 0, "output": 0, "cached_input": 0}}
         self.assertTrue(is_explicitly_free("cf-free-example", metadata))
         self.assertTrue(is_explicitly_free("avalai-catalogue-model", metadata))
+
+    def test_search_and_tool_models_are_not_chat_capable(self):
+        for model in ("serper-search", "perplexity-search", "parallel_ai-search-pro", "tavily-search"):
+            with self.subTest(model=model):
+                self.assertFalse(is_chat_capable(model, {}))
+
+    def test_text_chat_models_remain_chat_capable(self):
+        self.assertTrue(is_chat_capable("qwen3-32b", {"architecture": {"modality": "text->text"}}))
+        self.assertTrue(is_chat_capable("llama-3.3-70b", {"modalities": ["text"]}))
+
+    def test_catalogue_task_metadata_excludes_search_endpoint(self):
+        self.assertFalse(is_chat_capable(
+            "provider-model",
+            {"task": "web_search", "description": "Search the web and return sources"}
+        ))
 
     def test_unknown_or_paid_model_is_never_assumed_free(self):
         self.assertFalse(is_explicitly_free("catalogue-model", {"pricing": {"prompt": "0.1", "completion": "0.2"}}))
