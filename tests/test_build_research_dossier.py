@@ -52,6 +52,12 @@ class ResearchDossierTests(unittest.TestCase):
         with self.assertRaisesRegex(ResearchError, "unknown source ids"):
             self.run_dossier()
 
+
+    def test_rejects_malformed_source_reference(self):
+        self.data["claims"][0]["source_ids"] = [{"unexpected": "object"}]
+        with self.assertRaisesRegex(ResearchError, "non-empty source_ids"):
+            self.run_dossier()
+
     def test_unverified_claim_blocks_gate(self):
         self.data["claims"][0]["status"] = "unverified"
         self.data["claims"][0]["source_ids"] = ["S1"]
