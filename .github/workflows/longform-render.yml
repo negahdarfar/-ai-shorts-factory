@@ -107,7 +107,7 @@ jobs:
         run: |
           mkdir -p longform-output
           TOPIC="$(python -c 'import json,os; print(json.load(open(os.environ["RESEARCH_INPUT"], encoding="utf-8"))["topic"])')"
-          python scripts/collect_research_sources.py --feeds "$RESEARCH_FEEDS" --topic "$TOPIC" --output longform-output/research-candidates.json
+          python scripts/collect_research_sources.py --feeds "$RESEARCH_FEEDS" --topic "$TOPIC" --research-input "$RESEARCH_INPUT" --output longform-output/research-candidates.json
       - name: Extract readable text from discovered research pages
         run: |
           python scripts/extract_research_pages.py --input longform-output/research-candidates.json --output longform-output/research-extracts.json --max-pages 20
