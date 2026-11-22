@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       clips_manifest:
-        description: Repository JSON file containing ordered source clip paths
+        description: JSON storyboard with image stills and/or trimmed video clips
         required: true
         default: data/longform/clips.json
         type: string
@@ -90,10 +90,17 @@ jobs:
           rows = json.loads(manifest.read_text(encoding="utf-8"))
           if not isinstance(rows, list) or not rows:
               raise SystemExit("Manifest must be a non-empty JSON array.")
-          for item in rows:
-              p = (root / item).resolve()
+          seen = set()
+          for index, item in enumerate(rows):
+              asset = item if isinstance(item, str) else item.get("path") if isinstance(item, dict) else None
+              if not isinstance(asset, str) or not asset.strip():
+                  raise SystemExit(f"Storyboard scene {index} must be a path or an object with a path.")
+              p = (root / asset).resolve()
               if root not in p.parents or not p.is_file():
-                  raise SystemExit(f"Missing or unsafe clip path: {item}")
+                  raise SystemExit(f"Missing or unsafe storyboard asset: {asset}")
+              if p in seen:
+                  raise SystemExit(f"Duplicate storyboard asset path: {asset}")
+              seen.add(p)
           for item in sys.argv[2:]:
               if item:
                   p = (root / item).resolve()
@@ -135,12 +142,12 @@ jobs:
           BURN: ${{ inputs.burn_subtitles }}
         run: |
           set -euo pipefail
-          args=(--clips "$MANIFEST" --output longform-output/documentary.mp4)
+          args=(--manifest "$MANIFEST" --output longform-output/documentary.mp4)
           if [[ -n "$SUBTITLES" ]]; then args+=(--subtitles "$SUBTITLES"); fi
           if [[ -n "$VOICEOVER" ]]; then args+=(--voiceover "$VOICEOVER"); fi
           if [[ "$BURN" == "true" && -n "$SUBTITLES" ]]; then args+=(--burn-subtitles); fi
           mkdir -p longform-output
-          python scripts/assemble_documentary.py "${args[@]}"
+          python scripts/assemble_storyboard.py "${args[@]}"
       - name: Run long-form media quality gate
         env:
           MIN_DURATION: ${{ inputs.minimum_duration_seconds }}
