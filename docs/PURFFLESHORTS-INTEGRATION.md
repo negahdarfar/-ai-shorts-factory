@@ -9,8 +9,8 @@ The factory can run the upstream MIT-licensed PurffleShorts 3.1.0 renderer as an
 GitHub → Actions → **PurffleShorts Video Engine** → Run workflow.
 
 - Choose 1–4 videos.
-- Public YouTube upload is enabled by default; turn it off for render-only tests.
-- The private Android FreeLLMAPI route requires the phone server to be running and reachable over Tailscale. The cloud route is used only when its two cloud secrets are configured and the phone route is not selected.
+- Public YouTube upload is disabled by default; explicitly enable it only after reviewing the generated artifact.
+- The optional private Android FreeLLMAPI route is opt-in and requires the phone server to be running and reachable over Tailscale. The cloud route is preferred when the phone route is not selected and its two cloud secrets are configured.
 - The workflow is manual-only. It does not create a second scheduled publishing job or change the existing MoneyPrinterTurbo schedule.
 
 ## Existing repository secrets reused
