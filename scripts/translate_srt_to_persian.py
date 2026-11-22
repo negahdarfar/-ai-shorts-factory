@@ -1,50 +1,122 @@
 #!/usr/bin/env python3
-"""Translate SRT captions into Persian while preserving every index and timestamp."""
-import argparse, json, os, re, sys, time, urllib.request
+"""Translate SRT to Persian: zero-price AvalAI models first, then existing Gemini fallback."""
+import argparse
+import json
+import os
+import re
+import sys
+import time
+import urllib.request
 from pathlib import Path
 
-API="https://generativelanguage.googleapis.com/v1beta/models"
-BLOCK=re.compile(r"^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n([\s\S]*?)\s*$")
+from avalai_client import AvalAIClient, AvalAIError
+from free_model_router import discover_free_models
+
+API = "https://generativelanguage.googleapis.com/v1beta/models"
+BLOCK = re.compile(r"^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n([\s\S]*?)\s*$")
+
+
 def parse_srt(text):
-    blocks=re.split(r"\n\s*\n",text.strip())
-    rows=[]
-    for block in blocks:
-        m=BLOCK.match(block.strip())
-        if not m: raise ValueError("Malformed SRT block; expected index, timestamp line and caption.")
-        rows.append({"index":int(m.group(1)),"time":m.group(2),"text":m.group(3).replace("\n"," ")})
+    rows = []
+    for block in re.split(r"\n\s*\n", text.strip()):
+        match = BLOCK.match(block.strip())
+        if not match:
+            raise ValueError("Malformed SRT block; expected index, timestamp line and caption.")
+        rows.append({"index": int(match.group(1)), "time": match.group(2),
+                     "text": re.sub(r"\s+", " ", match.group(3)).strip()})
     return rows
-def translate_batch(rows,key,model):
-    prompt=("Translate these English subtitle lines into natural, concise Persian (Farsi). "
-      "Preserve meaning, names, numbers and tone. Do not add explanations. Return ONLY JSON "
-      "with a single key 'translations' containing exactly one Persian string per input line. "
-      "Do not merge or split captions. Input JSON:\n"+json.dumps([r["text"] for r in rows],ensure_ascii=False))
-    payload={"contents":[{"parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.15,"responseMimeType":"application/json"}}
-    req=urllib.request.Request(f"{API}/{model}:generateContent?key={key}",data=json.dumps(payload).encode(),
-      headers={"Content-Type":"application/json"},method="POST")
-    with urllib.request.urlopen(req,timeout=90) as resp: data=json.loads(resp.read().decode())
-    text="\n".join(p.get("text","") for p in data.get("candidates",[{}])[0].get("content",{}).get("parts",[]))
-    start,end=text.find("{"),text.rfind("}")
-    result=json.loads(text[start:end+1])["translations"]
-    if not isinstance(result,list) or len(result)!=len(rows) or any(not str(x).strip() for x in result):
+
+
+def prompt_for(rows):
+    return ("Translate these English subtitle lines into natural, concise Persian (Farsi). "
+            "Preserve meaning, names, numbers and tone. Do not add explanations. Return ONLY JSON "
+            "with a single key 'translations' containing exactly one Persian string per input line. "
+            "Do not merge or split captions. Input JSON:\n"
+            + json.dumps([row["text"] for row in rows], ensure_ascii=False))
+
+
+def parse_translations(raw, rows):
+    start, end = raw.find("{"), raw.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("Translation response is not JSON.")
+    result = json.loads(raw[start:end + 1]).get("translations")
+    if not isinstance(result, list) or len(result) != len(rows) or any(not str(x).strip() for x in result):
         raise ValueError("Translation response count mismatch or empty caption.")
-    return [str(x).strip() for x in result]
+    return [str(value).strip() for value in result]
+
+
+def translate_avalai(rows, base, key, model):
+    content = AvalAIClient(api_key=key, base_url=base).chat_completion(
+        model,
+        [{"role": "system", "content": "Translate English subtitles into concise, natural Persian. Return valid JSON only."},
+         {"role": "user", "content": prompt_for(rows)}],
+        temperature=0.15, max_tokens=5000, response_format={"type": "json_object"})
+    return parse_translations(content, rows)
+
+
+def translate_gemini(rows, key, model):
+    payload = {"contents": [{"parts": [{"text": prompt_for(rows)}]}],
+               "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}}
+    req = urllib.request.Request(f"{API}/{model}:generateContent?key={key}",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    raw = "\n".join(part.get("text", "") for part in
+                     data.get("candidates", [{}])[0].get("content", {}).get("parts", []))
+    return parse_translations(raw, rows)
+
+
 def main():
-    p=argparse.ArgumentParser(); p.add_argument("--input",required=True); p.add_argument("--output",default="subtitles.fa.srt")
-    p.add_argument("--model",default=os.getenv("SEO_GEMINI_MODEL","gemini-2.5-flash")); p.add_argument("--batch-size",type=int,default=30); a=p.parse_args()
-    key=os.getenv("GEMINI_API_KEY","").strip()
-    if not key: raise SystemExit("GEMINI_API_KEY is required.")
-    rows=parse_srt(Path(a.input).read_text(encoding="utf-8-sig"))
-    if not rows: raise SystemExit("No subtitle entries found.")
-    translated=[]
-    for start in range(0,len(rows),max(1,min(a.batch_size,50))):
-      batch=rows[start:start+max(1,min(a.batch_size,50))]
-      texts=translate_batch(batch,key,a.model)
-      translated.extend({**row,"text":txt} for row,txt in zip(batch,texts))
-      print(f"Translated {len(translated)}/{len(rows)} subtitle cues.")
-      time.sleep(0.2)
-    output="\n\n".join(f"{r['index']}\n{r['time']}\n{r['text']}" for r in translated)+"\n"
-    Path(a.output).write_text(output,encoding="utf-8")
-    print(f"PERSIAN_SRT_CREATED {a.output}; timing and cue count preserved.")
-if __name__=="__main__":
-  try: main()
-  except Exception as e: print(f"SRT translation failed: {e}",file=sys.stderr); raise SystemExit(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--output", default="subtitles.fa.srt")
+    parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-2.5-flash"))
+    parser.add_argument("--batch-size", type=int, default=30)
+    args = parser.parse_args()
+    rows = parse_srt(Path(args.input).read_text(encoding="utf-8-sig"))
+    if not rows:
+        raise SystemExit("No subtitle entries found.")
+    batch_size = max(1, min(args.batch_size, 50))
+    avalai_routes = []
+    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
+    avalai_base = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
+    if avalai_key:
+        try:
+            models = discover_free_models(avalai_base, avalai_key, task="translation",
+                                          preferred=os.getenv("AVALAI_MODEL", "auto"))
+            avalai_routes = [(avalai_base, avalai_key, model) for model in models]
+        except Exception as exc:
+            print("AVALAI_DISCOVERY_FAILED; continuing to existing free fallback: " + type(exc).__name__, file=sys.stderr)
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    translated = []
+    for start in range(0, len(rows), batch_size):
+        batch = rows[start:start + batch_size]
+        values = None
+        for base, key, model in avalai_routes:
+            try:
+                values = translate_avalai(batch, base, key, model)
+                print(f"SUBTITLE_PROVIDER=AVALAI model={model}")
+                break
+            except Exception as exc:
+                print(f"AVALAI_SUBTITLE_ROUTE_FAILED model={model} error={type(exc).__name__}", file=sys.stderr)
+        if values is None and gemini_key:
+            values = translate_gemini(batch, gemini_key, args.model)
+            print(f"SUBTITLE_PROVIDER=GEMINI model={args.model}")
+        if values is None:
+            raise RuntimeError("No explicitly free AvalAI model was available and GEMINI_API_KEY fallback is not configured.")
+        translated.extend({**row, "text": value} for row, value in zip(batch, values))
+        print(f"Translated {len(translated)}/{len(rows)} subtitle cues.")
+        time.sleep(0.2)
+    output = "\n\n".join(f"{row['index']}\n{row['time']}\n{row['text']}" for row in translated) + "\n"
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.output).write_text(output, encoding="utf-8")
+    print(f"PERSIAN_SRT_CREATED {args.output}; cue count and timestamps preserved.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        print("SRT translation failed: " + type(exc).__name__, file=sys.stderr)
+        raise SystemExit(1)
