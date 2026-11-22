@@ -32,25 +32,33 @@ def _license_family(value: str) -> str | None:
     return None
 
 
+def manifest_assets(manifest: list) -> list[str]:
+    assets = []
+    for index, item in enumerate(manifest):
+        path = item if isinstance(item, str) else item.get("path") if isinstance(item, dict) else None
+        if not isinstance(path, str) or not path.strip():
+            raise RightsError(f"Manifest item {index} must contain a non-empty asset path.")
+        asset = Path(path).as_posix()
+        if Path(asset).is_absolute() or ".." in Path(asset).parts:
+            raise RightsError(f"Manifest asset path must be relative and cannot traverse parent directories: {asset}")
+        assets.append(asset)
+    if len(set(assets)) != len(assets):
+        raise RightsError("Manifest contains duplicate asset paths; use a distinct file or deduplicate the scene list.")
+    return assets
+
+
 def validate_rights_ledger(manifest_path: str | Path, ledger_path: str | Path) -> dict:
-    manifest_file = Path(manifest_path).resolve()
-    ledger_file = Path(ledger_path).resolve()
     try:
-        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-        ledger = json.loads(ledger_file.read_text(encoding="utf-8"))
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        ledger = json.loads(Path(ledger_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RightsError(f"Cannot read manifest or rights ledger: {exc}") from exc
     if not isinstance(manifest, list) or not manifest:
-        raise RightsError("Clip manifest must be a non-empty JSON array.")
+        raise RightsError("Storyboard manifest must be a non-empty JSON array.")
     if not isinstance(ledger, list):
         raise RightsError("Rights ledger must be a JSON array.")
 
-    required = {str(Path(item).as_posix()) for item in manifest if isinstance(item, str) and item.strip()}
-    if len(required) != len(manifest):
-        raise RightsError("Every manifest item must be a non-empty relative asset path.")
-    if any(Path(item).is_absolute() or ".." in Path(item).parts for item in required):
-        raise RightsError("Manifest asset paths must be relative and cannot traverse parent directories.")
-
+    required = set(manifest_assets(manifest))
     entries: dict[str, dict] = {}
     for index, item in enumerate(ledger):
         if not isinstance(item, dict):
@@ -68,7 +76,7 @@ def validate_rights_ledger(manifest_path: str | Path, ledger_path: str | Path) -
         raise RightsError("Missing rights records for: " + ", ".join(missing))
     unused = sorted(set(entries) - required)
     if unused:
-        raise RightsError("Ledger contains assets not present in the clip manifest: " + ", ".join(unused))
+        raise RightsError("Ledger contains assets not present in the storyboard manifest: " + ", ".join(unused))
 
     validated = []
     for asset in sorted(required):
@@ -89,12 +97,7 @@ def validate_rights_ledger(manifest_path: str | Path, ledger_path: str | Path) -
             raise RightsError(f"{asset} marked owned requires a named rights_holder.")
         validated.append({"asset": asset, "license_family": family})
 
-    return {
-        "profile": "longform-rights-ledger",
-        "rights_gate": "passed",
-        "assets_checked": len(validated),
-        "assets": validated,
-    }
+    return {"profile": "longform-rights-ledger", "rights_gate": "passed", "assets_checked": len(validated), "assets": validated}
 
 
 def main() -> None:
