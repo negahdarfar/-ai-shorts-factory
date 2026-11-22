@@ -13,7 +13,7 @@ on:
         description: "Upload completed videos publicly to the connected YouTube channel"
         required: true
         type: boolean
-        default: true
+        default: false
       use_phone_gateway:
         description: "Use the private Android FreeLLMAPI gateway over Tailscale"
         required: false
