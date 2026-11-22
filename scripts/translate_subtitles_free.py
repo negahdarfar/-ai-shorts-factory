@@ -8,7 +8,8 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
-from free_model_router import discover_free_models\nfrom avalai_client import AvalAIClient
+from free_model_router import discover_free_models
+from avalai_client import AvalAIClient
 
 BLOCK = re.compile(r"^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3})\s*\n([\s\S]*?)\s*$")
 
