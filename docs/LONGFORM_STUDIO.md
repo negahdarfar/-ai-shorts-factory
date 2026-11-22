@@ -93,6 +93,14 @@ The workflow can collect candidate links from configurable RSS/Atom feeds using 
 
 Candidates are discovery leads only: the collector does not download full articles, infer facts, create claims, or mark sources confirmed. A human/editorial research step must read the linked material and curate the evidence in research.json. An empty feed list is allowed and produces zero candidates; replace the empty list with real official RSS/Atom feed URLs to activate discovery.
 
+## Automatic free topic research discovery
+
+Before page extraction, the workflow now searches three no-key public discovery endpoints: OpenAlex for scholarly works, Crossref for DOI-registered publications, and Wikipedia search for background leads. Candidate URLs are merged with configured RSS/Atom results and any curated URLs, with curated and academic leads prioritized before lower-confidence encyclopedia and feed results when the extraction limit is reached. The extractor still applies its HTTPS, redirect, public-IP, timeout, and response-size protections.
+
+OpenAlex and Crossref results are research leads, not proof of open full text; publisher pages may be paywalled or inaccessible. Wikipedia is explicitly tagged as an encyclopedia lead and must not be treated as independent factual verification. The discovery output records provider and source type. The current dossier validator still requires a curated research file with at least three source records from three distinct domains and appropriately supported claims. Search results do not automatically become confirmed claims.
+
+The default `data/longform/research.json` currently contains a placeholder. Replace its topic and add the source/claim evidence before running the full auto-generation workflow. Automatic topic discovery helps find candidate pages, but it does not yet replace the evidence-curation gate.
+
 ## Research page extraction
 
 After RSS discovery, the workflow now attempts to fetch up to 20 candidate pages and extract bounded readable HTML text into `longform-output/research-extracts.json`. It accepts HTTPS HTML pages only, blocks non-public IP destinations and unsafe redirects, limits each response to 1.5 MB, and records individual failures without losing other candidates. Script/style/navigation/footer content is excluded where identifiable. JavaScript-rendered pages, PDFs, paywalls, and pages requiring login are not handled. Extraction is not fact-checking: the output is unverified material for editorial review, and the separate curated `research.json` dossier remains the only research-gate input.
