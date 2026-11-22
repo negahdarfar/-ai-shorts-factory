@@ -1,9 +1,9 @@
 name: Factory lightweight CI
 on:
   pull_request:
-    branches: [longform-studio]
+    branches: [long-video-studio]
   push:
-    branches: [longform-studio]
+    branches: [long-video-studio]
 permissions:
   contents: read
 jobs:
