@@ -56,7 +56,8 @@ class ResearchFeedTests(unittest.TestCase):
             self.assertEqual(result["candidate_count"],1)
             self.assertEqual(result["candidates"][0]["source_id"],"OA-1")
             self.assertEqual(result["candidates"][0]["discovery_provider"],"OpenAlex")
-\n    def test_curated_source_requires_https(self):
+
+    def test_curated_source_requires_https(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); cfg=root/"feeds.json"; research=root/"research.json"
             cfg.write_text(json.dumps({"feeds":[]}),encoding="utf-8")
