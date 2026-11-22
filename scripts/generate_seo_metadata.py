@@ -346,7 +346,11 @@ def main():
             os.getenv("FREELLMAPI_API_KEY", "").strip(),
             os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
         ))
-    # AvalAI participates only when its live catalogue explicitly marks a model free or zero-priced.\n    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()\n    if avalai_key:\n        gateways.append(("AvalAI", os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip(), avalai_key, os.getenv("AVALAI_MODEL", "auto").strip() or "auto"))\n    # OpenRouter exposes rotating explicitly-free models through one OpenAI-compatible API.
+    # AvalAI participates only when its live catalogue explicitly marks a model free or zero-priced.
+    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
+    if avalai_key:
+        gateways.append(("AvalAI", os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip(), avalai_key, os.getenv("AVALAI_MODEL", "auto").strip() or "auto"))
+    # OpenRouter exposes rotating explicitly-free models through one OpenAI-compatible API.
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if openrouter_key:
         gateways.append((
