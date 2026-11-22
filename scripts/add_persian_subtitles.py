@@ -325,11 +325,23 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=No
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
     raise RuntimeError(f"All configured subtitle providers failed. {detail}")
 
+def parse_expected_count(value=None):
+    raw = os.getenv("EXPECTED_COUNT", "4") if value is None else str(value)
+    try:
+        count = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("EXPECTED_COUNT must be an integer between 4 and 10.") from exc
+    if not 4 <= count <= 10:
+        raise ValueError("EXPECTED_COUNT must be between 4 and 10.")
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
     parser.add_argument("--home", default=os.getenv("MPT_HOME", "mpt-runtime"))
     args = parser.parse_args()
+    expected_count = parse_expected_count()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     omniroute_base_url = os.getenv("OMNIROUTE_BASE_URL", "").strip()
     omniroute_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
@@ -359,8 +371,8 @@ def main():
         print("FREELLMAPI_INCOMPLETE_CONFIGURATION; skipping FreeLLMAPI.", flush=True)
     root = Path(args.home) / "storage" / "tasks"
     videos = sorted(root.glob("**/final-*.mp4"))
-    if len(videos) != 4:
-        raise SystemExit(f"Expected four final videos before Persian subtitle processing, found {len(videos)}.")
+    if len(videos) != expected_count:
+        raise SystemExit(f"Expected {expected_count} final videos before Persian subtitle processing, found {len(videos)}.")
     for index, video in enumerate(videos, 1):
         english = video.parent / "subtitle.srt"
         if not english.is_file():
@@ -374,7 +386,7 @@ def main():
             cloudflare,
             ollama,
         )
-        print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
+        print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/{expected_count}", flush=True)
         persian = video.parent / "subtitle.fa.srt"
         blocks = [
             f"{cue['index']}\n{cue['timing']}\n{translations[cue['index']]}\n"
@@ -404,8 +416,8 @@ def main():
         if not temporary.is_file() or temporary.stat().st_size < 500_000:
             raise SystemExit(f"Persian-subtitled output invalid for video {index}.")
         temporary.replace(video)
-        print(f"PERSIAN_SUBTITLES_BURNED_IN {index}/4 | cues={len(cues)} | {video.name}")
-    print("PERSIAN_SUBTITLES_COMPLETED_FOR_ALL_FOUR_VIDEOS")
+        print(f"PERSIAN_SUBTITLES_BURNED_IN {index}/{expected_count} | cues={len(cues)} | {video.name}")
+    print(f"PERSIAN_SUBTITLES_COMPLETED_FOR_ALL_{expected_count}_VIDEOS")
 
 
 if __name__ == "__main__":
