@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 from free_model_router import discover_free_models
+from avalai_client import AvalAIClient
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 RETRYABLE_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
@@ -244,7 +245,23 @@ def translate_freellmapi(rows, base_url, key, model):
     return parse_translation_json(raw, rows, "FreeLLMAPI")
 
 
+def translate_avalai(rows, base_url, key, model):
+    prompt = (
+        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
+        'Return ONLY JSON: {"translations":[{"index":1,"text":"..."}]}. '
+        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
+        "Input cues: " + json.dumps(rows, ensure_ascii=False)
+    )
+    content = AvalAIClient(api_key=key, base_url=base_url).chat_completion(
+        model,
+        [{"role": "system", "content": "You are a professional English-to-Persian subtitle translator. Return valid JSON only."},
+         {"role": "user", "content": prompt}],
+        temperature=0.15, max_tokens=5000, response_format={"type": "json_object"})
+    return parse_translation_json(content, rows, "AvalAI")
+
+
 def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
+    avalai = avalai or ("", "", "auto")
     cloudflare = cloudflare or ("", "", "")
     failures = []
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
@@ -260,6 +277,20 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
         except Exception as exc:
             failures.append(f"Cloudflare Workers AI: {exc}")
             print(f"CLOUDFLARE_FAILED_NEXT_PROVIDER | {exc}", flush=True)
+    if avalai[0] and avalai[1]:
+        try:
+            models = discover_free_models(avalai[0], avalai[1], task="translation", preferred=avalai[2])
+        except Exception as exc:
+            models = []
+            failures.append("AvalAI discovery: " + type(exc).__name__)
+            print("AVALAI_DISCOVERY_FAILED_NEXT_PROVIDER | " + type(exc).__name__, flush=True)
+        for model_id in models:
+            try:
+                print("AVALAI_AUTO_SELECTED_FREE_MODEL=" + model_id + " | task=translation", flush=True)
+                return translate_avalai(rows, avalai[0], avalai[1], model_id), "AvalAI"
+            except Exception as exc:
+                failures.append("AvalAI/" + model_id + ": " + type(exc).__name__)
+                print("AVALAI_MODEL_FAILED_NEXT_MODEL | model=" + model_id + " | " + type(exc).__name__, flush=True)
     if free[0] and free[1]:
         try:
             candidates = discover_free_models(
@@ -297,6 +328,9 @@ def main():
     freellmapi_base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
     freellmapi_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
     freellmapi_model = os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto"
+    avalai_base_url = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
+    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
+    avalai_model = os.getenv("AVALAI_MODEL", "auto").strip() or "auto"
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
     cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
@@ -305,10 +339,11 @@ def main():
     if not (
         (omniroute_base_url and omniroute_key)
         or (freellmapi_base_url and freellmapi_key)
+        or (avalai_base_url and avalai_key)
         or (cloudflare_base_url and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash")
         or gemini_key
     ):
-        raise SystemExit("Configure Cloudflare Workers AI free credentials, a FreeLLMAPI pair, an allowed OmniRoute pair, or GEMINI_API_KEY.")
+        raise SystemExit("Configure AvalAI, Cloudflare Workers AI, FreeLLMAPI, an allowed OmniRoute pair, or GEMINI_API_KEY.")
     if bool(omniroute_base_url) != bool(omniroute_key):
         print("OMNIROUTE_INCOMPLETE_CONFIGURATION; skipping OmniRoute.", flush=True)
     if bool(freellmapi_base_url) != bool(freellmapi_key):
@@ -328,6 +363,7 @@ def main():
             (freellmapi_base_url, freellmapi_key, freellmapi_model),
             (gemini_key, args.model),
             cloudflare,
+            (avalai_base_url, avalai_key, avalai_model),
         )
         print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
