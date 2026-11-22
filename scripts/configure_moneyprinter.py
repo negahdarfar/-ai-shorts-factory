@@ -46,6 +46,20 @@ if freellmapi_base_url and freellmapi_key:
         print("No explicitly free FreeLLMAPI models discovered; refusing unknown-price models.")
         freellmapi_base_url = ""
         freellmapi_key = ""
+avalai_key = os.environ.get("AVALAI_API_KEY", "").strip()
+avalai_base_url = os.environ.get("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
+avalai_model = os.environ.get("AVALAI_MODEL", "auto").strip() or "auto"
+avalai_free_models = []
+if avalai_key:
+    try:
+        avalai_free_models = discover_free_models(avalai_base_url, avalai_key, task="seo", preferred=avalai_model)
+    except Exception as exc:
+        print("AvalAI model discovery failed: " + type(exc).__name__)
+    if avalai_free_models:
+        avalai_model = avalai_free_models[0]
+        print("MoneyPrinterTurbo selected an explicitly free AvalAI model: " + avalai_model)
+    else:
+        print("No explicitly free AvalAI models discovered; paid/unknown-price models are excluded.")
 openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
 openrouter_base_url = "https://openrouter.ai/api/v1"
 openrouter_model = os.environ.get("OPENROUTER_MODEL", "auto").strip() or "auto"
@@ -94,6 +108,11 @@ elif freellmapi_base_url and freellmapi_key:
     app["openai_api_key"] = freellmapi_key
     app["openai_base_url"] = freellmapi_base_url.rstrip("/")
     app["openai_model_name"] = freellmapi_model
+elif avalai_free_models:
+    app["llm_provider"] = "openai"
+    app["openai_api_key"] = avalai_key
+    app["openai_base_url"] = avalai_base_url.rstrip("/")
+    app["openai_model_name"] = avalai_model
 elif openrouter_free_models:
     app["llm_provider"] = "openai"
     app["openai_api_key"] = openrouter_key
@@ -141,7 +160,7 @@ target = home / "config.toml"
 target.write_text(toml.dumps(config), encoding="utf-8")
 target.chmod(0o600)
 print(f"Configured MoneyPrinterTurbo in {home}")
-print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else freellmapi_model if freellmapi_base_url and freellmapi_key else openrouter_model if openrouter_free_models else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
+print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else freellmapi_model if freellmapi_base_url and freellmapi_key else avalai_model if avalai_free_models else openrouter_model if openrouter_free_models else omniroute_model if omniroute_base_url and omniroute_key else 'gemini-3.8-flash'}) | footage: {app['video_source']} | TTS: Edge Neural | upload: disabled")
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
     output.write("video_source=" + app["video_source"] + "\n")
