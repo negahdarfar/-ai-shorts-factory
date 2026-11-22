@@ -186,7 +186,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
         try:
             with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
+            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter", "AvalAI"):
                 choices = data.get("choices", [])
                 if not choices:
                     raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
@@ -358,7 +358,7 @@ def main():
     for provider, base_url, api_key, api_model in gateways:
         if not (base_url and api_key):
             continue
-        if provider in ("FreeLLMAPI", "OpenRouter"):
+        if provider in ("FreeLLMAPI", "OpenRouter", "AvalAI"):
             try:
                 candidate_models = discover_free_models(base_url, api_key, task="seo", preferred=api_model)
             except Exception as discovery_error:
