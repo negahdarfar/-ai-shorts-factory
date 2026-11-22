@@ -244,9 +244,49 @@ def translate_freellmapi(rows, base_url, key, model):
     return parse_translation_json(raw, rows, "FreeLLMAPI")
 
 
-def translate_with_fallback(rows, omni, free, gemini, cloudflare=None):
+def translate_ollama(rows, base_url, model):
+    """Translate locally through Ollama's OpenAI-compatible endpoint; no API key or cloud call."""
+    prompt = (
+        "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
+        'Return ONLY valid JSON with this exact shape: {"translations":[{"index":1,"text":"..."}]}. '
+        "Return exactly one translation for every input index, in order. Do not merge cues or add explanations. "
+        "Keep each Persian cue short enough to read on a phone. Input cues: "
+        + json.dumps(rows, ensure_ascii=False)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You are a professional English-to-Persian subtitle translator. Output only the requested JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.1,
+        "response_format": {"type": "json_object"},
+    }
+    response_data = post_json_with_retry(
+        base_url.rstrip("/") + "/chat/completions", payload,
+        {"Content-Type": "application/json"}, "Ollama", 2, 300, 2,
+    )
+    choices = response_data.get("choices", [])
+    if not choices:
+        raise RuntimeError("Ollama returned no chat completion choices.")
+    content = choices[0].get("message", {}).get("content", "")
+    if isinstance(content, list):
+        raw = "\\n".join(part.get("text", "") for part in content if isinstance(part, dict))
+    else:
+        raw = str(content)
+    return parse_translation_json(raw, rows, "Ollama")
+
+
+def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=None):
     cloudflare = cloudflare or ("", "", "")
     failures = []
+    ollama = ollama or ("", "", "")
+    if ollama[0] and ollama[1]:
+        try:
+            return translate_ollama(rows, ollama[0], ollama[1]), "Ollama (local)"
+        except Exception as exc:
+            failures.append(f"Ollama: {exc}")
+            print(f"OLLAMA_FAILED_NEXT_PROVIDER | {exc}", flush=True)
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
     if omni[0] and omni[1] and allow_nonfree_fallback:
         try:
@@ -302,11 +342,15 @@ def main():
     cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
     cloudflare_base_url = f"https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1" if cloudflare_account_id else ""
     cloudflare = (cloudflare_base_url, cloudflare_api_token, cloudflare_model)
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
+    ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip()
+    ollama = (ollama_base_url, ollama_model)
     if not (
         (omniroute_base_url and omniroute_key)
         or (freellmapi_base_url and freellmapi_key)
         or (cloudflare_base_url and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash")
         or gemini_key
+        or (ollama_base_url and ollama_model)
     ):
         raise SystemExit("Configure Cloudflare Workers AI free credentials, a FreeLLMAPI pair, an allowed OmniRoute pair, or GEMINI_API_KEY.")
     if bool(omniroute_base_url) != bool(omniroute_key):
@@ -328,6 +372,7 @@ def main():
             (freellmapi_base_url, freellmapi_key, freellmapi_model),
             (gemini_key, args.model),
             cloudflare,
+            ollama,
         )
         print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
