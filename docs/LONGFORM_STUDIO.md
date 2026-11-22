@@ -45,6 +45,23 @@ Optional inputs:
 - Narration audio, for example `assets/longform/narration.wav`
 - Burn subtitles: enabled only when an SRT path is supplied
 
+## Mixed-media storyboard rendering
+
+The render workflow now accepts a storyboard manifest containing still images, short video clips, or both. Existing string-only video manifests remain supported. New object entries use repository-relative paths:
+
+```json
+[
+  {"path": "assets/longform/establishing.jpg", "type": "image", "duration": 8, "motion": "zoom_in"},
+  {"path": "assets/longform/archive-short.mp4", "type": "video", "start": 3, "end": 17},
+  {"path": "assets/longform/map.png", "type": "image", "duration": 10, "motion": "pan_right"},
+  {"path": "assets/longform/interview.mp4", "type": "video", "start": 12, "end": 28}
+]
+```
+
+Image scenes support `zoom_in`, `zoom_out`, `pan_left`, `pan_right`, and `static`; their default duration is 6 seconds and allowed range is 1–120 seconds. Video scenes can be trimmed with `start` and `end` seconds. Every scene is normalized to 1920×1080, 30 fps H.264, then joined in storyboard order. The renderer creates a silent audio track when no narration is supplied so the technical output has an audio stream; this is not a substitute for a finished soundtrack. A supplied Persian SRT can be burned into the final render.
+
+The rights ledger remains mandatory for every distinct media file, whether it is a photograph or a video. Reusing a source file in multiple timeline scenes does not require duplicate rights records. This stage does not fetch media automatically, create AI images, generate narration, or establish copyright ownership; those are separate pipeline stages and must retain provenance and license checks.
+
 ## Candidate source discovery
 
 The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library and also queues every HTTPS URL already listed in the curated research dossier. Configure data/longform/research_feeds.json with trusted publisher feed URLs. Curated source URLs are included even when the feed list is empty, so the evidence audit can inspect the actual cited sources rather than only newly discovered RSS links. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
