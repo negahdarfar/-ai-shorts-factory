@@ -107,7 +107,7 @@ def main():
         try:
             models = discover_free_models(avalai_base, avalai_key, task="translation",
                                           preferred=os.getenv("AVALAI_MODEL", "auto"))
-            provider_routes.extend((\"AvalAI\", avalai_base, avalai_key, model) for model in models)
+            provider_routes.extend(("AvalAI", avalai_base, avalai_key, model) for model in models)
         except Exception as exc:
             print("AVALAI_DISCOVERY_FAILED; continuing to existing free fallback: " + type(exc).__name__, file=sys.stderr)
     free_base = os.getenv("FREELLMAPI_BASE_URL", "").strip()
