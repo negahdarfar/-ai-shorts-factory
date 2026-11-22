@@ -26,7 +26,7 @@ def local_review(items):
     reports = []
     for index, item in enumerate(items, 1):
         row = item if isinstance(item, dict) else {"content": str(item)}
-        script = str(row.get("video_script") or row.get("narration") or row.get("script") or "")
+        script = str(row.get("video_script") or row.get("narration") or row.get("script") or row.get("text") or "")
         metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else row
         title = str(metadata.get("title") or row.get("title") or "")
         description = str(metadata.get("description") or "")
