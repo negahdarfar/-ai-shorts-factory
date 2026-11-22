@@ -66,6 +66,46 @@ def is_explicitly_free(model_id, metadata=None):
     )
 
 
+NON_CHAT_MARKERS = (
+    "search", "serper", "perplexity", "parallel_ai", "tavily", "exa-",
+    "browser", "crawler", "scrape", "rerank", "ranker", "embedding",
+    "embed", "moderation", "transcrib", "transcription", "tts",
+    "text-to-speech", "speech", "audio", "image-generation",
+    "text-to-image", "video-generation", "ocr", "stt", "asr",
+)
+
+
+def is_chat_capable(model_id, metadata=None):
+    """Conservatively reject tool/task endpoints that are not chat-completion models."""
+    value = str(model_id or "").strip().lower()
+    if not value or any(marker in value for marker in NON_CHAT_MARKERS):
+        return False
+    if not isinstance(metadata, dict):
+        return True
+
+    architecture = metadata.get("architecture")
+    if isinstance(architecture, dict):
+        modality = str(architecture.get("modality") or "").lower()
+        if modality and "text" not in modality:
+            return False
+
+    modalities = metadata.get("modalities")
+    if isinstance(modalities, (list, tuple)) and modalities:
+        if "text" not in " ".join(str(item).lower() for item in modalities):
+            return False
+
+    # Catalogue task/type/description fields can identify search and utility APIs
+    # even when the model ID itself looks like a language model.
+    descriptive_fields = (
+        "task", "tasks", "task_type", "type", "description",
+        "capability", "capabilities", "endpoint",
+    )
+    description = " ".join(
+        str(metadata.get(key) or "").lower() for key in descriptive_fields
+    )
+    return not any(marker in description for marker in NON_CHAT_MARKERS)
+
+
 def _model_rows(payload):
     rows = payload.get("data", []) if isinstance(payload, dict) else []
     if not isinstance(rows, list):
@@ -78,7 +118,7 @@ def _model_ids(payload):
     for row in _model_rows(payload):
         if isinstance(row, dict):
             model_id = row.get("id") or row.get("name")
-            if model_id and is_explicitly_free(model_id, row):
+            if model_id and is_explicitly_free(model_id, row) and is_chat_capable(model_id, row):
                 result.append(str(model_id))
     return list(dict.fromkeys(result))
 
