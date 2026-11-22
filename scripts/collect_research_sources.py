@@ -69,6 +69,7 @@ def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_i
                 if row["url"] not in seen: seen.add(row["url"]); rows.append(row)
         except (FeedError,urllib.error.URLError,TimeoutError,OSError) as exc: errors.append(f"{feed.get('publisher','unknown')}: {exc}")
     curated_count=0
+    curated_rows=[]
     if research_input:
         try:
             dossier=json.loads(Path(research_input).read_text(encoding="utf-8"))
@@ -87,7 +88,7 @@ def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_i
                 continue
             if url not in seen:
                 seen.add(url)
-                rows.append({
+                curated_rows.append({
                     "title":str(source.get("title",""))[:500],
                     "url":url,
                     "publisher":str(source.get("publisher","")),
@@ -98,6 +99,7 @@ def collect(feeds_path,topic,output_path,timeout=15,limit_per_feed=30,research_i
                     "editorial_status":"curated_reference_requires_page_review",
                 })
                 curated_count+=1
+    rows=curated_rows+rows
     result={"schema_version":1,"topic":topic,"collected_at":datetime.now(timezone.utc).isoformat(),"candidate_count":len(rows),"curated_source_count":curated_count,"candidates":rows,"feed_errors":errors,"warning":"RSS items are discovery leads. Curated source URLs are fetched for evidence review but extracted text remains unverified."}
     target=Path(output_path); target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
