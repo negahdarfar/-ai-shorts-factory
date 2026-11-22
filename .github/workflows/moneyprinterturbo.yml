@@ -181,7 +181,10 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           if [ -n "$YOUTUBE_API_KEY" ]; then
-            python scripts/research_youtube_competitors.py --input trending_batch.json --output youtube_competitor_research.json --days 30 --max-results 20
+            if ! python scripts/research_youtube_competitors.py --input trending_batch.json --output youtube_competitor_research.json --days 30 --max-results 20; then
+              echo "::warning::YouTube competitor research failed; continuing without competitor metrics and without viral-performance claims."
+              printf '{"topics":[],"source":"fallback_after_youtube_research_error","note":"Live competitor research failed; do not infer or claim viral performance."}\n' > youtube_competitor_research.json
+            fi
           else
             echo "::warning::YOUTUBE_API_KEY is not configured; skipping live competitor metrics. AI scripts will use editorial judgment and will not claim competitor-performance insights."
             printf '{"topics":[],"source":"skipped_no_youtube_api_key","note":"No live competitor metrics available; do not infer or claim viral performance."}\n' > youtube_competitor_research.json
