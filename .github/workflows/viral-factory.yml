@@ -84,13 +84,13 @@ jobs:
           python -m py_compile viral_factory/cli.py
           python -m unittest discover -s viral_factory -p 'test_*.py' -v
       - name: Discover Commons sources and optional YouTube trend metadata
-        if: ${{ inputs.mode == 'discover' || inputs.mode == 'process' }}
+        if: ${{ github.event_name == 'schedule' || inputs.mode == 'discover' || inputs.mode == 'process' }}
         run: python viral_factory/cli.py discover --output-dir viral_factory/work
       - name: Render Shorts from selected Creative Commons source
-        if: ${{ inputs.mode == 'process' }}
+        if: ${{ github.event_name == 'schedule' || inputs.mode == 'process' }}
         env:
-          CANDIDATE_INDEX: ${{ inputs.candidate_index }}
-          CLIP_COUNT: ${{ inputs.clip_count }}
+          CANDIDATE_INDEX: ${{ inputs.candidate_index || 'auto' }}
+          CLIP_COUNT: ${{ inputs.clip_count || '2' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SEO_GEMINI_MODEL: ${{ vars.SEO_GEMINI_MODEL || 'gemini-2.5-flash' }}
         run: |
