@@ -57,7 +57,9 @@ class AvalAIClient:
                     delay = 1.5 * (2 ** attempt) + random.uniform(0, 0.25)
                 if delay <= 0:
                     delay = 1.5 * (2 ** attempt) + random.uniform(0, 0.25)
-                time.sleep(max(1.0, min(delay, 20.0)))
+                if last_status == 429:
+                    delay = max(30.0, delay)
+                time.sleep(max(1.0, min(delay, 60.0)))
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 if attempt >= self.max_retries:
                     raise AvalAIError(f"AvalAI network request failed ({type(exc).__name__}).") from None
