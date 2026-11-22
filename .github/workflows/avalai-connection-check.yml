@@ -1,4 +1,4 @@
-name: AvalAI safe connection check
+name: AvalAI safe connection and inference check
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - 'scripts/avalai_client.py'
       - 'scripts/free_model_router.py'
       - 'scripts/test_avalai_connection.py'
+      - 'scripts/test_avalai_inference.py'
       - 'tests/test_avalai_client.py'
       - '.github/workflows/avalai-connection-check.yml'
   workflow_dispatch:
@@ -29,8 +30,8 @@ jobs:
           python-version: '3.11'
       - name: Compile and test AvalAI client
         run: |
-          python -m py_compile scripts/avalai_client.py scripts/test_avalai_connection.py
+          python -m py_compile scripts/avalai_client.py scripts/test_avalai_connection.py scripts/test_avalai_inference.py
           python -m unittest discover -s tests -p 'test_avalai_client.py' -v
-      - name: Check AvalAI authentication and model catalogue (no inference)
+      - name: Run one minimal inference using an explicitly free model
         run: |
-          PYTHONPATH=scripts python scripts/test_avalai_connection.py
+          PYTHONPATH=scripts python scripts/test_avalai_inference.py
