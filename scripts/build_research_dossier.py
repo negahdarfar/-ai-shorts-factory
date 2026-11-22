@@ -114,8 +114,8 @@ def build_research_dossier(input_path: str | Path, output_path: str | Path,
             raise ResearchError(f"Claim {index + 1} requires id and claim text.")
         if status not in CLAIM_STATUSES:
             raise ResearchError(f"Claim {cid} status must be confirmed, disputed, or unverified.")
-        if not isinstance(refs, list) or not refs:
-            raise ResearchError(f"Claim {cid} must cite one or more source_ids.")
+        if not isinstance(refs, list) or not refs or any(not isinstance(ref, str) or not ref.strip() for ref in refs):
+            raise ResearchError(f"Claim {cid} must cite one or more non-empty source_ids.")
         if len(set(refs)) != len(refs):
             raise ResearchError(f"Claim {cid} contains duplicate source references.")
         unknown = sorted(set(refs) - set(source_map))
