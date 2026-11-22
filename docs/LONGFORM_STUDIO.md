@@ -62,6 +62,23 @@ Image scenes support `zoom_in`, `zoom_out`, `pan_left`, `pan_right`, and `static
 
 The rights ledger remains mandatory for every distinct media file, whether it is a photograph or a video. Reusing a source file in multiple timeline scenes does not require duplicate rights records. This stage does not fetch media automatically, create AI images, generate narration, or establish copyright ownership; those are separate pipeline stages and must retain provenance and license checks.
 
+## Free AI script generation and Commons media acquisition
+
+The workflow has an optional `auto_generate_plan` switch. When enabled, it asks only models explicitly identified as free by the configured FreeLLMAPI or OpenRouter model catalogue to draft an English documentary script and chapter-by-chapter visual plan. It requires at least three claims already marked `confirmed` in the curated research dossier, each backed by source URLs on at least two HTTPS hostnames. Disputed and unverified claims are excluded from the prompt. The output is labelled `AI_DRAFT_REQUIRES_SOURCE_AND_EDITORIAL_REVIEW`; this is not an automatic fact-check and is not cleared for public publishing.
+
+Required GitHub Actions secrets for AI generation:
+- `FREELLMAPI_BASE_URL` and `FREELLMAPI_API_KEY` for the self-hosted FreeLLMAPI gateway
+- Optional `FREELLMAPI_MODEL` preference
+- Optional `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` as fallback
+
+The free-model router rejects unknown-price models instead of assuming they are free. If no explicitly free model is available, the workflow stops with a clear error rather than silently using a paid model. API keys are read from GitHub Secrets and are never written into generated artifacts.
+
+When an AI or manually supplied storyboard plan is available, the workflow searches Wikimedia Commons for each visual query and downloads eligible images or short video clips. It automatically accepts only Public Domain, CC0, and CC BY metadata; it deliberately excludes CC BY-SA, NC, ND, and unclear licenses until a separate compatibility review is made. It records the Commons file page, license URL, creator attribution, and downloaded asset path in a generated rights ledger. It prefers the requested media type and falls back from a missing video to a still image. Video clips are capped at 15 seconds by default and require FFprobe to report a usable duration.
+
+The downloader is bounded to 8 Commons results per scene and 80 MB per downloaded asset. It does not bypass paywalls, scrape commercial streaming platforms, or download YouTube/movie/TV clips. Commons metadata can be incomplete or incorrect: inspect each original file page and attribution before commercial use. A successful rights metadata gate is not legal advice or proof of ownership. If some scenes have no eligible media, the report lists them; the final minimum-duration gate can still fail if too little footage was found.
+
+To run the automated path, open **Actions → Koroush Longform Studio - render and QA → Run workflow**, enable `auto_generate_plan`, and provide a curated research dossier containing enough confirmed claims. Set `minimum_duration_seconds` to the desired target runtime (for example 480 for eight minutes). Ensure the AI provider secrets above are configured. The manual `storyboard_plan` input can be used instead when a plan already exists.
+
 ## Candidate source discovery
 
 The workflow can collect candidate links from configurable RSS/Atom feeds using Python's standard library and also queues every HTTPS URL already listed in the curated research dossier. Configure data/longform/research_feeds.json with trusted publisher feed URLs. Curated source URLs are included even when the feed list is empty, so the evidence audit can inspect the actual cited sources rather than only newly discovered RSS links. The collector filters titles/descriptions against the documentary topic, deduplicates links, and applies HTTPS, timeout, and response-size limits. Its research-candidates.json output is included in the workflow artifact.
