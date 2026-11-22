@@ -19,6 +19,8 @@ def _normalise_license(value: str) -> str:
 
 def _license_family(value: str) -> str | None:
     text = _normalise_license(value)
+    if re.search(r"\\bcc by nc\\b|\\bcc by nd\\b|\\bnoncommercial\\b|\\bno derivatives\\b", text):
+        return None
     if text in {"public domain", "publicdomain", "pd", "cc0", "cc0 1.0"} or text.startswith("cc0 "):
         return "public-domain"
     if re.match(r"^cc by sa(?:\s|$)", text):
