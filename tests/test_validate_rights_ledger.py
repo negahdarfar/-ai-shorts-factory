@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_rights_ledger import RightsError, validate_rights_ledger
+from scripts.validate_rights_ledger import RightsError, validate_rights_ledger, manifest_assets
 
 
 class RightsLedgerTests(unittest.TestCase):
@@ -36,6 +36,25 @@ class RightsLedgerTests(unittest.TestCase):
         result = validate_rights_ledger(self.manifest, self.ledger)
         self.assertEqual(result["rights_gate"], "passed")
         self.assertEqual(result["assets_checked"], 1)
+
+    def test_accepts_mixed_image_and_video_storyboard_paths(self):
+        self.manifest.write_text(json.dumps([
+            {"path": "assets/still.jpg", "type": "image", "duration": 8},
+            {"path": "assets/clip-a.mp4", "type": "video", "start": 2, "end": 10},
+        ]), encoding="utf-8")
+        self.write_ledger([
+            self.valid_entry(),
+            self.valid_entry(asset="assets/still.jpg", license="CC0", license_url="https://creativecommons.org/publicdomain/zero/1.0/"),
+        ])
+        result = validate_rights_ledger(self.manifest, self.ledger)
+        self.assertEqual(result["assets_checked"], 2)
+
+    def test_manifest_assets_extracts_object_paths(self):
+        self.assertEqual(manifest_assets([{"path": "a.jpg", "type": "image"}, "b.mp4"]), ["a.jpg", "b.mp4"])
+
+    def test_rejects_duplicate_asset_paths(self):
+        with self.assertRaisesRegex(RightsError, "duplicate"):
+            manifest_assets(["a.mp4", {"path": "a.mp4"}])
 
     def test_rejects_missing_asset_record(self):
         self.write_ledger([])
