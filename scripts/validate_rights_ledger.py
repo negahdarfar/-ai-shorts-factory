@@ -14,16 +14,16 @@ class RightsError(ValueError):
 
 
 def _normalise_license(value: str) -> str:
-    return re.sub(r"\\s+", " ", str(value or "").strip().lower().replace("_", " ").replace("-", " "))
+    return re.sub(r"\s+", " ", str(value or "").strip().lower().replace("_", " ").replace("-", " "))
 
 
 def _license_family(value: str) -> str | None:
     text = _normalise_license(value)
     if text in {"public domain", "publicdomain", "pd", "cc0", "cc0 1.0"} or text.startswith("cc0 "):
         return "public-domain"
-    if re.match(r"^cc by sa(?:\\s|$)", text):
+    if re.match(r"^cc by sa(?:\s|$)", text):
         return "cc-by-sa"
-    if re.match(r"^cc by(?:\\s|$)", text):
+    if re.match(r"^cc by(?:\s|$)", text):
         return "cc-by"
     if text in {"owned", "original", "user owned", "user-owned", "all rights owned"}:
         return "owned"
@@ -83,7 +83,7 @@ def validate_rights_ledger(manifest_path: str | Path, ledger_path: str | Path) -
             raise RightsError(f"{asset} requires attribution text (use an explicit public-domain/source credit if applicable).")
         if family == "cc-by-sa" and item.get("share_alike_acknowledged") is not True:
             raise RightsError(f"{asset} uses CC BY-SA; set share_alike_acknowledged to true only after confirming ShareAlike compliance.")
-        if family == "owned" and not isinstance(item.get("rights_holder"), str) or family == "owned" and not item.get("rights_holder", "").strip():
+        if family == "owned" and (not isinstance(item.get("rights_holder"), str) or not item.get("rights_holder", "").strip()):
             raise RightsError(f"{asset} marked owned requires a named rights_holder.")
         validated.append({"asset": asset, "license_family": family})
 
