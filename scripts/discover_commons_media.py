@@ -148,7 +148,7 @@ def video_seconds(path: Path) -> float | None:
 
 def build_storyboard(plan_path: str | Path, output_manifest: str | Path,
                      output_ledger: str | Path, asset_dir: str | Path,
-                     per_scene: int = 8, max_video_seconds: int = 15) -> dict:
+                     per_scene: int = 8, max_video_seconds: int = 30) -> dict:
     plan = json.loads(Path(plan_path).read_text(encoding="utf-8"))
     chapters = plan.get("chapters") if isinstance(plan, dict) else None
     if not isinstance(chapters, list) or not chapters:
@@ -256,7 +256,7 @@ def main() -> None:
     parser.add_argument("--ledger", default="data/longform/generated-rights.json")
     parser.add_argument("--assets", default="assets/longform/generated")
     parser.add_argument("--per-scene", type=int, default=8)
-    parser.add_argument("--max-video-seconds", type=int, default=15)
+    parser.add_argument("--max-video-seconds", type=int, default=30)
     args = parser.parse_args()
     if not 1 <= args.per_scene <= 20 or not 2 <= args.max_video_seconds <= 60:
         raise SystemExit("per-scene must be 1–20 and max-video-seconds 2–60.")
