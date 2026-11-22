@@ -8,6 +8,11 @@ on:
         required: true
         default: data/longform/clips.json
         type: string
+      research_feeds:
+        description: JSON registry of trusted RSS or Atom feed URLs
+        required: true
+        default: data/longform/research_feeds.json
+        type: string
       research_input:
         description: Curated JSON evidence dossier input with source records and cited claims
         required: true
@@ -66,6 +71,7 @@ jobs:
           MANIFEST: ${{ inputs.clips_manifest }}
           RIGHTS_LEDGER: ${{ inputs.rights_ledger }}
           RESEARCH_INPUT: ${{ inputs.research_input }}
+          RESEARCH_FEEDS: ${{ inputs.research_feeds }}
           SUBTITLES: ${{ inputs.subtitles_srt }}
           VOICEOVER: ${{ inputs.voiceover_audio }}
         run: |
@@ -73,6 +79,7 @@ jobs:
           test -f "$MANIFEST"
           test -f "$RIGHTS_LEDGER"
           test -f "$RESEARCH_INPUT"
+          test -f "$RESEARCH_FEEDS"
           python - "$MANIFEST" "$RIGHTS_LEDGER" "$RESEARCH_INPUT" "$SUBTITLES" "$VOICEOVER" <<'PY'
           import json, sys
           from pathlib import Path
@@ -93,6 +100,14 @@ jobs:
                   if root not in p.parents or not p.is_file():
                       raise SystemExit(f"Missing or unsafe optional asset: {item}")
           PY
+      - name: Discover candidate sources from configured RSS and Atom feeds
+        env:
+          RESEARCH_INPUT: ${{ inputs.research_input }}
+          RESEARCH_FEEDS: ${{ inputs.research_feeds }}
+        run: |
+          mkdir -p longform-output
+          TOPIC="$(python -c 'import json,os; print(json.load(open(os.environ["RESEARCH_INPUT"], encoding="utf-8"))["topic"])')"
+          python scripts/collect_research_sources.py --feeds "$RESEARCH_FEEDS" --topic "$TOPIC" --output longform-output/research-candidates.json
       - name: Validate factual research and citations
         env:
           RESEARCH_INPUT: ${{ inputs.research_input }}
