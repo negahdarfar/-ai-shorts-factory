@@ -76,8 +76,13 @@ async def synthesize(plan, output_audio, output_srt, voice, rate):
                     raise RuntimeError(f"TTS failed on chapter {index}; no offline espeak-ng fallback is installed.") from last_error
                 subprocess.run(["espeak-ng", "-v", "en-us", "-s", "150", "-w", str(fallback), narration], check=True)
                 target = fallback
-            duration = probe_duration(target)
-            audio_files.append(target)
+            normalized = temp / f"chapter_{index:03d}_normalized.wav"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(target),
+                "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(normalized)
+            ], check=True)
+            duration = probe_duration(normalized)
+            audio_files.append(normalized)
             cue_groups.append((split_cues(narration), duration))
 
         concat_file = temp / "concat.txt"
