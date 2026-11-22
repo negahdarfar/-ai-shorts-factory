@@ -146,7 +146,7 @@ Use the research to identify audience-interest patterns, opening-hook structures
 Return ONLY valid JSON in this structure:
 {{"items":[{{"index":1,"video_script":"120-145 spoken words, no title or markdown","video_terms":["8 concrete stock-footage search phrases"],"metadata":{{"primary_keyword":"natural search phrase","secondary_keywords":["3-6 relevant phrases"],"title":"accurate compelling title under 100 characters","description":"2-4 useful sentences","hashtags":["up to 3, no #"],"tags":["8-15 relevant tags"],"pinned_comment":"useful question","thumbnail_concept":"specific visual idea","search_intent":"viewer intent"}}}}]}}
 Exactly one indexed item per input topic. Each script MUST contain 130-140 spoken words (never fewer than 120 or more than 145). Count the words before returning each item; aim for 135 words. Script must have a strong opening, clear explanation and natural payoff. Use short concrete narration sentences that can be illustrated by relevant real footage. Do not invent statistics, dates, quotes, legal holdings, scientific claims or other facts. If the topic is disputed or current, clearly distinguish established facts from allegations or opinions; if facts are uncertain, say so or omit them. Search terms must be concrete, topic-specific visual phrases in English, 2-4 words each, not generic filler. Across all four topics, each item's visual search phrases must be distinct and must not reuse the same generic b-roll concepts. Select visuals that could not plausibly be swapped between topics. Every title must be unique and explicitly name the real topic or named entity; avoid generic titles such as 'Interesting Facts' or 'Explained'. The primary keyword must closely match the input topic and appear naturally in the title. Write a useful description with specific verified context, a concise opening hook, and a natural viewer question. SEO must be accurate, natural and not keyword-stuffed. Never claim keyword volume, CTR or ranking data."""
-    if api_base_url and api_key:
+    if api_base_url and (api_key or api_provider == "Ollama"):
         payload = {
             "model": api_model,
             "messages": [
@@ -161,10 +161,9 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
             "response_format": {"type": "json_object"},
         }
         request_url = api_base_url.rstrip("/") + "/chat/completions"
-        request_headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        request_headers = {"Content-Type": "application/json"}
+        if api_key:
+            request_headers["Authorization"] = f"Bearer {api_key}"
         provider = api_provider
     else:
         payload = {
@@ -184,9 +183,9 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
             method="POST"
         )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
+            with urllib.request.urlopen(req, timeout=300 if provider == "Ollama" else (180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150)) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter"):
+            if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter", "Ollama"):
                 choices = data.get("choices", [])
                 if not choices:
                     raise RuntimeError("FreeLLMAPI returned no chat completion choices.")
@@ -310,6 +309,11 @@ def main():
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
     cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
     gateways = []
+    # Local Ollama is opt-in: hosted GitHub runners must not wait on localhost.
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
+    ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip()
+    if ollama_base_url and ollama_model:
+        gateways.append(("Ollama", ollama_base_url, "", ollama_model))
     if cloudflare_account_id and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash":
         gateways.append((
             "Cloudflare",
@@ -356,7 +360,7 @@ def main():
     # Run each topic as its own request: free models often truncate four-item batches.
     provider_routes = []
     for provider, base_url, api_key, api_model in gateways:
-        if not (base_url and api_key):
+        if not base_url or (not api_key and provider != "Ollama"):
             continue
         if provider in ("FreeLLMAPI", "OpenRouter"):
             try:
