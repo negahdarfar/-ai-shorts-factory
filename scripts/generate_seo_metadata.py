@@ -177,15 +177,22 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
 
     result = {}
     for attempt in range(max(1, max_attempts)):
-        req = urllib.request.Request(
-            request_url,
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers=request_headers,
-            method="POST"
-        )
         try:
-            with urllib.request.urlopen(req, timeout=180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150) as response:
-                data = json.loads(response.read().decode("utf-8"))
+            if provider == "AvalAI":
+                from avalai_client import AvalAIClient
+                raw = AvalAIClient(api_key=api_key, base_url=api_base_url).chat_completion(
+                    api_model, payload["messages"], temperature=payload.get("temperature", 0.25),
+                    max_tokens=payload.get("max_tokens", 2400), response_format=payload.get("response_format"))
+                data = {"choices": [{"message": {"content": raw}}]}
+            else:
+                req = urllib.request.Request(
+                    request_url,
+                    data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    headers=request_headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=300 if provider == "Ollama" else (180 if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter") else 150)) as response:
+                    data = json.loads(response.read().decode("utf-8"))
             if provider in ("FreeLLMAPI", "Cloudflare", "OpenRouter", "AvalAI"):
                 choices = data.get("choices", [])
                 if not choices:
@@ -335,7 +342,7 @@ def main():
             os.getenv("FREELLMAPI_API_KEY", "").strip(),
             os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
         ))
-    # OpenRouter exposes rotating explicitly-free models through one OpenAI-compatible API.
+    # AvalAI participates only when its live catalogue explicitly marks a model free or zero-priced.\n    avalai_key = os.getenv("AVALAI_API_KEY", "").strip()\n    if avalai_key:\n        gateways.append(("AvalAI", os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip(), avalai_key, os.getenv("AVALAI_MODEL", "auto").strip() or "auto"))\n    # OpenRouter exposes rotating explicitly-free models through one OpenAI-compatible API.
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if openrouter_key:
         gateways.append((
