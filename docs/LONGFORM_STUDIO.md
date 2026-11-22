@@ -51,6 +51,10 @@ The workflow can collect candidate links from configurable RSS/Atom feeds using 
 
 Candidates are discovery leads only: the collector does not download full articles, infer facts, create claims, or mark sources confirmed. A human/editorial research step must read the linked material and curate the evidence in research.json. An empty feed list is allowed and produces zero candidates; replace the empty list with real official RSS/Atom feed URLs to activate discovery.
 
+## Research page extraction
+
+After RSS discovery, the workflow now attempts to fetch up to 20 candidate pages and extract bounded readable HTML text into `longform-output/research-extracts.json`. It accepts HTTPS HTML pages only, blocks non-public IP destinations and unsafe redirects, limits each response to 1.5 MB, and records individual failures without losing other candidates. Script/style/navigation/footer content is excluded where identifiable. JavaScript-rendered pages, PDFs, paywalls, and pages requiring login are not handled. Extraction is not fact-checking: the output is unverified material for editorial review, and the separate curated `research.json` dossier remains the only research-gate input.
+
 ## Factual research input
 
 The render workflow now requires `data/longform/research.json` (or another repository path supplied at dispatch). It is a curated evidence file, not a search engine. Use this structure:
@@ -117,7 +121,7 @@ The workflow:
 
 ## Important limitations
 
-- This workflow validates a supplied, curated research dossier and assembles supplied footage; it discovers candidate links from configured RSS/Atom feeds but does not read full articles, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
+- This workflow validates a supplied, curated research dossier and assembles supplied footage; it discovers candidate links from configured RSS/Atom feeds and extracts bounded text from accessible HTML pages, but does not independently fact-check claims, generate a verified factual script, synthesize narration, or acquire licensed footage automatically.
 - No YouTube upload or public publishing is performed by this workflow.
 - A passed technical QA or rights-metadata report is not legal advice, proof of ownership, factuality review, editorial review, or a guarantee of audience retention.
 - GitHub-hosted runners have time, storage, and artifact limits. Large footage collections may exceed those limits.
