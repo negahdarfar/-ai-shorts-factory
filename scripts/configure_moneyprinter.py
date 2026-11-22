@@ -133,6 +133,7 @@ else:
     print("No explicitly free LLM route is available; skipping generation rather than risk paid inference.")
     raise SystemExit(0)
 app["video_source"] = "pexels" if pexels else "pixabay"
+fallback_video_source = ("pixabay" if pexels else "pexels") if (pexels and pixabay) else ""
 app["pexels_api_keys"] = [pexels] if pexels else []
 app["pixabay_api_keys"] = [pixabay] if pixabay else []
 app["match_materials_to_script"] = True
@@ -164,3 +165,4 @@ print(f"LLM: {app['llm_provider']} ({cloudflare_model if cloudflare_ready else f
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     output.write("ready=true\n")
     output.write("video_source=" + app["video_source"] + "\n")
+    output.write("fallback_video_source=" + fallback_video_source + "\n")
