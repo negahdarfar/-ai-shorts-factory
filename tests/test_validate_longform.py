@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from validate_longform import validate_longform
+from scripts.validate_longform import validate_longform
 from koroush_core.quality import QualityError
 
 
