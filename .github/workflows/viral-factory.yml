@@ -24,7 +24,7 @@ on:
         description: "Upload the rendered Shorts publicly (explicit opt-in)"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -43,6 +43,14 @@ jobs:
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
       VIRAL_REGION: US
+      AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+      AVALAI_BASE_URL: https://api.avalai.ir/v1
+      AVALAI_MODEL: ${{ vars.AVALAI_MODEL }}
+      FREELLMAPI_BASE_URL: ${{ vars.FREELLMAPI_BASE_URL }}
+      FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+      FREELLMAPI_MODEL: ${{ vars.FREELLMAPI_MODEL }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,6 +94,21 @@ jobs:
             --limit "$CLIP_COUNT" \
             --model tiny \
             --output-dir viral_factory/work
+      - name: Verify rendered video files and caption reports
+        if: ${{ inputs.mode == 'process' }}
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('viral_factory/work')
+          videos=sorted((root/'shorts').glob('*.mp4'))
+          assert videos, 'No Shorts were rendered.'
+          for video in videos:
+              assert video.stat().st_size > 100_000, f'Video too small: {video.name}'
+          report=json.loads((root/'caption_report.json').read_text())
+          print(f'RENDER_QA_OK videos={len(videos)} captions={len(report)}')
+          print('PERSIAN_BURNED_IN',sum(bool(x.get('burned_in_persian')) for x in report))
+          PY
       - name: Upload publicly to YouTube (explicit opt-in only)
         if: ${{ inputs.mode == 'process' && inputs.publish_public == true }}
         run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
