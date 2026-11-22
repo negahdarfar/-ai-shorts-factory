@@ -48,7 +48,7 @@ def main():
         if not srt.is_file(): raise SystemExit("Subtitle file not found.")
         # Soft-burn uses FFmpeg subtitles filter; input SRT is UTF-8.
         escaped_srt = str(srt).replace("\\\\", "\\\\\\\\").replace(":", "\\\\:").replace("'", "\\\\'")
-        subtitle_filter = f"subtitles='{escaped_srt}':force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'"
+        subtitle_filter = f"subtitles='{escaped_srt}':force_style='FontName=Noto Naskh Arabic,FontSize=28,Outline=2,Shadow=1,Alignment=2,MarginV=42,WrapStyle=2'"
         run(["ffmpeg","-y","-i",str(current),"-vf",subtitle_filter,"-c:v","libx264","-preset","veryfast","-crf","20","-c:a","copy","-movflags","+faststart",str(out)])
       else:
         run(["ffmpeg","-y","-i",str(current),"-c","copy",str(out)])
