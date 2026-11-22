@@ -72,7 +72,7 @@ def main():
             f"excluded_task_models={diagnostics['excluded_rows']}; "
             f"non_text_modality_models={diagnostics['non_text_modality_rows']}; "
             f"free_chat_candidates={len(candidates)}; "
-            f"max_candidates_to_test={os.getenv('AVALAI_MAX_FREE_CHAT_CANDIDATES', '8')}",
+            f"max_candidates_to_test={os.getenv('AVALAI_MAX_FREE_CHAT_CANDIDATES', '12')}",
             flush=True,
         )
         if not candidates:
@@ -83,9 +83,9 @@ def main():
         # Try several explicitly-free chat models in rank order. A model outage or
         # unsupported endpoint must not prevent trying the next free model.
         try:
-            max_candidates = max(1, min(int(os.getenv("AVALAI_MAX_FREE_CHAT_CANDIDATES", "8")), 12))
+            max_candidates = max(1, min(int(os.getenv("AVALAI_MAX_FREE_CHAT_CANDIDATES", "12")), 12))
         except ValueError:
-            max_candidates = 8
+            max_candidates = 12
         failures = []
         for model in candidates[:max_candidates]:
             print(f"AVALAI_INFERENCE_ATTEMPT: model={model}", flush=True)
@@ -97,10 +97,13 @@ def main():
                     max_tokens=24,
                 )
                 if "AVALAI_INFERENCE_OK" not in answer:
+                    failures.append(f"{model}: provider returned a non-matching response marker")
                     print(
-                        "AVALAI_INFERENCE_UNEXPECTED_RESPONSE: provider returned text but not the expected marker."
+                        "AVALAI_INFERENCE_UNEXPECTED_RESPONSE: "
+                        f"model={model}; continuing to the next explicitly free chat candidate.",
+                        flush=True,
                     )
-                    return 1
+                    continue
                 print(
                     "AVALAI_INFERENCE_OK: "
                     f"catalogue_models={len(rows)}; explicitly_free={diagnostics['free_rows']}; "
