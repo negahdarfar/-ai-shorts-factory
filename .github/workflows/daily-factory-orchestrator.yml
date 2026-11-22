@@ -1,0 +1,44 @@
+name: Daily Factory Orchestrator
+
+on:
+  schedule:
+    - cron: "30 15 * * *"
+  workflow_dispatch:
+    inputs:
+      run_viral:
+        description: "Run the Viral Factory now"
+        required: true
+        type: boolean
+        default: false
+      publish_public:
+        description: "Publish after all viral media, licence and subtitle checks pass"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: koroush-daily-factory-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  dispatch-viral:
+    if: \${{ github.event_name == 'schedule' || inputs.run_viral == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Viral Factory on its production branch
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_PUBLIC: \${{ github.event_name == 'schedule' || inputs.publish_public == true }}
+        run: |
+          set -euo pipefail
+          gh workflow run viral-factory.yml \
+            --ref viral-video-factory \
+            -f mode=process \
+            -f candidate_index=auto \
+            -f clip_count=2 \
+            -f publish_public="$PUBLISH_PUBLIC"
+          echo "VIRAL_FACTORY_DISPATCHED ref=viral-video-factory public=$PUBLISH_PUBLIC"
