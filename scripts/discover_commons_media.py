@@ -40,7 +40,7 @@ def clean_html(value: str) -> str:
 
 def license_family(short_name: str) -> str | None:
     value = re.sub(r"\s+", " ", str(short_name or "").strip().lower().replace("-", " "))
-    if "noncommercial" in value or "no derivatives" in value or "nc" in value.split() or "nd" in value.split():
+    if "noncommercial" in value or "no derivatives" in value or "nc" in value.split() or "nd" in value.split() or "sa" in value.split():
         return None
     if value in {"public domain", "pd", "cc0", "cc0 1.0"} or value.startswith("public domain"):
         return "public-domain"
