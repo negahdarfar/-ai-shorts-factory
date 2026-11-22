@@ -208,7 +208,7 @@ def translate_cloudflare(rows, base_url, key, model):
     return parse_translation_json(raw, rows, "Cloudflare Workers AI")
 
 
-def translate_freellmapi(rows, base_url, key, model):
+def translate_freellmapi(rows, base_url, key, model, provider="FreeLLMAPI"):
     prompt = (
         "Translate each English subtitle cue into natural, concise Persian (Farsi). Preserve meaning, names, numbers, and tone. "
         'Return ONLY valid JSON with this exact shape: {"translations":[{"index":1,"text":"..."}]}. '
@@ -229,7 +229,7 @@ def translate_freellmapi(rows, base_url, key, model):
         base_url.rstrip("/") + "/chat/completions",
         payload,
         {"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
-        "FreeLLMAPI",
+        provider,
         max(1, int(os.getenv("FREELLMAPI_MAX_ATTEMPTS", "3"))),
         max(30, int(os.getenv("FREELLMAPI_TIMEOUT_SECONDS", "180"))),
         max(1.0, float(os.getenv("FREELLMAPI_RETRY_BASE_SECONDS", "15"))),
@@ -242,7 +242,7 @@ def translate_freellmapi(rows, base_url, key, model):
         raw = "\n".join(part.get("text", "") for part in content if isinstance(part, dict))
     else:
         raw = str(content)
-    return parse_translation_json(raw, rows, "FreeLLMAPI")
+    return parse_translation_json(raw, rows, provider)
 
 
 def translate_avalai(rows, base_url, key, model):
@@ -260,11 +260,13 @@ def translate_avalai(rows, base_url, key, model):
     return parse_translation_json(content, rows, "AvalAI")
 
 
-def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, avalai=None):
+def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, avalai=None, openrouter=None):
     avalai = avalai or ("", "", "auto")
     cloudflare = cloudflare or ("", "", "")
+    openrouter = openrouter or ("", "", "auto")
     failures = []
     allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
     if omni[0] and omni[1] and allow_nonfree_fallback:
         try:
             return translate_omniroute(rows, *omni), "OmniRoute"
@@ -291,6 +293,24 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, avalai=No
             except Exception as exc:
                 failures.append("AvalAI/" + model_id + ": " + type(exc).__name__)
                 print("AVALAI_MODEL_FAILED_NEXT_MODEL | model=" + model_id + " | " + type(exc).__name__, flush=True)
+    if openrouter[0] and openrouter[1]:
+        try:
+            models = discover_free_models(
+                openrouter[0], openrouter[1], task="translation", preferred=openrouter[2]
+            )
+        except Exception as exc:
+            models = []
+            failures.append("OpenRouter discovery: " + type(exc).__name__)
+            print("OPENROUTER_DISCOVERY_FAILED_NEXT_PROVIDER | " + type(exc).__name__, flush=True)
+        for model_id in models:
+            try:
+                print("OPENROUTER_AUTO_SELECTED_FREE_MODEL=" + model_id + " | task=translation", flush=True)
+                return translate_freellmapi(
+                    rows, openrouter[0], openrouter[1], model_id, provider="OpenRouter"
+                ), "OpenRouter"
+            except Exception as exc:
+                failures.append("OpenRouter/" + model_id + ": " + type(exc).__name__)
+                print("OPENROUTER_MODEL_FAILED_NEXT_MODEL | model=" + model_id + " | " + type(exc).__name__, flush=True)
     if free[0] and free[1]:
         try:
             candidates = discover_free_models(
@@ -309,10 +329,13 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, avalai=No
             except Exception as exc:
                 failures.append(f"FreeLLMAPI/{model_id}: {exc}")
                 print(f"FREELLMAPI_MODEL_FAILED_NEXT_MODEL | model={model_id} | {exc}", flush=True)
-    if gemini[0] and allow_nonfree_fallback:
-        return translate_gemini(rows, gemini[1], gemini[0]), "Gemini"
-    if (omni[0] and omni[1]) or gemini[0]:
-        print("NON_FREE_LLM_FALLBACK_DISABLED; paid or unknown-price providers were not called.", flush=True)
+    if gemini[0] and (gemini_free_tier_enabled or allow_nonfree_fallback):
+        return translate_gemini(rows, gemini[1], gemini[0]), (
+            "Gemini_Free_Tier" if gemini_free_tier_enabled else "Gemini"
+        )
+    if (omni[0] and omni[1]) or (gemini[0] and not gemini_free_tier_enabled):
+        if not allow_nonfree_fallback:
+            print("NON_FREE_LLM_FALLBACK_DISABLED; paid or unknown-price providers were not called.", flush=True)
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
     raise RuntimeError(f"All configured subtitle providers failed. {detail}")
 
@@ -331,6 +354,9 @@ def main():
     avalai_base_url = os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").strip()
     avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
     avalai_model = os.getenv("AVALAI_MODEL", "auto").strip() or "auto"
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "auto").strip() or "auto"
+    openrouter = ("https://openrouter.ai/api/v1", openrouter_key, openrouter_model)
     cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
     cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
     cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
@@ -340,6 +366,7 @@ def main():
         (omniroute_base_url and omniroute_key)
         or (freellmapi_base_url and freellmapi_key)
         or (avalai_base_url and avalai_key)
+        or (openrouter[0] and openrouter[1])
         or (cloudflare_base_url and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash")
         or gemini_key
     ):
@@ -364,6 +391,7 @@ def main():
             (gemini_key, args.model),
             cloudflare,
             (avalai_base_url, avalai_key, avalai_model),
+            openrouter,
         )
         print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/4", flush=True)
         persian = video.parent / "subtitle.fa.srt"
