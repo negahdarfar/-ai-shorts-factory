@@ -24,14 +24,35 @@ def load_published_topics(state_dir: Path) -> set[str]:
     return {item.casefold() for item in _read_list(state_dir / "published_topics.json", "publication history")}
 
 
+def load_public_upload_topics(state_dir: Path) -> set[str]:
+    path = state_dir / "upload_history.json"
+    if not path.exists():
+        return set()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"Could not read upload history safely: {exc}") from exc
+    if not isinstance(value, dict) or not isinstance(value.get("uploads", {}), dict):
+        raise RuntimeError("upload history is malformed; expected an uploads object.")
+    topics = set()
+    for entry in value.get("uploads", {}).values():
+        if not isinstance(entry, dict):
+            raise RuntimeError("upload history contains a malformed entry.")
+        if entry.get("mode") == "public" and entry.get("status") in {"pending", "completed"}:
+            topic = str(entry.get("topic", "")).strip()
+            if topic:
+                topics.add(topic.casefold())
+    return topics
+
+
 def ensure_new_topics(state_dir: Path, topics: list[str]) -> None:
-    published = load_published_topics(state_dir)
+    published = load_published_topics(state_dir) | load_public_upload_topics(state_dir)
     duplicates = [topic for topic in topics if topic.strip().casefold() in published]
     if duplicates:
         raise RuntimeError(
             "PUBLIC_PUBLISH_BLOCKED_DUPLICATE_TOPICS: "
             + "; ".join(duplicates)
-            + ". Choose four new topics or run private QA."
+            + ". Choose fresh topics or run private QA."
         )
 
 
