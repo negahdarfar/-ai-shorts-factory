@@ -1,6 +1,14 @@
 name: AvalAI safe connection check
 
 on:
+  push:
+    branches: [main, shorts-factory, longform-studio, viral-video-factory]
+    paths:
+      - 'scripts/avalai_client.py'
+      - 'scripts/free_model_router.py'
+      - 'scripts/test_avalai_connection.py'
+      - 'tests/test_avalai_client.py'
+      - '.github/workflows/avalai-connection-check.yml'
   workflow_dispatch:
 
 permissions:
