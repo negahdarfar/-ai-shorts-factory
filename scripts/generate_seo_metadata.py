@@ -362,7 +362,7 @@ def main():
     for provider, base_url, api_key, api_model in gateways:
         if not base_url or (not api_key and provider != "Ollama"):
             continue
-        if provider in ("FreeLLMAPI", "OpenRouter"):
+        if provider in ("FreeLLMAPI", "OpenRouter", "AvalAI"):
             try:
                 candidate_models = discover_free_models(base_url, api_key, task="seo", preferred=api_model)
             except Exception as discovery_error:
