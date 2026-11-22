@@ -49,6 +49,21 @@ class AvalAIClientTests(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=FakeResponse(payload)):
             self.assertEqual(client.chat_completion("sample", [{"role":"user","content":"hi"}]), "hello")
 
+    def test_moderate_uses_dedicated_endpoint_and_parses_results(self):
+        client = AvalAIClient(api_key="dummy", max_retries=0)
+        payload = {"results": [{"flagged": False, "categories": {}}]}
+        with patch("urllib.request.urlopen", return_value=FakeResponse(payload)) as call:
+            result = client.moderate("omni-moderation-latest", ["safe text"])
+        self.assertFalse(result["results"][0]["flagged"])
+        self.assertTrue(call.call_args.args[0].full_url.endswith("/moderations"))
+        self.assertEqual(call.call_args.args[0].get_method(), "POST")
+
+    def test_moderation_rejects_result_count_mismatch(self):
+        client = AvalAIClient(api_key="dummy", max_retries=0)
+        with patch("urllib.request.urlopen", return_value=FakeResponse({"results": []})):
+            with self.assertRaisesRegex(AvalAIError, "no moderation results"):
+                client.moderate("omni-moderation-latest", ["text"])
+
     def test_http_error_does_not_leak_body_or_key(self):
         client = AvalAIClient(api_key="secret-value", max_retries=0)
         error = HTTPError("https://api.avalai.ir/v1/models", 401, "bad", {}, BytesIO(b"secret-value"))
