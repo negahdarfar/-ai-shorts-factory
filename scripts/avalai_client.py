@@ -17,7 +17,7 @@ class AvalAIError(RuntimeError):
 
 
 class AvalAIClient:
-    def __init__(self, api_key=None, base_url=None, timeout=45, max_retries=2):
+    def __init__(self, api_key=None, base_url=None, timeout=45, max_retries=4):
         self.api_key = (api_key if api_key is not None else os.getenv("AVALAI_API_KEY", "")).strip()
         self.base_url = (base_url or os.getenv("AVALAI_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.timeout = max(5, min(int(timeout), 180))
@@ -55,7 +55,9 @@ class AvalAIClient:
                     delay = float(retry_after)
                 except (TypeError, ValueError):
                     delay = 1.5 * (2 ** attempt) + random.uniform(0, 0.25)
-                time.sleep(max(0.2, min(delay, 12.0)))
+                if delay <= 0:
+                    delay = 1.5 * (2 ** attempt) + random.uniform(0, 0.25)
+                time.sleep(max(1.0, min(delay, 20.0)))
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 if attempt >= self.max_retries:
                     raise AvalAIError(f"AvalAI network request failed ({type(exc).__name__}).") from None
