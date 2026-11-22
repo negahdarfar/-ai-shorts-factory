@@ -101,7 +101,7 @@ def extract_candidates(input_path,output_path,timeout=15,max_pages=20):
     results=[]
     for item in candidates[:max_pages]:
         if not isinstance(item,dict) or not item.get("url"): continue
-        record={k:item.get(k) for k in ("title","publisher","published_at","topic_match_score","url")}
+        record={k:item.get(k) for k in ("title","publisher","published_at","topic_match_score","url","source_id","curated_source","discovery_only","editorial_status")} if item.get("source_id") or item.get("curated_source") else {k:item.get(k) for k in ("title","publisher","published_at","topic_match_score","url")}
         try: record.update(fetch_page(item["url"],timeout))
         except (ExtractionError,urllib.error.URLError,TimeoutError,OSError) as exc:
             record.update({"extraction_status":"failed","error":str(exc),"fact_checked":False})
