@@ -16,6 +16,7 @@ This repository is organized around exactly three production tracks. Keep produc
 - Licensed footage only. Preserve source URLs, creators, licence names and attribution obligations.
 - Every rendered file passes technical validation before upload. Public publishing must not bypass failed checks.
 - SHA-256 upload history and topic history prevent duplicate publication and unsafe retries.
+- A weekly read-only API catalogue and GitHub project scout searches for free-first integrations without reading secrets, cloning repositories or executing third-party code.
 - Secrets are read only at runtime. Never print, copy into artifacts, or commit secret values.
 
 ## Current verified state
