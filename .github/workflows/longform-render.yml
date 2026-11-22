@@ -166,6 +166,9 @@ jobs:
           RESEARCH_DOSSIER: longform-output/research-dossier.json
           TARGET_SECONDS: ${{ inputs.minimum_duration_seconds }}
           FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
           FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
           FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -180,6 +183,9 @@ jobs:
         env:
           PLAN_PATH: ${{ steps.plan.outputs.path }}
           FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
           FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
           FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
