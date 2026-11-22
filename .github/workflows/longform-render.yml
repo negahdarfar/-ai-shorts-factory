@@ -117,6 +117,9 @@ jobs:
         run: |
           mkdir -p longform-output
           python scripts/build_research_dossier.py --input "$RESEARCH_INPUT" --output longform-output/research-dossier.json --report longform-output/research-dossier.md
+      - name: Audit extracted text against curated research claims
+        run: |
+          python scripts/audit_research_evidence.py --dossier longform-output/research-dossier.json --extracts longform-output/research-extracts.json --output longform-output/research-evidence-audit.json --report longform-output/research-evidence-audit.md
       - name: Enforce source rights ledger
         env:
           MANIFEST: ${{ inputs.clips_manifest }}
