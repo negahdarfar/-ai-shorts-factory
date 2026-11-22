@@ -100,6 +100,18 @@ jobs:
             --limit "$CLIP_COUNT" \
             --model tiny \
             --output-dir viral_factory/work
+      - name: Evaluate selected clip transcripts with free AI providers
+        if: ${{ inputs.mode == 'process' }}
+        env:
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
+          AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
+        run: python scripts/evaluate_content_quality.py --input viral_factory/work/selected_clips.json --output viral_factory/work/content-quality-report.json
       - name: Upload publicly to YouTube (explicit opt-in only)
         if: ${{ inputs.mode == 'process' && inputs.publish_public == true }}
         run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
