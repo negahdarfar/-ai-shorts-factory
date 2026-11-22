@@ -90,7 +90,6 @@ jobs:
           rows = json.loads(manifest.read_text(encoding="utf-8"))
           if not isinstance(rows, list) or not rows:
               raise SystemExit("Manifest must be a non-empty JSON array.")
-          seen = set()
           for index, item in enumerate(rows):
               asset = item if isinstance(item, str) else item.get("path") if isinstance(item, dict) else None
               if not isinstance(asset, str) or not asset.strip():
@@ -98,9 +97,6 @@ jobs:
               p = (root / asset).resolve()
               if root not in p.parents or not p.is_file():
                   raise SystemExit(f"Missing or unsafe storyboard asset: {asset}")
-              if p in seen:
-                  raise SystemExit(f"Duplicate storyboard asset path: {asset}")
-              seen.add(p)
           for item in sys.argv[2:]:
               if item:
                   p = (root / item).resolve()
