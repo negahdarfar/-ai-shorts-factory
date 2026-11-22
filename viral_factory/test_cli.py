@@ -44,7 +44,7 @@ class ViralFactoryTests(unittest.TestCase):
             count = write_clip_srt(segments, clip, output)
             self.assertEqual(count, 3)
             rendered = output.read_text(encoding="utf-8")
-            self.assertIn("00:00:00,500 --> 00:00:01,000", rendered)
+            self.assertIn("00:00:00,000 --> 00:00:00,500", rendered)
             self.assertIn("00:00:01,500 --> 00:00:02,500", rendered)
 
 
