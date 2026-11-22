@@ -39,7 +39,7 @@ def translate_batch(rows, base, key, model):
         {"role": "system", "content": "You are a professional English-to-Persian subtitle translator. Output valid JSON only."},
         {"role": "user", "content": prompt}],
         "temperature": 0.1, "max_tokens": 5000, "response_format": {"type": "json_object"}}
-    if base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
+    if base.rstrip("/") == os.getenv("AVALAI_BASE_URL", "https://api.avalai.ir/v1").rstrip("/") or base.rstrip("/") in ("https://api.avalai.ir/v1", "https://api.avalapis.ir/v1", "https://api.avalai.org/v1"):
         content = AvalAIClient(api_key=key, base_url=base).chat_completion(
             model, payload["messages"], temperature=0.1, max_tokens=5000,
             response_format={"type": "json_object"})
