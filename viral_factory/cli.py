@@ -235,9 +235,23 @@ def render(source: Path,clip: dict[str,Any],target: Path) -> None:
       "-c:v","libx264","-preset","veryfast","-crf","23","-c:a","aac",
       "-b:a","128k","-movflags","+faststart",str(target)],check=True)
 
-def process(index: int,out: Path,limit: int,model: str) -> None:
+def process(index: int | str,out: Path,limit: int,model: str) -> None:
     candidates=out/"commons_candidates.json"
     if not candidates.exists(): raise FileNotFoundError("Run discover first.")
+    candidate_rows=json.loads(candidates.read_text(encoding="utf-8"))
+    used_path=out/"used_sources.json"
+    if used_path.exists():
+        used_value=json.loads(used_path.read_text(encoding="utf-8"))
+        if not isinstance(used_value,list) or any(not isinstance(x,str) for x in used_value):
+            raise ValueError("used_sources.json is malformed; refusing to reuse a source blindly.")
+        used=set(used_value)
+    else:
+        used=set()
+    if str(index).strip().lower()=="auto":
+        index=next((i for i,row in enumerate(candidate_rows) if row.get("download_url") not in used),None)
+        if index is None: raise RuntimeError("No unused licensed Commons source remains in this discovery batch.")
+    else:
+        index=int(index)
     source=out/"source.mp4"; attribution=download_candidate(candidates,index,source)
     duration=probe(source)
     if duration<20: raise ValueError("Source video is shorter than 20 seconds.")
@@ -262,6 +276,8 @@ def process(index: int,out: Path,limit: int,model: str) -> None:
         quality.append(validate_viral_clip(target,fa_srt))
         print(f"Rendered and validated Persian-subtitled clip {n}/{len(clips)} ({cue_count} cues):",target)
     (out/"viral_quality_report.json").write_text(json.dumps(quality,ensure_ascii=False,indent=2),encoding="utf-8")
+    used.add(str(attribution.get("download_url","")))
+    used_path.write_text(json.dumps(sorted(used),ensure_ascii=False,indent=2),encoding="utf-8")
     description=("Edited short from a Creative Commons-licensed source.\n\n"
       +"Source: "+attribution.get("source_page","")+"\n"
       +"Creator: "+(attribution.get("artist") or "Not stated")+"\n"
@@ -341,7 +357,7 @@ def main() -> None:
     parser=argparse.ArgumentParser(description="KOROUSH Viral Factory")
     sub=parser.add_subparsers(dest="command",required=True)
     p=sub.add_parser("discover"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
-    p=sub.add_parser("process"); p.add_argument("--candidate-index",type=int,default=0)
+    p=sub.add_parser("process"); p.add_argument("--candidate-index",type=str,default="auto")
     p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
     p.add_argument("--limit",type=int,default=4); p.add_argument("--model",default="tiny")
     p=sub.add_parser("publish"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
