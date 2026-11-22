@@ -48,6 +48,11 @@ on:
         required: false
         default: ""
         type: string
+      auto_generate_plan:
+        description: Generate the documentary script and storyboard from confirmed research claims using explicitly free AI models
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -80,10 +85,13 @@ jobs:
           SUBTITLES: ${{ inputs.subtitles_srt }}
           VOICEOVER: ${{ inputs.voiceover_audio }}
           STORYBOARD_PLAN: ${{ inputs.storyboard_plan }}
+          AUTO_GENERATE_PLAN: ${{ inputs.auto_generate_plan }}
         run: |
           set -euo pipefail
-          if [[ -n "$STORYBOARD_PLAN" ]]; then
-            test -f "$STORYBOARD_PLAN"
+          test -f "$RESEARCH_INPUT"
+          test -f "$RESEARCH_FEEDS"
+          if [[ -n "$STORYBOARD_PLAN" || "$AUTO_GENERATE_PLAN" == "true" ]]; then
+            if [[ -n "$STORYBOARD_PLAN" ]]; then test -f "$STORYBOARD_PLAN"; fi
             python - "$STORYBOARD_PLAN" <<'PY'
           import json,sys
           from pathlib import Path
@@ -143,11 +151,26 @@ jobs:
       - name: Audit extracted text against curated research claims
         run: |
           python scripts/audit_research_evidence.py --dossier longform-output/research-dossier.json --extracts longform-output/research-extracts.json --output longform-output/research-evidence-audit.json --report longform-output/research-evidence-audit.md
+      - name: Generate documentary script and storyboard with explicitly free AI models
+        if: inputs.auto_generate_plan
+        id: plan
+        env:
+          RESEARCH_DOSSIER: longform-output/research-dossier.json
+          TARGET_SECONDS: ${{ inputs.minimum_duration_seconds }}
+          FREELLMAPI_BASE_URL: ${{ secrets.FREELLMAPI_BASE_URL }}
+          FREELLMAPI_API_KEY: ${{ secrets.FREELLMAPI_API_KEY }}
+          FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          python scripts/generate_longform_plan.py --research "$RESEARCH_DOSSIER" --output longform-output/longform-plan.json --target-duration-seconds "$TARGET_SECONDS"
+          echo "path=longform-output/longform-plan.json" >> "$GITHUB_OUTPUT"
       - name: Download openly licensed Commons visuals for AI storyboard
-        if: inputs.storyboard_plan != ''
+        if: inputs.auto_generate_plan || inputs.storyboard_plan != ''
         id: commons
         env:
-          STORYBOARD_PLAN: ${{ inputs.storyboard_plan }}
+          STORYBOARD_PLAN: ${{ steps.plan.outputs.path || inputs.storyboard_plan }}
         run: |
           set -euo pipefail
           python scripts/discover_commons_media.py --plan "$STORYBOARD_PLAN" --manifest data/longform/generated-storyboard.json --ledger data/longform/generated-rights.json --assets assets/longform/generated
