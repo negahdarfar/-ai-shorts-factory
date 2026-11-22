@@ -4,6 +4,10 @@ import argparse, json, subprocess, tempfile
 from pathlib import Path
 
 def run(cmd): subprocess.run(cmd,check=True)
+
+def duration_seconds(path):
+    result=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)],capture_output=True,text=True,check=True)
+    return float(result.stdout.strip())
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--clips",required=True,help="JSON array of clip paths in story order")
@@ -32,8 +36,12 @@ def main():
       if a.voiceover:
         voice=Path(a.voiceover).resolve()
         if not voice.is_file(): raise SystemExit("Voiceover file not found.")
+        joined_duration=duration_seconds(joined)
+        voice_duration=duration_seconds(voice)
+        if voice_duration > joined_duration + 1.0:
+            raise SystemExit(f"Voiceover ({voice_duration:.1f}s) exceeds visual timeline ({joined_duration:.1f}s); add footage instead of truncating narration.")
         voiced=Path(tmp)/"voiced.mp4"
-        run(["ffmpeg","-y","-i",str(joined),"-i",str(voice),"-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-shortest",str(voiced)])
+        run(["ffmpeg","-y","-i",str(joined),"-i",str(voice),"-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-ar","48000","-ac","2","-af","loudnorm=I=-16:TP=-1.5:LRA=11","-shortest",str(voiced)])
         current=voiced
       if a.subtitles and a.burn_subtitles:
         srt=Path(a.subtitles).resolve()
