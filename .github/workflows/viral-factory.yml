@@ -1,6 +1,8 @@
 name: KOROUSH Viral Factory (standalone)
 
 on:
+  schedule:
+    - cron: "30 15 * * *" # Daily automated run; publish only after license and media QA pass.
   workflow_dispatch:
     inputs:
       mode:
@@ -21,10 +23,10 @@ on:
         options: ["1", "2", "3", "4"]
         default: "2"
       publish_public:
-        description: "Upload the rendered Shorts publicly (explicit opt-in)"
+        description: "Upload rendered Shorts publicly after license and media QA pass"
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -97,8 +99,8 @@ jobs:
             --limit "$CLIP_COUNT" \
             --model tiny \
             --output-dir viral_factory/work
-      - name: Upload publicly to YouTube (explicit opt-in only)
-        if: ${{ inputs.mode == 'process' && inputs.publish_public == true }}
+      - name: Upload publicly to YouTube after quality and license validation
+        if: ${{ (github.event_name == 'schedule' || inputs.publish_public == true) && (github.event_name == 'schedule' || inputs.mode == 'process') }}
         run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
       - name: Persist processed-source history
         if: ${{ always() && hashFiles('viral_factory/work/used_sources.json') != '' }}
