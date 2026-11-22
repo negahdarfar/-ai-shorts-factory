@@ -1,5 +1,7 @@
 import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -13,11 +15,27 @@ class FreeModelRouterTests(unittest.TestCase):
         self.assertTrue(is_explicitly_free("nvidia/nemotron:free"))
         self.assertTrue(is_explicitly_free("kilo-auto/free"))
         self.assertTrue(is_explicitly_free("vendor/model", {"is_free": True}))
+        self.assertTrue(is_explicitly_free("avalai/model", {"pricing": {"input": 0, "output": 0}}))
         self.assertTrue(is_explicitly_free("vendor/model", {"pricing": {"prompt": "0", "completion": "0"}}))
         self.assertFalse(is_explicitly_free("anthropic/claude-sonnet"))
         self.assertFalse(is_explicitly_free("provider/model-with-unknown-pricing"))
         self.assertFalse(is_explicitly_free("vendor/model", {"pricing": {"prompt": "0", "completion": "0.0001"}}))
         self.assertFalse(is_explicitly_free("vendor/model", {"pricing": {"prompt": "0"}}))
+
+    def test_avalai_catalogue_cache_reuses_model_pricing_within_ttl(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = str(Path(directory) / "models.json")
+            env = {"AVALAI_MODEL_CACHE_PATH": cache, "AVALAI_MODEL_CACHE_TTL_SECONDS": "300"}
+            with patch.dict(os.environ, env, clear=False):
+                with patch("free_model_router.AvalAIClient") as client_class:
+                    client_class.return_value.list_models.return_value = [
+                        {"id": "avalai/free-flash", "pricing": {"input": 0, "output": 0}}
+                    ]
+                    first = discover_free_models("https://api.avalai.ir/v1", "test-key", task="translation")
+                    second = discover_free_models("https://api.avalai.ir/v1", "test-key", task="translation")
+        self.assertEqual(first, ["avalai/free-flash"])
+        self.assertEqual(second, first)
+        client_class.return_value.list_models.assert_called_once()
 
     @patch("free_model_router.urllib.request.urlopen")
     def test_discovers_and_ranks_free_translation_models(self, urlopen):
