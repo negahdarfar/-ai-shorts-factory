@@ -75,7 +75,7 @@ jobs:
       - name: Install FFmpeg and Persian fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra espeak-ng
       - name: Validate manifest and optional assets
         env:
           MANIFEST: ${{ inputs.clips_manifest }}
