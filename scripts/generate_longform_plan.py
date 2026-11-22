@@ -33,7 +33,9 @@ def build_prompt(dossier, target_seconds):
         "causes, or explanations. Each chapter must cite exact claim_ids. Do not use disputed "
         "or unverified material. Create 5-30 chapters; each narration must contain 100-260 words. "
         "Each chapter needs 2-5 scene briefs with visual_query (at least 3 words), media_type "
-        "(image or video), duration_seconds (4-30), and purpose. Prefer public-domain archival, "
+        "(image or video), duration_seconds (4-30), and purpose. The sum of all scene durations "
+        "MUST cover the full target runtime; aim for 20-30 seconds per scene and add enough scenes. "
+        "Prefer public-domain archival, "
         "educational, landscape, map, and neutral illustrative visuals. Do not request movie/TV "
         "clips, broadcast footage, logos, or celebrity likenesses. Return only JSON with keys "
         "title, logline, chapters. CONFIRMED CLAIMS:\n"
@@ -46,7 +48,7 @@ def validate_plan(plan, dossier, target_seconds):
     chapters = plan.get("chapters")
     if not isinstance(chapters, list) or not 5 <= len(chapters) <= 30:
         raise ValueError("Plan must contain 5-30 chapters.")
-    output, seen, words = [], set(), 0
+    output, seen, words, visual_seconds = [], set(), 0, 0
     for index, row in enumerate(chapters, 1):
         if not isinstance(row, dict):
             raise ValueError(f"Chapter {index} must be an object.")
@@ -73,6 +75,7 @@ def validate_plan(plan, dossier, target_seconds):
                 raise ValueError("Scene has invalid query, type, or duration.")
             clean.append({"visual_query": query, "media_type": kind,
                           "duration_seconds": duration, "purpose": str(scene.get("purpose", ""))[:200]})
+            visual_seconds += duration
         seen.add(cid)
         words += count
         output.append({"id": cid, "title": title[:160], "narration": narration,
@@ -80,12 +83,14 @@ def validate_plan(plan, dossier, target_seconds):
     minimum = max(600, target_seconds * 2)
     if words < minimum:
         raise ValueError(f"Only {words} narration words; at least {minimum} are required.")
+    if visual_seconds < target_seconds:
+        raise ValueError(f"Planned visuals cover only {visual_seconds:.1f}s; at least {target_seconds}s are required.")
     if not str(plan.get("title", "")).strip() or not str(plan.get("logline", "")).strip():
         raise ValueError("Plan requires title and logline.")
     return {
         "schema_version": 1, "topic": dossier.get("topic", ""),
         "title": str(plan["title"])[:160], "logline": str(plan["logline"])[:500],
-        "target_duration_seconds": target_seconds, "narration_word_count": words,
+        "target_duration_seconds": target_seconds, "narration_word_count": words, "planned_visual_seconds": round(visual_seconds, 2),
         "chapters": output, "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "editorial_status": "AI_DRAFT_REQUIRES_SOURCE_AND_EDITORIAL_REVIEW",
         "warning": "Claim IDs do not prove every sentence. Verify narration against source passages before publication."
