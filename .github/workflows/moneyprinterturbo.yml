@@ -234,7 +234,12 @@ jobs:
         if: ${{ steps.configure.outputs.ready == 'true' }}
         working-directory: vendor/MoneyPrinterTurbo
         run: |
-          python "$GITHUB_WORKSPACE/scripts/run_mpt_batch_with_retry.py" --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source ${{ steps.configure.outputs.video_source }} --max-attempts 3 --retry-delay-seconds 20
+          ARGS=(--batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source "${{ steps.configure.outputs.video_source }}" --max-attempts 3 --retry-delay-seconds 20)
+          FALLBACK_SOURCE="${{ steps.configure.outputs.fallback_video_source }}"
+          if [ -n "$FALLBACK_SOURCE" ]; then
+            ARGS+=(--fallback-video-source "$FALLBACK_SOURCE")
+          fi
+          python "$GITHUB_WORKSPACE/scripts/run_mpt_batch_with_retry.py" "${ARGS[@]}"
       - name: Translate and burn Persian subtitles
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
