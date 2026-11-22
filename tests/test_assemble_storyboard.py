@@ -78,7 +78,7 @@ class StoryboardManifestTests(unittest.TestCase):
                 {"path": "assets/clip.mp4", "type": "video", "start": 0, "end": 2},
             ]), encoding="utf-8")
             output = root / "output" / "documentary.mp4"
-            result = assemble(manifest, output)
+            result = assemble(manifest, output, root_dir=root)
             probe = subprocess.run([
                 "ffprobe", "-v", "error", "-show_entries",
                 "stream=codec_type,width,height", "-of", "json", str(output),
