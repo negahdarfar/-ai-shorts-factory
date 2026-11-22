@@ -1,8 +1,8 @@
-name: Koroush AI - shorts-factory validation
+name: Koroush AI - short-video-studio validation
 
 on:
   push:
-    branches: ["shorts-factory"]
+    branches: ["short-video-studio"]
     paths:
       - "koroush_core/**"
       - "scripts/**"
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: koroush-shorts-factory-ci-${{ github.ref }}
+  group: koroush-short-video-studio-ci-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
