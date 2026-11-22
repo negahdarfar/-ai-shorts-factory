@@ -26,7 +26,7 @@ on:
         description: "Upload rendered Shorts publicly after license and media QA pass"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -75,7 +75,7 @@ jobs:
           restore-keys: |
             viral-sources-${{ runner.os }}-
       - name: Validate existing YouTube OAuth secrets for public upload
-        if: ${{ inputs.publish_public == true }}
+        if: ${{ (github.event_name == 'schedule' && vars.VIRAL_PUBLIC_PUBLISH_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish_public == true) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -123,7 +123,7 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
         run: python scripts/evaluate_content_quality.py --input viral_factory/work/selected_clips.json --output viral_factory/work/content-quality-report.json
       - name: Upload publicly to YouTube after quality and license validation
-        if: ${{ (github.event_name == 'schedule' || inputs.publish_public == true) && (github.event_name == 'schedule' || inputs.mode == 'process') }}
+        if: ${{ ((github.event_name == 'schedule' && vars.VIRAL_PUBLIC_PUBLISH_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish_public == true)) && (github.event_name == 'schedule' || inputs.mode == 'process') }}
         run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
       - name: Persist processed-source history
         if: ${{ always() && hashFiles('viral_factory/work/used_sources.json') != '' }}
