@@ -15,6 +15,8 @@ def free_chat_candidates(rows, requested):
     free_rows = 0
     excluded_rows = 0
     modality_rows = 0
+    excluded_ids = []
+    free_ids = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -24,8 +26,10 @@ def free_chat_candidates(rows, requested):
         explicitly_free = is_explicitly_free(model_id, row)
         if explicitly_free:
             free_rows += 1
+            free_ids.append(model_id)
         if not is_chat_capable(model_id, row):
             excluded_rows += 1
+            excluded_ids.append(model_id)
             architecture = row.get("architecture")
             if isinstance(architecture, dict):
                 modality = str(architecture.get("modality") or "").lower()
@@ -44,6 +48,8 @@ def free_chat_candidates(rows, requested):
             "free_rows": free_rows,
             "excluded_rows": excluded_rows,
             "non_text_modality_rows": modality_rows,
+            "free_ids": free_ids,
+            "excluded_ids": excluded_ids,
         }
     candidates.sort(key=lambda value: (
         next((len(PREFERRED) - i for i, word in enumerate(PREFERRED) if word in value.lower()), 0),
@@ -53,6 +59,8 @@ def free_chat_candidates(rows, requested):
         "free_rows": free_rows,
         "excluded_rows": excluded_rows,
         "non_text_modality_rows": modality_rows,
+        "free_ids": free_ids,
+        "excluded_ids": excluded_ids,
     }
 
 
@@ -75,12 +83,20 @@ def main():
             f"max_candidates_to_test={os.getenv('AVALAI_MAX_FREE_CHAT_CANDIDATES', '12')}",
             flush=True,
         )
+        print("AVALAI_EXPLICITLY_FREE_MODEL_IDS: " + ", ".join(diagnostics["free_ids"]), flush=True)
+        print("AVALAI_EXCLUDED_NON_CHAT_MODEL_IDS: " + ", ".join(diagnostics["excluded_ids"]),
+            flush=True,
+        )
         if candidates:
             print("AVALAI_CHAT_CANDIDATE_IDS: " + ", ".join(candidates[:max(1, min(int(os.getenv("AVALAI_MAX_FREE_CHAT_CANDIDATES", "12")), 12))]), flush=True)
         if not candidates:
-            raise AvalAIError(
-                "No explicitly free text-chat candidate remains after modality filtering."
+            print(
+                "AVALAI_INFERENCE_SKIPPED: no explicitly free chat-completion model is present "
+                "in the current catalogue; the factory must skip AvalAI and continue to the "
+                "next configured free provider.",
+                flush=True,
             )
+            return 0
 
         # Try several explicitly-free chat models in rank order. A model outage or
         # unsupported endpoint must not prevent trying the next free model.
