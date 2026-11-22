@@ -26,6 +26,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Restore factory upload ledger
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/mpt-runtime/state
+          key: mpt-topics-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mpt-topics-${{ runner.os }}-
       - name: Download the latest completed analytics report
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,7 +48,7 @@ jobs:
           test -s analytics-artifact/youtube_analytics.json
 
       - name: Generate weekly optimization recommendations
-        run: python scripts/weekly_optimization.py --input analytics-artifact/youtube_analytics.json --output weekly_optimization.json --markdown weekly_optimization.md
+        run: python scripts/weekly_optimization.py --input analytics-artifact/youtube_analytics.json --upload-history "$GITHUB_WORKSPACE/mpt-runtime/state/upload_history.json" --output weekly_optimization.json --markdown weekly_optimization.md
 
       - name: Refresh dashboard with optimization report
         run: python scripts/build_factory_dashboard.py --analytics analytics-artifact/youtube_analytics.json --optimization weekly_optimization.json --output factory_dashboard.html
