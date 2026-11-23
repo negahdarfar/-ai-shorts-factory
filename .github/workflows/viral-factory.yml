@@ -22,8 +22,13 @@ on:
         type: choice
         options: ["1", "2", "3", "4"]
         default: "2"
+      upload_private:
+        description: "Upload validated videos as PRIVATE YouTube QA items"
+        required: true
+        type: boolean
+        default: false
       publish_public:
-        description: "Upload rendered Shorts publicly after license and media QA pass"
+        description: "Upload publicly (manual run only; explicit confirmation required)"
         required: true
         type: boolean
         default: false
@@ -89,7 +94,7 @@ jobs:
       - name: Discover Commons sources and optional YouTube trend metadata
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'discover' || inputs.mode == 'process' }}
         run: python viral_factory/cli.py discover --output-dir viral_factory/work
-      - name: Render Shorts from selected Creative Commons source
+      - name: Render 2–10 minute videos from selected licensed source
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'process' }}
         env:
           CANDIDATE_INDEX: ${{ inputs.candidate_index || 'auto' }}
@@ -122,9 +127,17 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
         run: python scripts/evaluate_content_quality.py --input viral_factory/work/selected_clips.json --output viral_factory/work/content-quality-report.json
-      - name: Upload publicly to YouTube after quality and license validation
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_public == true && inputs.mode == 'process' }}
-        run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
+      - name: Upload validated videos to YouTube (PRIVATE by default)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'process' && (inputs.upload_private == true || inputs.publish_public == true) }}
+        env:
+          PUBLISH_PUBLIC: ${{ inputs.publish_public }}
+        run: |
+          set -euo pipefail
+          args=(publish --output-dir viral_factory/work --max-uploads 4 --privacy private)
+          if [[ "$PUBLISH_PUBLIC" == "true" ]]; then
+            args+=(--privacy public --confirm-public)
+          fi
+          python viral_factory/cli.py "${args[@]}"
       - name: Persist processed-source history
         if: ${{ always() && hashFiles('viral_factory/work/used_sources.json') != '' }}
         uses: actions/cache/save@v4
