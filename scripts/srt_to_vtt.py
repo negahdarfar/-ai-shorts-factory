@@ -22,10 +22,11 @@ def convert_srt_to_vtt(source: Path, target: Path) -> int:
         start = f"{match.group(1)}.{match.group(2)}"
         end = f"{match.group(3)}.{match.group(4)}"
         def milliseconds(clock: str) -> int:
-            hours, minutes, seconds = (int(part) for part in clock.split(":"))
+            clock_part, fraction_part = clock.split(".", 1)
+            hours, minutes, seconds = (int(part) for part in clock_part.split(":"))
             if minutes > 59 or seconds > 59:
                 raise ValueError(f"Invalid minute/second value in cue {block_number}.")
-            fraction = int(clock.split(".")[1])
+            fraction = int(fraction_part)
             return ((hours * 60 + minutes) * 60 + seconds) * 1000 + fraction
         start_ms = milliseconds(start)
         end_ms = milliseconds(end)
