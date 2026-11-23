@@ -80,8 +80,8 @@ for path, topic, task_index in files_with_topics:
         raise SystemExit(f"Resolution below 720x1280 minimum: {width}x{height}: {path}")
 
     duration = float(info["format"]["duration"])
-    if not 45 <= duration <= 60:
-        raise SystemExit(f"Shorts duration must be 45-60 seconds ({duration:.1f}s): {path}")
+    if not 60 <= duration <= 120:
+        raise SystemExit(f"Short Video Studio duration must be 60-120 seconds ({duration:.1f}s): {path}")
 
     subtitles = path.parent / "subtitle.fa.srt"
     if not subtitles.is_file() or subtitles.stat().st_size < 20:
