@@ -12,7 +12,7 @@ Independent English-language YouTube short-video pipeline.
 
 ## Workflow and scheduling boundary
 - `.github/workflows/moneyprinterturbo.yml` — manual production and private scheduled QA.
-- `.github/workflows/daily-factory-orchestrator.yml` — manual/scheduled dispatch coordinator.
+- `.github/workflows/daily-factory-orchestrator.yml` — branch-local orchestration draft; it is not present on default branch `main`.
 - GitHub Actions scheduled workflows run only when the workflow file exists on the repository's default branch (`main`). This branch-specific workflow file does not independently establish a working daily schedule. Enabling scheduling requires an approved change to `main`; no such change has been made.
 - No public upload was run during this work.
 
