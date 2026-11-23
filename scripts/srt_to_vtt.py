@@ -20,6 +20,19 @@ def convert_srt_to_vtt(source: Path, target: Path) -> int:
             raise ValueError(f"Malformed SRT timestamp in cue {block_number}.")
         start = f"{match.group(1)}.{match.group(2)}"
         end = f"{match.group(3)}.{match.group(4)}"
+        def milliseconds(clock: str) -> int:
+            hours, minutes, seconds = (int(part) for part in clock.split(":"))
+            if minutes > 59 or seconds > 59:
+                raise ValueError(f"Invalid minute/second value in cue {block_number}.")
+            fraction = int(clock.split(".")[1])
+            return ((hours * 60 + minutes) * 60 + seconds) * 1000 + fraction
+        start_ms = milliseconds(start)
+        end_ms = milliseconds(end)
+        if end_ms <= start_ms:
+            raise ValueError(f"Subtitle cue {block_number} has a non-positive duration.")
+        if start_ms < previous_end:
+            raise ValueError(f"Subtitle cue {block_number} overlaps the previous cue.")
+        previous_end = end_ms
         text = [line.rstrip() for line in lines[2:] if line.strip()]
         if not text:
             raise ValueError(f"Empty subtitle text in cue {block_number}.")
