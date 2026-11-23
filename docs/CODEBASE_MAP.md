@@ -9,7 +9,7 @@ Dedicated MoneyPrinterTurbo-based short-video engine. This map reflects the curr
 - Provider setup and routing: `scripts/configure_moneyprinter.py`, `scripts/free_model_router.py`, `scripts/avalai_client.py`.
 - Content pipeline: `scripts/build_trending_batch.py`, `scripts/research_youtube_competitors.py`, `scripts/generate_seo_metadata.py`, `scripts/render_seo_thumbnails.py`.
 - Subtitle processing: `scripts/add_persian_subtitles.py` writes Persian SRT and English/Persian VTT sidecars; it does not modify the MP4.
-- Media validation: `scripts/validate_mpt_outputs.py` requires 60–120 seconds, vertical media, audio, Persian SRT and black/silence checks.
+- Media validation: `scripts/validate_mpt_outputs.py` requires 60–120 seconds, 1080×1920 vertical media, audio, English/Persian SRT+VTT sidecars, valid cue timing and black/silence checks.
 - Upload state: `scripts/upload_history.py`, `scripts/upload_four_private_youtube_tests.py`, `data/factory_state/`.
 - Tests: `tests/`.
 - Separate licensed-media engine: `viral_factory/`; it is not the MoneyPrinterTurbo short pipeline.
