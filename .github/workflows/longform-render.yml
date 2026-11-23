@@ -34,7 +34,7 @@ on:
         default: ""
         type: string
       burn_subtitles:
-        description: Burn the supplied Persian subtitles into the video
+        description: Burn Persian subtitles into the video (off by default; SRT remains a separate file)
         required: true
         default: true
         type: boolean
