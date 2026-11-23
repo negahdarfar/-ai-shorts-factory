@@ -38,6 +38,21 @@ class ViralFactoryTests(unittest.TestCase):
             for right in clips[i + 1:]:
                 self.assertTrue(left["end"] <= right["start"] or right["end"] <= left["start"])
 
+    def test_fallback_clips_are_non_overlapping(self):
+        clips = select([], 60, 3)
+        self.assertEqual(len(clips), 3)
+        for left, right in zip(clips, clips[1:]):
+            self.assertLessEqual(left["end"], right["start"])
+        self.assertTrue(all(20 <= clip["duration"] <= 35 for clip in clips))
+        self.assertLessEqual(clips[-1]["end"], 60)
+
+    def test_fallback_clips_cover_uneven_source_without_overlap(self):
+        clips = select([], 95, 4)
+        self.assertEqual(len(clips), 4)
+        for left, right in zip(clips, clips[1:]):
+            self.assertLessEqual(left["end"], right["start"])
+        self.assertTrue(all(20 <= clip["duration"] <= 35 for clip in clips))
+
     def test_clip_srt_uses_relative_timestamps(self):
         segments = [
             {"start": 10.0, "end": 11.0, "text": "Hello"},
