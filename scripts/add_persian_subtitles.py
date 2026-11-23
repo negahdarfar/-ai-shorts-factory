@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Translate generated English SRT captions to Persian and burn them in above the English captions."""
+"""Translate English SRT captions into separate Persian SRT/VTT sidecars; never alter the MP4."""
 import argparse
 import json
 import http.client
@@ -393,30 +393,23 @@ def main():
             for cue in cues
         ]
         persian.write_text("\n".join(blocks), encoding="utf-8")
-        temporary = video.with_name(video.stem + ".fa-tmp.mp4")
-        escaped = str(persian.resolve()).replace("\\", "/").replace(":", "\\:")
-        vf = (
-            f"subtitles='{escaped}':force_style='FontName=Noto Naskh Arabic,"
-            "FontSize=14,Alignment=2,MarginV=105,Outline=1,Shadow=0,"
-            "BorderStyle=1,BackColour=&HFF000000'"
-        )
-        command = [
-            "ffmpeg", "-y", "-i", str(video), "-vf", vf,
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-            "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart",
-            str(temporary),
-        ]
-        result = subprocess.run(command, capture_output=True, text=True)
-        if result.returncode != 0:
-            temporary.unlink(missing_ok=True)
-            raise SystemExit(
-                f"Persian subtitle burn-in failed for video {index}: "
-                f"{(result.stderr or result.stdout)[-2500:]}"
-            )
-        if not temporary.is_file() or temporary.stat().st_size < 500_000:
-            raise SystemExit(f"Persian-subtitled output invalid for video {index}.")
-        temporary.replace(video)
-        print(f"PERSIAN_SUBTITLES_BURNED_IN {index}/{expected_count} | cues={len(cues)} | {video.name}")
+        if not persian.is_file() or persian.stat().st_size < 20:
+            raise SystemExit(f"Persian subtitle sidecar is empty for video {index}.")
+        if not any(0x0600 <= ord(ch) <= 0x06ff for ch in persian.read_text(encoding="utf-8")):
+            raise SystemExit(f"Persian subtitle sidecar has no Persian-script text for video {index}.")
+        def write_vtt(source, target):
+            raw = source.read_text(encoding="utf-8-sig").strip()
+            blocks = []
+            for block in re.split(r"\\n\\s*\\n", raw):
+                lines = block.splitlines()
+                if len(lines) < 3:
+                    raise SystemExit(f"Malformed SRT block in {source}.")
+                timing = lines[1].replace(",", ".")
+                blocks.append(timing + "\\n" + "\\n".join(lines[2:]))
+            target.write_text("WEBVTT\\n\\n" + "\\n\\n".join(blocks) + "\\n", encoding="utf-8")
+        write_vtt(english, video.parent / "subtitle.en.vtt")
+        write_vtt(persian, video.parent / "subtitle.fa.vtt")
+        print(f"PERSIAN_SUBTITLE_SIDECARS_READY {index}/{expected_count} | cues={len(cues)} | {video.name}")
     print(f"PERSIAN_SUBTITLES_COMPLETED_FOR_ALL_{expected_count}_VIDEOS")
 
 
