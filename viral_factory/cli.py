@@ -223,7 +223,7 @@ def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dic
         for nxt in segments[i:]:
             if float(nxt["end"])-start>600: break
             end=float(nxt["end"]); texts.append(nxt["text"]); span=end-start
-            if 120<=span<=600:
+            if 120<=span<=600 and re.search(r"[.!?]$", str(nxt["text"]).strip()):
                 text=" ".join(texts)
                 windows.append({"start":round(start,2),"end":round(end,2),
                   "duration":round(span,2),"text":text,"score":score(text)})
@@ -233,14 +233,6 @@ def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dic
         if all(candidate["end"]<=old["start"] or candidate["start"]>=old["end"] for old in chosen):
             chosen.append(candidate)
         if len(chosen)>=limit: break
-    if not chosen and duration>=120:
-        count=min(limit,int(duration//120))
-        step=duration/count
-        length=min(600.0,step)
-        for i in range(count):
-            start=i*step
-            chosen.append({"start":round(start,2),"end":round(start+length,2),
-              "duration":round(length,2),"text":"","score":0,"selection":"evenly-spaced fallback"})
     return chosen
 
 def render(source: Path,clip: dict[str,Any],target: Path,aspect: str="16:9") -> None:
