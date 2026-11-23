@@ -135,10 +135,10 @@ jobs:
         id: configure
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
           FREELLMAPI_BASE_URL: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_BASE_URL || '' }}
-          FREELLMAPI_CLOUD_BASE_URL: ${{ secrets.FREELLMAPI_CLOUD_BASE_URL }}
-          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || secrets.FREELLMAPI_CLOUD_API_KEY || '' }}
+          FREELLMAPI_API_KEY: ${{ steps.freeapi.outputs.ready == 'true' && secrets.FREELLMAPI_API_KEY || '' }}
           FREELLMAPI_MODEL: ${{ secrets.FREELLMAPI_MODEL || 'auto' }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
