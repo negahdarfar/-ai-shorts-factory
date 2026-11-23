@@ -386,13 +386,13 @@ def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bo
     if not allowed_license(attribution.get("license","")): raise RuntimeError("Source licence is not on the approved allowlist.")
     creds=Credentials(token=None,refresh_token=os.environ["YOUTUBE_REFRESH_TOKEN"],
       token_uri="https://oauth2.googleapis.com/token",client_id=os.environ["YOUTUBE_CLIENT_ID"],
-      client_secret=os.environ["YOUTUBE_CLIENT_SECRET"],scopes=["https://www.googleapis.com/auth/youtube.upload"])
+      client_secret=os.environ["YOUTUBE_CLIENT_SECRET"],scopes=["https://www.googleapis.com/auth/youtube.force-ssl"])
     creds.refresh(Request())
     if not creds.valid or not creds.token: raise RuntimeError("YouTube OAuth did not return a valid access token.")
     api=build("youtube","v3",credentials=creds,cache_discovery=False)
     meta=json.loads((out/"publish_metadata.json").read_text(encoding="utf-8"))
     files=sorted((out/"videos").glob("*.mp4"))[:max_uploads]
-    if not files: raise FileNotFoundError("No rendered Shorts found.")
+    if not files: raise FileNotFoundError("No rendered 2–10 minute videos found.")
     ledger_path=out/"upload_history.json"
     if ledger_path.exists():
         ledger=json.loads(ledger_path.read_text(encoding="utf-8"))
@@ -427,10 +427,34 @@ def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bo
         response=api.videos().insert(part="snippet,status",body=body,media_body=media,notifySubscribers=False).execute()
         video_id=response.get("id")
         if not video_id: raise RuntimeError("YouTube returned no video ID; pending ledger retained for reconciliation.")
+        caption_ids={}
+        for language,suffix,label in (("en",".en.srt","English"),("fa",".fa.srt","Persian")):
+            caption_path=path.with_suffix(suffix)
+            if not caption_path.is_file():
+                raise RuntimeError(f"Missing {language} caption sidecar; video remains {privacy} and upload is pending.")
+            validate_subtitle_file(caption_path,quality["duration_seconds"])
+            caption_response=api.captions().insert(
+                part="snippet",
+                body={"snippet":{"videoId":video_id,"language":language,"name":label,"isDraft":False}},
+                media_body=MediaFileUpload(str(caption_path),mimetype="application/octet-stream",resumable=True)
+            ).execute()
+            caption_id=caption_response.get("id")
+            if not caption_id:
+                raise RuntimeError(f"YouTube did not confirm {language} caption insertion; video remains {privacy}.")
+            caption_ids[language]=caption_id
+        caption_listing=api.captions().list(part="snippet",videoId=video_id).execute()
+        uploaded_languages={
+            row.get("snippet",{}).get("language")
+            for row in caption_listing.get("items",[])
+        }
+        if not {"en","fa"}.issubset(uploaded_languages):
+            raise RuntimeError("YouTube caption-track verification failed; video remains private/pending.")
         result={"file":path.name,"video_id":video_id,"sha256":digest,"privacy":privacy,
+                "captions":{"en":caption_ids["en"],"fa":caption_ids["fa"],"verified_languages":["en","fa"]},
                 "source_page":attribution.get("source_page"),"license":attribution.get("license"),
                 "url":"https://www.youtube.com/watch?v="+str(video_id)}
         ledger["uploads"][key]={**pending,"status":"completed","video_id":video_id,"url":result["url"],
+                                "caption_ids":caption_ids,"caption_languages_verified":["en","fa"],
                                 "completed_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())}
         ledger_path.write_text(json.dumps(ledger,ensure_ascii=False,indent=2),encoding="utf-8")
         uploaded.append(result)
