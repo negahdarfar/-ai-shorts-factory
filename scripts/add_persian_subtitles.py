@@ -277,8 +277,7 @@ def translate_ollama(rows, base_url, model):
     return parse_translation_json(raw, rows, "Ollama")
 
 
-def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=None):
-    cloudflare = cloudflare or ("", "", "")
+def translate_with_fallback(rows, free, gemini, gemini_free_tier_enabled=False, ollama=None):
     failures = []
     ollama = ollama or ("", "", "")
     if ollama[0] and ollama[1]:
@@ -287,19 +286,6 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=No
         except Exception as exc:
             failures.append(f"Ollama: {exc}")
             print(f"OLLAMA_FAILED_NEXT_PROVIDER | {exc}", flush=True)
-    allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
-    if omni[0] and omni[1] and allow_nonfree_fallback:
-        try:
-            return translate_omniroute(rows, *omni), "OmniRoute"
-        except Exception as exc:
-            failures.append(f"OmniRoute: {exc}")
-            print(f"OMNIROUTE_FAILED_NEXT_PROVIDER | {exc}", flush=True)
-    if cloudflare[0] and cloudflare[1] and cloudflare[2] == "@cf/zai-org/glm-4.7-flash":
-        try:
-            return translate_cloudflare(rows, cloudflare[0], cloudflare[1], cloudflare[2]), "Cloudflare Workers AI"
-        except Exception as exc:
-            failures.append(f"Cloudflare Workers AI: {exc}")
-            print(f"CLOUDFLARE_FAILED_NEXT_PROVIDER | {exc}", flush=True)
     if free[0] and free[1]:
         try:
             candidates = discover_free_models(
@@ -318,10 +304,10 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=No
             except Exception as exc:
                 failures.append(f"FreeLLMAPI/{model_id}: {exc}")
                 print(f"FREELLMAPI_MODEL_FAILED_NEXT_MODEL | model={model_id} | {exc}", flush=True)
-    if gemini[0] and allow_nonfree_fallback:
-        return translate_gemini(rows, gemini[1], gemini[0]), "Gemini"
-    if (omni[0] and omni[1]) or gemini[0]:
-        print("NON_FREE_LLM_FALLBACK_DISABLED; paid or unknown-price providers were not called.", flush=True)
+    if gemini[0] and gemini_free_tier_enabled:
+        return translate_gemini(rows, gemini[1], gemini[0]), "Gemini Free Tier"
+    if gemini[0] and not gemini_free_tier_enabled:
+        print("GEMINI_FREE_TIER_NOT_ENABLED; skipping Gemini to prevent paid inference.", flush=True)
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
     raise RuntimeError(f"All configured subtitle providers failed. {detail}")
 
@@ -354,35 +340,24 @@ def parse_expected_count(value=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-3.8-flash"))
+    parser.add_argument("--model", default=os.getenv("SEO_GEMINI_MODEL", "gemini-2.5-flash"))
     parser.add_argument("--home", default=os.getenv("MPT_HOME", "mpt-runtime"))
     args = parser.parse_args()
     expected_count = parse_expected_count()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    omniroute_base_url = os.getenv("OMNIROUTE_BASE_URL", "").strip()
-    omniroute_key = os.getenv("OMNIROUTE_API_KEY", "").strip()
-    omniroute_model = os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto"
+    gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
     freellmapi_base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
     freellmapi_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
     freellmapi_model = os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto"
-    cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-    cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
-    cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
-    cloudflare_base_url = f"https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1" if cloudflare_account_id else ""
-    cloudflare = (cloudflare_base_url, cloudflare_api_token, cloudflare_model)
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
     ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip()
     ollama = (ollama_base_url, ollama_model)
     if not (
-        (omniroute_base_url and omniroute_key)
-        or (freellmapi_base_url and freellmapi_key)
-        or (cloudflare_base_url and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash")
-        or gemini_key
+        (freellmapi_base_url and freellmapi_key)
+        or (gemini_key and gemini_free_tier_enabled)
         or (ollama_base_url and ollama_model)
     ):
-        raise SystemExit("Configure Cloudflare Workers AI free credentials, a FreeLLMAPI pair, an allowed OmniRoute pair, or GEMINI_API_KEY.")
-    if bool(omniroute_base_url) != bool(omniroute_key):
-        print("OMNIROUTE_INCOMPLETE_CONFIGURATION; skipping OmniRoute.", flush=True)
+        raise SystemExit("Configure an explicitly free FreeLLMAPI model, enable the confirmed Gemini Free Tier, or install a local Ollama model.")
     if bool(freellmapi_base_url) != bool(freellmapi_key):
         print("FREELLMAPI_INCOMPLETE_CONFIGURATION; skipping FreeLLMAPI.", flush=True)
     root = Path(args.home) / "storage" / "tasks"
@@ -396,10 +371,9 @@ def main():
         cues = parse_srt(english)
         translations, provider_used = translate_with_fallback(
             cues,
-            (omniroute_base_url, omniroute_key, omniroute_model),
             (freellmapi_base_url, freellmapi_key, freellmapi_model),
             (gemini_key, args.model),
-            cloudflare,
+            gemini_free_tier_enabled,
             ollama,
         )
         print(f"{provider_used.upper()}_TRANSLATION_SUCCEEDED {index}/{expected_count}", flush=True)
