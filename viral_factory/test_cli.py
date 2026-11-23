@@ -2,7 +2,7 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from cli import allowed_license, score, select, srt_to_vtt, write_clip_srt
+from cli import allowed_license, score, select, srt_to_vtt, validate_subtitle_file, write_clip_srt
 
 
 class ViralFactoryTests(unittest.TestCase):
@@ -69,6 +69,49 @@ class ViralFactoryTests(unittest.TestCase):
             rendered = output.read_text(encoding="utf-8")
             self.assertIn("00:00:00,000 --> 00:00:00,500", rendered)
             self.assertIn("00:00:01,500 --> 00:00:02,500", rendered)
+
+    def test_subtitle_validator_accepts_valid_persian_srt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fa.srt"
+            path.write_text(
+                "1\n00:00:00,000 --> 00:00:01,000\nسلام\n\n"
+                "2\n00:00:01,100 --> 00:00:02,000\nخوبی\n\n"
+                "3\n00:00:02,100 --> 00:00:03,000\nدنیا\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(validate_subtitle_file(path, 3.0), 3)
+
+    def test_subtitle_validator_rejects_overlap_and_out_of_range(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fa.srt"
+            overlap = (
+                "1\n00:00:00,000 --> 00:00:02,000\nسلام\n\n"
+                "2\n00:00:01,000 --> 00:00:02,500\nخوبی\n\n"
+                "3\n00:00:02,600 --> 00:00:03,000\nدنیا\n"
+            )
+            path.write_text(overlap, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "overlaps"):
+                validate_subtitle_file(path, 3.0)
+            path.write_text(
+                "1\n00:00:00,000 --> 00:00:01,000\nسلام\n\n"
+                "2\n00:00:01,100 --> 00:00:02,000\nخوبی\n\n"
+                "3\n00:00:02,100 --> 00:00:04,000\nدنیا\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "overlaps"):
+                validate_subtitle_file(path, 3.0)
+
+    def test_subtitle_validator_rejects_minute_overflow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fa.srt"
+            path.write_text(
+                "1\n00:60:00,000 --> 00:60:01,000\nسلام\n\n"
+                "2\n00:60:01,100 --> 00:60:02,000\nخوبی\n\n"
+                "3\n00:60:02,100 --> 00:60:03,000\nدنیا\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "overflow"):
+                validate_subtitle_file(path, 4000.0)
 
 
 if __name__ == "__main__":
