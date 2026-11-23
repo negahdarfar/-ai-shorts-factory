@@ -400,13 +400,13 @@ def main():
         def write_vtt(source, target):
             raw = source.read_text(encoding="utf-8-sig").strip()
             blocks = []
-            for block in re.split(r"\\n\\s*\\n", raw):
+            for block in re.split(r"\n\s*\n", raw):
                 lines = block.splitlines()
                 if len(lines) < 3:
                     raise SystemExit(f"Malformed SRT block in {source}.")
                 timing = lines[1].replace(",", ".")
-                blocks.append(timing + "\\n" + "\\n".join(lines[2:]))
-            target.write_text("WEBVTT\\n\\n" + "\\n\\n".join(blocks) + "\\n", encoding="utf-8")
+                blocks.append(timing + "\n" + "\n".join(lines[2:]))
+            target.write_text("WEBVTT\n\n" + "\n\n".join(blocks) + "\n", encoding="utf-8")
         write_vtt(english, video.parent / "subtitle.en.vtt")
         write_vtt(persian, video.parent / "subtitle.fa.vtt")
         print(f"PERSIAN_SUBTITLE_SIDECARS_READY {index}/{expected_count} | cues={len(cues)} | {video.name}")
