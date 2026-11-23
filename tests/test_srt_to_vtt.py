@@ -28,7 +28,7 @@ class SrtToVttTests(unittest.TestCase):
             source = Path(directory) / "bad.srt"
             target = Path(directory) / "bad.vtt"
             source.write_text("1\n00:90:00,000 --> 00:00:01,000\nBad\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "timestamp"):
+            with self.assertRaisesRegex(ValueError, "Invalid minute/second"):
                 convert_srt_to_vtt(source, target)
 
     def test_rejects_empty_cue(self):
