@@ -84,14 +84,14 @@ jobs:
               raise SystemExit("Voiceover or Persian subtitle file is empty.")
           print(f"Validated {len(clips)} source clips.")
           PY
-      - name: Assemble English narration with Persian subtitles
+      - name: Assemble English narration with separate Persian subtitle sidecar
         env:
           CLIPS_MANIFEST: ${{ inputs.clips_manifest }}
           VOICEOVER: ${{ inputs.voiceover_path }}
           PERSIAN_SRT: ${{ inputs.persian_srt_path }}
           OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
-          python scripts/assemble_documentary.py --clips "$CLIPS_MANIFEST" --voiceover "$VOICEOVER" --subtitles "$PERSIAN_SRT" --burn-subtitles --output "$OUTPUT_NAME"
+          python scripts/assemble_documentary.py --clips "$CLIPS_MANIFEST" --voiceover "$VOICEOVER" --subtitles "$PERSIAN_SRT" --output "$OUTPUT_NAME"
       - name: Enforce longform technical quality gate
         env:
           OUTPUT_NAME: ${{ inputs.output_name }}
