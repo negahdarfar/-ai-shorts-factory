@@ -413,7 +413,9 @@ def main():
             raise SystemExit(f"Persian subtitle sidecar is empty for video {index}.")
         if not any(0x0600 <= ord(ch) <= 0x06ff for ch in persian.read_text(encoding="utf-8")):
             raise SystemExit(f"Persian subtitle sidecar has no Persian-script text for video {index}.")
-        write_vtt(english, video.parent / "subtitle.en.vtt")
+        english_sidecar = video.parent / "subtitle.en.srt"
+        english_sidecar.write_text(english.read_text(encoding="utf-8-sig"), encoding="utf-8")
+        write_vtt(english_sidecar, video.parent / "subtitle.en.vtt")
         write_vtt(persian, video.parent / "subtitle.fa.vtt")
         print(f"PERSIAN_SUBTITLE_SIDECARS_READY {index}/{expected_count} | cues={len(cues)} | {video.name}")
     print(f"PERSIAN_SUBTITLES_COMPLETED_FOR_ALL_{expected_count}_VIDEOS")
