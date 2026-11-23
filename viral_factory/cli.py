@@ -137,7 +137,10 @@ def download_candidate(path: Path,index: int,target: Path) -> dict[str,Any]:
         temp.replace(target)
     finally:
         if temp.exists(): temp.unlink()
-    item["downloaded_file"]=str(target); item["downloaded_bytes"]=total\n    item["sha256"]=digest.hexdigest()\n    item["downloaded_at_utc"]=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())\n    item["commercial_use_allowed"]=True
+    item["downloaded_file"]=str(target); item["downloaded_bytes"]=total
+    item["sha256"]=digest.hexdigest()
+    item["downloaded_at_utc"]=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())
+    item["commercial_use_allowed"]=True
     (target.parent/"source_attribution.json").write_text(json.dumps(item,ensure_ascii=False,indent=2),encoding="utf-8")
     return item
 
@@ -313,8 +316,8 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
       "description":description,"tags":["education","licensed-media","documentary"]},
       ensure_ascii=False,indent=2),encoding="utf-8")
     (out/"sources.json").write_text(json.dumps([attribution],ensure_ascii=False,indent=2),encoding="utf-8")
-    (out/"attribution.txt").write_text(description+"\\nSHA-256: "+str(attribution.get("sha256",""))+
-      "\\nDownloaded at UTC: "+str(attribution.get("downloaded_at_utc",""))+"\\n",encoding="utf-8")
+    (out/"attribution.txt").write_text(description+"\nSHA-256: "+str(attribution.get("sha256",""))+
+      "\nDownloaded at UTC: "+str(attribution.get("downloaded_at_utc",""))+"\n",encoding="utf-8")
     (out/"metadata.json").write_text(json.dumps({
       "engine":"viral-video-studio","title":attribution.get("title","Licensed source video"),
       "language":"en","aspect_ratio":"16:9","clip_count":len(quality),
@@ -404,7 +407,8 @@ def main() -> None:
     p.add_argument("--aspect",choices=("16:9","9:16","1:1"),default="16:9")
     p=sub.add_parser("publish"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
     p.add_argument("--max-uploads",type=int,default=4)
-    p.add_argument("--privacy",choices=("private","public"),default="private")\n    p.add_argument("--confirm-public",action="store_true")
+    p.add_argument("--privacy",choices=("private","public"),default="private")
+    p.add_argument("--confirm-public",action="store_true")
     args=parser.parse_args()
     if args.command=="discover": discover(args.output_dir)
     elif args.command=="process": process(args.candidate_index,args.output_dir,max(1,min(args.limit,8)),args.model,args.aspect)
