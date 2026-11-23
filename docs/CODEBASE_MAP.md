@@ -15,13 +15,13 @@ Dedicated MoneyPrinterTurbo-based short-video engine. This map reflects the curr
 - Separate licensed-media engine: `viral_factory/`; it is not the MoneyPrinterTurbo short pipeline.
 
 ## Publication safety
-- Scheduled upload step is private-only.
+- This branch's schedule step is private-only; the separate active `main` workflow still has a daily schedule that can create staggered PUBLIC releases. The observed 2026-11-22 schedule failed before upload, but the next successful run could reach that step.
 - Manual public upload still requires `workflow_dispatch` with `publish_four_public=true`.
-- No public upload was performed in this work.
+- No public upload was performed by this assistant; `main` was left unchanged pending approval.
 - Pending upload ledger entries are intentionally not retried blindly.
 
 ## Scheduling limitation
-GitHub Actions schedules are evaluated from the repository default branch. The default branch is `main`, not this branch. Therefore this branch's cron declarations do not by themselves prove a daily scheduled run. A default-branch dispatcher change is required and was not made because `main` is protected by the user's explicit instruction.
+GitHub Actions schedules run from the default branch. The active daily production path is the workflow file on `main`, not this specialist branch. This branch's safer workflow changes do not alter the main-branch public schedule.
 
 ## Known limitations
 - Real MoneyPrinterTurbo rendering against the new 60–120 second gate remains untested.
