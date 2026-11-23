@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Standalone, license-aware discovery and 2–10 minute video renderer."""
 from __future__ import annotations
-import argparse, hashlib, html, json, os, re, subprocess, sys, time, urllib.parse, urllib.request\nfrom datetime import datetime, timezone
+import argparse, hashlib, html, json, os, re, subprocess, sys, time, urllib.parse, urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
