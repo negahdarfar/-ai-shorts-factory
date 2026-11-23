@@ -211,6 +211,30 @@ def burn_persian_subtitles(video: Path,srt: Path) -> None:
     subprocess.run(["ffmpeg","-y","-i",str(video),"-vf",vf,"-c:v","libx264","-preset","veryfast","-crf","21","-c:a","copy","-movflags","+faststart",str(temp)],check=True)
     temp.replace(video)
 
+def validate_subtitle_file(srt: Path,duration: float) -> int:
+    raw=srt.read_text(encoding="utf-8-sig").strip()
+    blocks=re.split(r"\\n\\s*\\n",raw)
+    previous_end=0.0
+    count=0
+    for block in blocks:
+        lines=block.splitlines()
+        if len(lines)<3 or not lines[0].strip().isdigit():
+            raise ValueError("Malformed subtitle cue.")
+        match=re.fullmatch(r"(\\d{2,}):(\\d{2}):(\\d{2}),(\\d{3}) --> (\\d{2,}):(\\d{2}):(\\d{2}),(\\d{3})",lines[1].strip())
+        if not match: raise ValueError("Invalid subtitle timestamp.")
+        values=[int(x) for x in match.groups()]
+        sh,sm,ss,sms,eh,em,es,ems=values
+        if sm>59 or ss>59 or em>59 or es>59: raise ValueError("Subtitle minute/second overflow.")
+        start=sh*3600+sm*60+ss+sms/1000
+        end=eh*3600+em*60+es+ems/1000
+        if end<=start or start<previous_end or end>duration+0.25:
+            raise ValueError("Subtitle timing overlaps or exceeds video duration.")
+        if not any(line.strip() for line in lines[2:]): raise ValueError("Empty subtitle cue.")
+        previous_end=end
+        count+=1
+    if count<3: raise ValueError("At least three subtitle cues are required.")
+    return count
+
 def validate_viral_clip(video: Path,srt: Path,aspect: str="16:9") -> dict[str,Any]:
     result=subprocess.run(["ffprobe","-v","error","-show_streams","-show_format","-of","json",str(video)],capture_output=True,text=True,check=True)
     info=json.loads(result.stdout)
@@ -228,7 +252,8 @@ def validate_viral_clip(video: Path,srt: Path,aspect: str="16:9") -> dict[str,An
     if not 120<=duration<=600: raise ValueError(f"Viral clip duration must be 120-600 seconds, got {duration:.1f}.")
     if not srt.is_file() or not any(0x0600<=ord(ch)<=0x06ff for ch in srt.read_text(encoding="utf-8-sig")):
         raise ValueError("Persian SRT missing or invalid.")
-    return {"file":video.name,"duration_seconds":round(duration,2),"resolution":f"{width}x{height}","subtitle_file":srt.name,"status":"passed"}
+    cue_count=validate_subtitle_file(srt,duration)
+    return {"file":video.name,"duration_seconds":round(duration,2),"resolution":f"{width}x{height}","subtitle_file":srt.name,"subtitle_cues":cue_count,"status":"passed"}
 
 def score(text: str) -> float:
     lower=text.lower(); words=re.findall(r"\b\w+\b",lower)
@@ -308,7 +333,11 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
         fa_srt=target.with_suffix(".fa.srt")
         render(source,clip,target,aspect)
         cue_count=write_clip_srt(transcript,clip,en_srt)
+        en_vtt=target.with_suffix(".en.vtt")
+        fa_vtt=target.with_suffix(".fa.vtt")
+        srt_to_vtt(en_srt,en_vtt)
         subprocess.run([sys.executable,str(translator),"--input",str(en_srt),"--output",str(fa_srt),"--model",os.getenv("SEO_GEMINI_MODEL","gemini-2.5-flash")],check=True)
+        srt_to_vtt(fa_srt,fa_vtt)
         quality.append(validate_viral_clip(target,fa_srt,aspect))
         print(f"Rendered and validated Persian-subtitled clip {n}/{len(clips)} ({cue_count} cues):",target)
     (out/"viral_quality_report.json").write_text(json.dumps(quality,ensure_ascii=False,indent=2),encoding="utf-8")
