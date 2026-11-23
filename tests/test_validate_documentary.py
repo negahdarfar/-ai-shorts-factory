@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_documentary import parse_srt
+from scripts.validate_documentary import inspect_documentary, parse_srt
 
 
 def write_srt(text):
@@ -64,6 +64,24 @@ class DocumentarySrtTests(unittest.TestCase):
         text = VALID.split("\n\n2\n")[0]
         with self.assertRaisesRegex(ValueError, "At least three"):
             self.parse_text(text)
+
+    def test_rejects_documentary_longer_than_thirty_minutes(self):
+        import json
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            video = Path(directory) / "documentary.mp4"
+            video.write_bytes(b"x" * 500_001)
+            payload = {
+                "streams": [
+                    {"codec_type": "video", "width": 1920, "height": 1080, "codec_name": "h264"},
+                    {"codec_type": "audio", "codec_name": "aac"},
+                ],
+                "format": {"duration": "1801"},
+            }
+            mocked = type("Result", (), {"stdout": json.dumps(payload)})()
+            with patch("scripts.validate_documentary.subprocess.run", return_value=mocked):
+                with self.assertRaisesRegex(ValueError, "exceeds the 1800s maximum"):
+                    inspect_documentary(video, 600)
 
 
 if __name__ == "__main__":
