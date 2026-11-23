@@ -89,6 +89,11 @@ def translate_gemini(rows, key, model):
     return parse_translations(raw, rows)
 
 
+def is_gemini_free_tier_enabled():
+    """Gemini fallback is opt-in only; a key alone never authorizes potentially billable inference."""
+    return os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -128,6 +133,9 @@ def main():
         except Exception as exc:
             print("OPENROUTER_DISCOVERY_FAILED: " + type(exc).__name__, file=sys.stderr)
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_enabled = is_gemini_free_tier_enabled()
+    if gemini_key and not gemini_enabled:
+        print("GEMINI_FREE_TIER_NOT_EXPLICITLY_ENABLED; skipping Gemini to prevent unexpected charges.", file=sys.stderr)
     translated = []
     for start in range(0, len(rows), batch_size):
         batch = rows[start:start + batch_size]
@@ -142,11 +150,11 @@ def main():
                 break
             except Exception as exc:
                 print(f"{provider.upper()}_SUBTITLE_ROUTE_FAILED model={model} error={type(exc).__name__}", file=sys.stderr)
-        if values is None and gemini_key:
+        if values is None and gemini_key and gemini_enabled:
             values = translate_gemini(batch, gemini_key, args.model)
             print(f"SUBTITLE_PROVIDER=GEMINI model={args.model}")
         if values is None:
-            raise RuntimeError("No explicitly free AvalAI, FreeLLMAPI or OpenRouter model was available and GEMINI_API_KEY fallback is not configured.")
+            raise RuntimeError("No explicitly free AvalAI, FreeLLMAPI or OpenRouter model was available; Gemini fallback is disabled unless GEMINI_FREE_TIER_ENABLED=true confirms the eligible free tier.")
         translated.extend({**row, "text": value} for row, value in zip(batch, values))
         print(f"Translated {len(translated)}/{len(rows)} subtitle cues.")
         time.sleep(0.2)
