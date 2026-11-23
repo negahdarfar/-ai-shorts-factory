@@ -325,6 +325,22 @@ def translate_with_fallback(rows, omni, free, gemini, cloudflare=None, ollama=No
     detail = "; ".join(failures) if failures else "No complete provider credentials configured."
     raise RuntimeError(f"All configured subtitle providers failed. {detail}")
 
+def write_vtt(source, target):
+    raw = source.read_text(encoding="utf-8-sig").strip()
+    blocks = []
+    for block in re.split(r"\n\s*\n", raw):
+        lines = block.splitlines()
+        if len(lines) < 3 or not lines[0].strip().isdigit():
+            raise ValueError(f"Malformed SRT block in {source}.")
+        timing = lines[1].replace(",", ".")
+        if not re.fullmatch(r"\d{2,}:\d{2}:\d{2}\.\d{3} --> \d{2,}:\d{2}:\d{2}\.\d{3}", timing):
+            raise ValueError(f"Malformed SRT timestamp in {source}.")
+        blocks.append(timing + "\n" + "\n".join(lines[2:]))
+    if not blocks:
+        raise ValueError(f"No subtitle cues in {source}.")
+    target.write_text("WEBVTT\n\n" + "\n\n".join(blocks) + "\n", encoding="utf-8")
+
+
 def parse_expected_count(value=None):
     raw = os.getenv("EXPECTED_COUNT", "4") if value is None else str(value)
     try:
@@ -397,16 +413,6 @@ def main():
             raise SystemExit(f"Persian subtitle sidecar is empty for video {index}.")
         if not any(0x0600 <= ord(ch) <= 0x06ff for ch in persian.read_text(encoding="utf-8")):
             raise SystemExit(f"Persian subtitle sidecar has no Persian-script text for video {index}.")
-        def write_vtt(source, target):
-            raw = source.read_text(encoding="utf-8-sig").strip()
-            blocks = []
-            for block in re.split(r"\n\s*\n", raw):
-                lines = block.splitlines()
-                if len(lines) < 3:
-                    raise SystemExit(f"Malformed SRT block in {source}.")
-                timing = lines[1].replace(",", ".")
-                blocks.append(timing + "\n" + "\n".join(lines[2:]))
-            target.write_text("WEBVTT\n\n" + "\n\n".join(blocks) + "\n", encoding="utf-8")
         write_vtt(english, video.parent / "subtitle.en.vtt")
         write_vtt(persian, video.parent / "subtitle.fa.vtt")
         print(f"PERSIAN_SUBTITLE_SIDECARS_READY {index}/{expected_count} | cues={len(cues)} | {video.name}")
