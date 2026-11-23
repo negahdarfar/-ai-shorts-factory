@@ -35,6 +35,7 @@ def inspect_documentary(path: Path,min_duration_seconds: int,subtitles=None,max_
     if width<1280 or height<720 or abs(width/height-16/9)>0.025: raise ValueError(f"Documentary must be at least 1280x720 in 16:9; got {width}x{height}.")
     duration=float(info.get("format",{}).get("duration",0))
     if duration<min_duration_seconds: raise ValueError(f"Documentary duration {duration:.1f}s is below the {min_duration_seconds}s minimum.")
+    if duration>max_duration_seconds: raise ValueError(f"Documentary duration {duration:.1f}s exceeds the {max_duration_seconds}s maximum.")
     cues=parse_srt(subtitles) if subtitles else []
     if cues and cues[-1]["end_ms"]>(duration+1)*1000: raise ValueError("Persian subtitles extend beyond the final video duration.")
     return {"file":str(path),"duration_seconds":round(duration,2),"resolution":f"{width}x{height}","video_codec":video.get("codec_name"),"audio_codec":audio.get("codec_name"),"subtitle_cues":len(cues),"size_mb":round(path.stat().st_size/1_000_000,2),"status":"passed"}
