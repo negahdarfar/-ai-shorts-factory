@@ -15,7 +15,7 @@ gemini = os.environ.get("GEMINI_API_KEY", "").strip()
 gemini_free_tier_enabled = os.environ.get("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
 gemini_free_ready = bool(gemini and gemini_free_tier_enabled)
 # Metered cloud AI endpoints are intentionally excluded from this zero-cost path.
-freellmapi_base_url = (os.environ.get("FREELLMAPI_CLOUD_BASE_URL", "").strip() or os.environ.get("FREELLMAPI_BASE_URL", "").strip())
+freellmapi_base_url = os.environ.get("FREELLMAPI_BASE_URL", "").strip()
 freellmapi_key = os.environ.get("FREELLMAPI_API_KEY", "").strip()
 freellmapi_model = os.environ.get("FREELLMAPI_MODEL", "auto").strip() or "auto"
 if freellmapi_base_url and freellmapi_key:
@@ -59,7 +59,7 @@ pexels = os.environ.get("PEXELS_API_KEY", "").strip()
 pixabay = os.environ.get("PIXABAY_API_KEY", "").strip()
 missing = []
 if not (freellmapi_base_url and freellmapi_key) and not openrouter_free_models and not gemini_free_ready:
-    missing.append("a verified-free LLM route: Cloudflare Workers AI, Gemini free tier (GEMINI_API_KEY + GEMINI_FREE_TIER_ENABLED=true), or an explicitly free gateway model")
+    missing.append("a verified-free LLM route: explicitly free FreeLLMAPI/OpenRouter model or Gemini free tier (GEMINI_API_KEY + GEMINI_FREE_TIER_ENABLED=true)")
 if not pexels and not pixabay:
     missing.append("PEXELS_API_KEY or PIXABAY_API_KEY")
 if missing:
@@ -84,7 +84,7 @@ elif openrouter_free_models:
 elif gemini_free_ready:
     app["llm_provider"] = "gemini"
     app["gemini_api_key"] = gemini
-    app["gemini_model_name"] = "gemini-3.8-flash"
+    app["gemini_model_name"] = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 else:
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write("ready=false\n")
