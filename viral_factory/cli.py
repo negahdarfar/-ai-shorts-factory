@@ -162,6 +162,21 @@ def srt_timestamp(seconds: float) -> str:
     whole,ms=divmod(remain,1000)
     return f"{hours:02d}:{minutes:02d}:{whole:02d},{ms:03d}"
 
+def srt_to_vtt(source: Path,target: Path) -> None:
+    raw=source.read_text(encoding="utf-8-sig").strip()
+    blocks=[]
+    for block in re.split(r"\\n\\s*\\n",raw):
+        lines=block.splitlines()
+        if len(lines)<3 or not lines[0].strip().isdigit():
+            raise ValueError(f"Malformed SRT block in {source}.")
+        timing=lines[1].replace(",",".")
+        if not re.fullmatch(r"\\d{2,}:\\d{2}:\\d{2}\\.\\d{3} --> \\d{2,}:\\d{2}:\\d{2}\\.\\d{3}",timing):
+            raise ValueError(f"Malformed SRT timing in {source}.")
+        blocks.append(timing+"\\n"+"\\n".join(lines[2:]))
+    if not blocks: raise ValueError(f"No subtitle cues in {source}.")
+    target.write_text("WEBVTT\\n\\n"+"\\n\\n".join(blocks)+"\\n",encoding="utf-8")
+
+
 def write_clip_srt(segments: list[dict[str,Any]],clip: dict[str,Any],target: Path) -> int:
     rows=[]
     for segment in segments:
@@ -294,9 +309,23 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
       +"Credit: "+(attribution.get("credit") or "See source page")+"\n"
       +"License: "+attribution.get("license","")+" "+attribution.get("license_url",""))
     (out/"publish_metadata.json").write_text(json.dumps({
-      "title_prefix":attribution.get("title","Creative Commons video"),
-      "description":description,"tags":["shorts","creativecommons","education"]},
+      "title_prefix":attribution.get("title","Licensed source video"),
+      "description":description,"tags":["education","licensed-media","documentary"]},
       ensure_ascii=False,indent=2),encoding="utf-8")
+    (out/"sources.json").write_text(json.dumps([attribution],ensure_ascii=False,indent=2),encoding="utf-8")
+    (out/"attribution.txt").write_text(description+"\\nSHA-256: "+str(attribution.get("sha256",""))+
+      "\\nDownloaded at UTC: "+str(attribution.get("downloaded_at_utc",""))+"\\n",encoding="utf-8")
+    (out/"metadata.json").write_text(json.dumps({
+      "engine":"viral-video-studio","title":attribution.get("title","Licensed source video"),
+      "language":"en","aspect_ratio":"16:9","clip_count":len(quality),
+      "durations_seconds":[row["duration_seconds"] for row in quality],
+      "persian_subtitles":"separate_srt_vtt","english_subtitles":"separate_srt_vtt",
+      "human_review_required":True},ensure_ascii=False,indent=2),encoding="utf-8")
+    (out/"run_report.json").write_text(json.dumps({
+      "status":"rendered_and_quality_checked","source_license":attribution.get("license"),
+      "source_sha256":attribution.get("sha256"),"downloaded_at_utc":attribution.get("downloaded_at_utc"),
+      "public_upload":"not_requested","private_upload":"not_requested",
+      "youtube_caption_upload":"not_implemented"},ensure_ascii=False,indent=2),encoding="utf-8")
 
 def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bool=False) -> None:
     from google.auth.transport.requests import Request
