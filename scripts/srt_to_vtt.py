@@ -11,6 +11,7 @@ def convert_srt_to_vtt(source: Path, target: Path) -> int:
     raw = source.read_text(encoding="utf-8-sig").strip()
     blocks = re.split(r"\n\s*\n", raw)
     rendered = []
+    previous_end = -1
     for block_number, block in enumerate(blocks, 1):
         lines = block.splitlines()
         if len(lines) < 3 or not lines[0].strip().isdigit():
