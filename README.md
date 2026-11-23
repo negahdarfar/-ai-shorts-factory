@@ -1,30 +1,32 @@
-# KOROUSH VIRAL SHORTS FACTORY — Short Video Studio
+# KOROUSH — Short Video Studio
 
-Dedicated engine for automated short-form YouTube production.
+Independent English-language YouTube short-video pipeline.
 
-## What lives here
-- MoneyPrinterTurbo-based Shorts generation and batch orchestration.
-- Trend/topic research, competitor research, SEO metadata and thumbnail rendering.
-- English content workflow with Persian subtitle tooling.
-- Video validation, visual uniqueness checks, topic/upload history.
-- YouTube analytics dashboard and weekly optimization.
-- Shared AI provider routing and quality checks.
-- An isolated `viral_factory/` package is present separately; see its own README.
+## Current implementation
+- MoneyPrinterTurbo v1.3.10 is installed from its upstream tag by the production workflow.
+- Topic discovery, competitor metadata research, SEO metadata, thumbnail drafts and output validation.
+- The workflow requests 4–10 videos per batch. The final media validator now requires 60–120 seconds and vertical 9:16 output (minimum 720×1280; 1080×1920 is the preferred target).
+- English captions are supplied by the upstream render; Persian translation is saved as separate UTF-8 SRT and VTT sidecars. The subtitle script no longer burns Persian text into the MP4.
+- Scheduled runs upload PRIVATE QA videos only. Manual public publishing remains a separate explicit workflow input and is not enabled by this change.
+- Upload history uses SHA-256 idempotency records and refuses ambiguous pending uploads.
 
-## Main entry points
-- `.github/workflows/moneyprinterturbo.yml` — primary Shorts production workflow.
-- `.github/workflows/daily-factory-orchestrator.yml` — scheduled/manual orchestration.
-- `scripts/build_trending_batch.py` — topic batch preparation.
-- `scripts/generate_seo_metadata.py` — SEO metadata generation.
-- `scripts/add_persian_subtitles.py` and `scripts/translate_srt_to_persian.py` — Persian subtitle tooling.
-- `scripts/validate_mpt_outputs.py` — generated output validation.
-- `scripts/youtube_analytics_report.py` and `scripts/weekly_optimization.py` — performance feedback.
+## Workflow and scheduling boundary
+- `.github/workflows/moneyprinterturbo.yml` — manual production and private scheduled QA.
+- `.github/workflows/daily-factory-orchestrator.yml` — manual/scheduled dispatch coordinator.
+- GitHub Actions scheduled workflows run only when the workflow file exists on the repository's default branch (`main`). This branch-specific workflow file does not independently establish a working daily schedule. Enabling scheduling requires an approved change to `main`; no such change has been made.
+- No public upload was run during this work.
 
-## Repository map
-See [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) for the file inventory, boundaries, and known workflow path inconsistencies.
+## Local validation
+Install Python 3.11, FFmpeg, fonts and the repository requirements, then run:
+```bash
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python scripts/validate_mpt_outputs.py
+```
+The last command requires a completed MoneyPrinterTurbo batch and its runtime reports; it is not a standalone sample render.
 
-## Safe changes
-Preserve existing runtime logic and persistent state. Before moving any file, map imports, workflow paths, artifacts, caches, and tests. Keep public publishing opt-in during testing.
-
-## Current limitation
-Some workflow triggers still reference legacy branch names. These are documented in the codebase map and must be corrected as a separate, tested workflow-only change.
+## Known limits
+- Actual MoneyPrinterTurbo generation and its ability to meet the new 60–120 second gate have not yet been proven by a real render.
+- Separate SRT/VTT sidecars are generated locally, but YouTube caption-track upload is not yet implemented/verified. Existing OAuth scope `youtube.upload` alone does not prove caption API permission.
+- Public release requires a human-triggered manual run; do not enable unattended public publishing.
+- Free software does not eliminate runner, bandwidth, model-download, storage or electricity costs.
