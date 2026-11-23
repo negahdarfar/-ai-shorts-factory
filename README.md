@@ -3,12 +3,12 @@
 Standalone, license-aware engine for producing 2–10 minute English-language videos from eligible source footage.
 
 ## Current implementation
-- Discovers source video files on Wikimedia Commons and optionally collects YouTube most-popular metadata for topic research only.
+- Discovers source video files on Wikimedia Commons and optionally collects YouTube most-popular metadata for topic research only. The trend snapshot records views, age in hours, views-per-hour and observation timestamp; channel-baseline performance is explicitly unavailable from this endpoint.
 - YouTube trend metadata is not downloaded or republished.
 - Source candidates are filtered to CC0, CC BY and public-domain labels. NC, ND, unknown and ShareAlike licenses are rejected by default until their obligations are implemented and audited.
 - Faster-Whisper transcribes English source audio; transcript windows are scored heuristically and selected without overlap.
 - FFmpeg renders 120–600 second landscape 16:9 outputs by default. `--aspect` also accepts 9:16 or 1:1, but the current QA validator is deliberately strict for the required 16:9 output.
-- English and Persian SRT sidecars are produced. Persian text is no longer burned into the MP4.
+- English and Persian SRT and VTT sidecars are produced. Persian text is no longer burned into the MP4. Output also includes `metadata.json`, `sources.json`, `attribution.txt` and `run_report.json`.
 - Scheduled workflow runs may discover and render but never upload. Public upload is gated to an explicit manual workflow dispatch with `publish_public=true`.
 
 ## Local commands
