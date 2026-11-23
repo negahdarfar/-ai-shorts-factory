@@ -165,16 +165,16 @@ def srt_timestamp(seconds: float) -> str:
 def srt_to_vtt(source: Path,target: Path) -> None:
     raw=source.read_text(encoding="utf-8-sig").strip()
     blocks=[]
-    for block in re.split(r"\\n\\s*\\n",raw):
+    for block in re.split(r"\n\s*\n",raw):
         lines=block.splitlines()
         if len(lines)<3 or not lines[0].strip().isdigit():
             raise ValueError(f"Malformed SRT block in {source}.")
         timing=lines[1].replace(",",".")
-        if not re.fullmatch(r"\\d{2,}:\\d{2}:\\d{2}\\.\\d{3} --> \\d{2,}:\\d{2}:\\d{2}\\.\\d{3}",timing):
+        if not re.fullmatch(r"\d{2,}:\d{2}:\d{2}\.\d{3} --> \d{2,}:\d{2}:\d{2}\.\d{3}",timing):
             raise ValueError(f"Malformed SRT timing in {source}.")
-        blocks.append(timing+"\\n"+"\\n".join(lines[2:]))
+        blocks.append(timing+"\n"+"\n".join(lines[2:]))
     if not blocks: raise ValueError(f"No subtitle cues in {source}.")
-    target.write_text("WEBVTT\\n\\n"+"\\n\\n".join(blocks)+"\\n",encoding="utf-8")
+    target.write_text("WEBVTT\n\n"+"\n\n".join(blocks)+"\n",encoding="utf-8")
 
 
 def write_clip_srt(segments: list[dict[str,Any]],clip: dict[str,Any],target: Path) -> int:
