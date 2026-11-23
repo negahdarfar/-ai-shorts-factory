@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Standalone, license-aware discovery and Shorts renderer."""
+"""Standalone, license-aware discovery and 2–10 minute video renderer."""
 from __future__ import annotations
-import argparse, hashlib, html, json, os, re, subprocess, sys, time, urllib.parse, urllib.request
+import argparse, hashlib, html, json, os, re, subprocess, sys, time, urllib.parse, urllib.request\nfrom datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +48,7 @@ def commons_search(term: str) -> list[dict[str, Any]]:
             return clean((meta.get(key) or {}).get("value",""))
         license_name, license_url = m("LicenseShortName"), m("LicenseUrl")
         url = info.get("url","")
-        if not allowed_license(license_name) or not url.startswith("https://upload.wikimedia.org/"):
+        if not allowed_license(license_name) or not license_url or not url.startswith("https://upload.wikimedia.org/"):
             continue
         title = page.get("title","")
         rows.append({"title":title,"download_url":url,
@@ -68,14 +68,27 @@ def youtube_trends() -> list[dict[str, Any]]:
       "regionCode":os.getenv("VIRAL_REGION","US"),"maxResults":"25","key":key})
     data = get_json(url)
     rows=[]
+    observed_at=datetime.now(timezone.utc)
     for item in data.get("items",[]):
         sn, st = item.get("snippet",{}), item.get("statistics",{})
+        published=sn.get("publishedAt")
+        try:
+            published_dt=datetime.fromisoformat(str(published).replace("Z","+00:00"))
+            age_hours=max(0.25,(observed_at-published_dt).total_seconds()/3600)
+        except (TypeError,ValueError):
+            age_hours=None
+        views=int(st.get("viewCount",0))
+        likes=int(st.get("likeCount",0))
+        velocity=round(views/age_hours,2) if age_hours else None
         rows.append({"video_id":item.get("id"),"title":sn.get("title"),
-          "channel":sn.get("channelTitle"),"published_at":sn.get("publishedAt"),
-          "views":int(st.get("viewCount",0)),"likes":int(st.get("likeCount",0)),
+          "channel":sn.get("channelTitle"),"published_at":published,
+          "views":views,"likes":likes,"age_hours":round(age_hours,2) if age_hours else None,
+          "views_per_hour":velocity,"trend_score":velocity,
+          "channel_baseline":"not_available_from_this_endpoint",
+          "metrics_observed_at_utc":observed_at.isoformat(),
           "url":"https://www.youtube.com/watch?v="+str(item.get("id")),
-          "note":"Metadata only; not downloaded or republished."})
-    return sorted(rows,key=lambda x:x["views"],reverse=True)
+          "note":"Snapshot metadata only; not downloaded or republished."})
+    return sorted(rows,key=lambda x:x["trend_score"] or -1,reverse=True)
 
 def discover(out: Path) -> None:
     out.mkdir(parents=True,exist_ok=True)
@@ -123,7 +136,7 @@ def download_candidate(path: Path,index: int,target: Path) -> dict[str,Any]:
         temp.replace(target)
     finally:
         if temp.exists(): temp.unlink()
-    item["downloaded_file"]=str(target); item["downloaded_bytes"]=total
+    item["downloaded_file"]=str(target); item["downloaded_bytes"]=total\n    item["sha256"]=digest.hexdigest()\n    item["downloaded_at_utc"]=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())\n    item["commercial_use_allowed"]=True
     (target.parent/"source_attribution.json").write_text(json.dumps(item,ensure_ascii=False,indent=2),encoding="utf-8")
     return item
 
