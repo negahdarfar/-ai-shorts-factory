@@ -213,14 +213,14 @@ def burn_persian_subtitles(video: Path,srt: Path) -> None:
 
 def validate_subtitle_file(srt: Path,duration: float) -> int:
     raw=srt.read_text(encoding="utf-8-sig").strip()
-    blocks=re.split(r"\\n\\s*\\n",raw)
+    blocks=re.split(r"\n\s*\n",raw)
     previous_end=0.0
     count=0
     for block in blocks:
         lines=block.splitlines()
         if len(lines)<3 or not lines[0].strip().isdigit():
             raise ValueError("Malformed subtitle cue.")
-        match=re.fullmatch(r"(\\d{2,}):(\\d{2}):(\\d{2}),(\\d{3}) --> (\\d{2,}):(\\d{2}):(\\d{2}),(\\d{3})",lines[1].strip())
+        match=re.fullmatch(r"(\d{2,}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2,}):(\d{2}):(\d{2}),(\d{3})",lines[1].strip())
         if not match: raise ValueError("Invalid subtitle timestamp.")
         values=[int(x) for x in match.groups()]
         sh,sm,ss,sms,eh,em,es,ems=values
