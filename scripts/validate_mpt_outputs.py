@@ -83,6 +83,15 @@ for path, topic, task_index in files_with_topics:
     if not 60 <= duration <= 120:
         raise SystemExit(f"Short Video Studio duration must be 60-120 seconds ({duration:.1f}s): {path}")
 
+    english_srt = path.parent / "subtitle.en.srt"
+    english_vtt = path.parent / "subtitle.en.vtt"
+    persian_vtt = path.parent / "subtitle.fa.vtt"
+    if not english_srt.is_file() or english_srt.stat().st_size < 20:
+        raise SystemExit(f"Missing or empty English subtitle sidecar: {english_srt}")
+    if not english_vtt.is_file() or not english_vtt.read_text(encoding="utf-8").startswith("WEBVTT"):
+        raise SystemExit(f"Missing or invalid English WebVTT sidecar: {english_vtt}")
+    if not persian_vtt.is_file() or not persian_vtt.read_text(encoding="utf-8").startswith("WEBVTT"):
+        raise SystemExit(f"Missing or invalid Persian WebVTT sidecar: {persian_vtt}")
     subtitles = path.parent / "subtitle.fa.srt"
     if not subtitles.is_file() or subtitles.stat().st_size < 20:
         raise SystemExit(f"Missing or empty Persian subtitle file: {subtitles}")
