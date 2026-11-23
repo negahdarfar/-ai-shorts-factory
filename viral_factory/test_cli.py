@@ -2,7 +2,7 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from cli import allowed_license, score, select, write_clip_srt
+from cli import allowed_license, score, select, srt_to_vtt, write_clip_srt
 
 
 class ViralFactoryTests(unittest.TestCase):
@@ -43,6 +43,17 @@ class ViralFactoryTests(unittest.TestCase):
 
     def test_short_sources_are_not_downgraded_to_short_shorts(self):
         self.assertEqual(select([], 119.9, 4), [])
+
+    def test_srt_to_vtt_creates_selectable_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "clip.fa.srt"
+            target = Path(directory) / "clip.fa.vtt"
+            source.write_text("1\\n00:00:00,000 --> 00:00:01,000\\nسلام\\n", encoding="utf-8")
+            srt_to_vtt(source, target)
+            rendered = target.read_text(encoding="utf-8")
+            self.assertTrue(rendered.startswith("WEBVTT\\n"))
+            self.assertIn("00:00:00.000 --> 00:00:01.000", rendered)
+            self.assertIn("سلام", rendered)
 
     def test_clip_srt_uses_relative_timestamps(self):
         segments = [
