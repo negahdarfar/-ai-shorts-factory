@@ -39,7 +39,7 @@ on:
         default: true
         type: boolean
       minimum_duration_seconds:
-        description: Minimum documentary duration (default 8 minutes)
+        description: Minimum documentary duration (10–30 minutes)
         required: true
         default: "600"
         type: string
