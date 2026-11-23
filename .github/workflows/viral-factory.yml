@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Discover trends only, or render Shorts from licensed material"
+        description: "Discover trends only, or render 2–10 minute videos from licensed material"
         required: true
         type: choice
         options: [discover, process]
