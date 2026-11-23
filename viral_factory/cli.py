@@ -26,7 +26,7 @@ def clean(value: Any) -> str:
 
 def allowed_license(name: str) -> bool:
     text = clean(name).lower().replace("_", " ").replace("-", " ")
-    if any(x in text for x in ("noncommercial","non commercial","no derivatives")) or re.search(r"\bnc\b|\bnd\b", text):
+    if any(x in text for x in ("noncommercial","non commercial","no derivatives","share alike","sharealike")) or re.search(r"\bnc\b|\bnd\b|\bsa\b", text):
         return False
     return any(x in text for x in LICENSES)
 
@@ -186,9 +186,9 @@ def validate_viral_clip(video: Path,srt: Path) -> dict[str,Any]:
     if not v or not a: raise ValueError(f"Missing video or audio stream: {video}")
     width,height=int(v.get("width",0)),int(v.get("height",0))
     duration=float(info.get("format",{}).get("duration",0))
-    if width<720 or height<1280 or abs(width/height-9/16)>0.025:
-        raise ValueError(f"Viral clip is not valid vertical 9:16 media: {width}x{height}")
-    if not 20<=duration<=58: raise ValueError(f"Viral clip duration must be 20-58 seconds, got {duration:.1f}.")
+    if width<1280 or height<720 or abs(width/height-16/9)>0.025:
+        raise ValueError(f"Viral clip is not valid landscape 16:9 media: {width}x{height}")
+    if not 120<=duration<=600: raise ValueError(f"Viral clip duration must be 120-600 seconds, got {duration:.1f}.")
     if not srt.is_file() or not any(0x0600<=ord(ch)<=0x06ff for ch in srt.read_text(encoding="utf-8-sig")):
         raise ValueError("Persian SRT missing or invalid.")
     return {"file":video.name,"duration_seconds":round(duration,2),"resolution":f"{width}x{height}","subtitle_file":srt.name,"status":"passed"}
@@ -207,9 +207,9 @@ def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dic
     for i,seg in enumerate(segments):
         start=float(seg["start"]); end=start; texts=[]
         for nxt in segments[i:]:
-            if float(nxt["end"])-start>58: break
+            if float(nxt["end"])-start>600: break
             end=float(nxt["end"]); texts.append(nxt["text"]); span=end-start
-            if 20<=span<=58:
+            if 120<=span<=600:
                 text=" ".join(texts)
                 windows.append({"start":round(start,2),"end":round(end,2),
                   "duration":round(span,2),"text":text,"score":score(text)})
@@ -219,25 +219,28 @@ def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dic
         if all(candidate["end"]<=old["start"] or candidate["start"]>=old["end"] for old in chosen):
             chosen.append(candidate)
         if len(chosen)>=limit: break
-    if not chosen and duration>=20:
-        count=min(limit,int(duration//20))
+    if not chosen and duration>=120:
+        count=min(limit,int(duration//120))
         step=duration/count
-        length=min(35.0,step)
+        length=min(600.0,step)
         for i in range(count):
             start=i*step
             chosen.append({"start":round(start,2),"end":round(start+length,2),
               "duration":round(length,2),"text":"","score":0,"selection":"evenly-spaced fallback"})
     return chosen
 
-def render(source: Path,clip: dict[str,Any],target: Path) -> None:
+def render(source: Path,clip: dict[str,Any],target: Path,aspect: str="16:9") -> None:
     target.parent.mkdir(parents=True,exist_ok=True)
-    vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1"
+    dimensions={"16:9":(1920,1080),"9:16":(1080,1920),"1:1":(1080,1080)}
+    if aspect not in dimensions: raise ValueError("Aspect ratio must be 16:9, 9:16 or 1:1.")
+    width,height=dimensions[aspect]
+    vf=f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1"
     subprocess.run(["ffmpeg","-y","-ss",str(clip["start"]),"-i",str(source),
       "-t",str(clip["duration"]),"-map","0:v:0","-map","0:a?","-vf",vf,
       "-c:v","libx264","-preset","veryfast","-crf","23","-c:a","aac",
       "-b:a","128k","-movflags","+faststart",str(target)],check=True)
 
-def process(index: int | str,out: Path,limit: int,model: str) -> None:
+def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9") -> None:
     candidates=out/"commons_candidates.json"
     if not candidates.exists(): raise FileNotFoundError("Run discover first.")
     candidate_rows=json.loads(candidates.read_text(encoding="utf-8"))
@@ -271,10 +274,9 @@ def process(index: int | str,out: Path,limit: int,model: str) -> None:
         target=out/"shorts"/("viral_short_%02d.mp4"%n)
         en_srt=target.with_suffix(".en.srt")
         fa_srt=target.with_suffix(".fa.srt")
-        render(source,clip,target)
+        render(source,clip,target,aspect)
         cue_count=write_clip_srt(transcript,clip,en_srt)
         subprocess.run([sys.executable,str(translator),"--input",str(en_srt),"--output",str(fa_srt),"--model",os.getenv("SEO_GEMINI_MODEL","gemini-2.5-flash")],check=True)
-        burn_persian_subtitles(target,fa_srt)
         quality.append(validate_viral_clip(target,fa_srt))
         print(f"Rendered and validated Persian-subtitled clip {n}/{len(clips)} ({cue_count} cues):",target)
     (out/"viral_quality_report.json").write_text(json.dumps(quality,ensure_ascii=False,indent=2),encoding="utf-8")
@@ -361,12 +363,13 @@ def main() -> None:
     p=sub.add_parser("discover"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
     p=sub.add_parser("process"); p.add_argument("--candidate-index",type=str,default="auto")
     p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
-    p.add_argument("--limit",type=int,default=4); p.add_argument("--model",default="tiny")
+    p.add_argument("--limit",type=int,default=2); p.add_argument("--model",default="tiny")
+    p.add_argument("--aspect",choices=("16:9","9:16","1:1"),default="16:9")
     p=sub.add_parser("publish"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
     p.add_argument("--max-uploads",type=int,default=4)
     args=parser.parse_args()
     if args.command=="discover": discover(args.output_dir)
-    elif args.command=="process": process(args.candidate_index,args.output_dir,max(1,min(args.limit,8)),args.model)
+    elif args.command=="process": process(args.candidate_index,args.output_dir,max(1,min(args.limit,8)),args.model,args.aspect)
     else: publish(args.output_dir,max(1,min(args.max_uploads,4)))
 
 if __name__=="__main__":
