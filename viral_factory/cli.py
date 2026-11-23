@@ -122,6 +122,7 @@ def download_candidate(path: Path,index: int,target: Path) -> dict[str,Any]:
     req=urllib.request.Request(item["download_url"],headers={"User-Agent":UA})
     target.parent.mkdir(parents=True,exist_ok=True); temp=target.with_suffix(".part")
     total=0
+    digest=hashlib.sha256()
     try:
         with urllib.request.urlopen(req,timeout=120) as response,temp.open("wb") as out_file:
             ctype=response.headers.get("Content-Type","")
@@ -132,6 +133,7 @@ def download_candidate(path: Path,index: int,target: Path) -> dict[str,Any]:
                 if not chunk: break
                 total+=len(chunk)
                 if total>MAX_BYTES: raise ValueError("Source exceeds 500 MiB.")
+                digest.update(chunk)
                 out_file.write(chunk)
         if total==0: raise ValueError("Empty download.")
         temp.replace(target)
@@ -240,6 +242,8 @@ def score(text: str) -> float:
 def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dict[str,Any]]:
     windows=[]
     for i,seg in enumerate(segments):
+        if i and not re.search(r"[.!?][\"')\\]]?$", str(segments[i-1].get("text","")).strip()):
+            continue
         start=float(seg["start"]); end=start; texts=[]
         for nxt in segments[i:]:
             if float(nxt["end"])-start>600: break
@@ -299,7 +303,7 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
     if not translator.is_file(): raise FileNotFoundError("Shared Persian SRT translator is missing.")
     quality=[]
     for n,clip in enumerate(clips,1):
-        target=out/"shorts"/("viral_short_%02d.mp4"%n)
+        target=out/"videos"/("viral_video_%02d.mp4"%n)
         en_srt=target.with_suffix(".en.srt")
         fa_srt=target.with_suffix(".fa.srt")
         render(source,clip,target,aspect)
@@ -355,7 +359,7 @@ def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bo
     if not creds.valid or not creds.token: raise RuntimeError("YouTube OAuth did not return a valid access token.")
     api=build("youtube","v3",credentials=creds,cache_discovery=False)
     meta=json.loads((out/"publish_metadata.json").read_text(encoding="utf-8"))
-    files=sorted((out/"shorts").glob("*.mp4"))[:max_uploads]
+    files=sorted((out/"videos").glob("*.mp4"))[:max_uploads]
     if not files: raise FileNotFoundError("No rendered Shorts found.")
     ledger_path=out/"upload_history.json"
     if ledger_path.exists():
