@@ -31,5 +31,5 @@ GitHub Actions schedules run only from the default branch (`main`). The cron dec
 
 ## Known limits
 - Real 4-minute render, rights review, YouTube private upload and caption-track upload have not been executed.
-- The current publish command still needs a private-upload mode and a verified YouTube caption-track path before it can satisfy the complete private-upload requirement.
+- YouTube caption-track upload and processing confirmation are not yet implemented. The current private uploader uploads the MP4 only; SRT sidecars remain separate artifacts.
 - Faster-Whisper CPU processing and FFmpeg rendering can be slow and resource-intensive.
