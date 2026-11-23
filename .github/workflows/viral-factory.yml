@@ -100,6 +100,7 @@ jobs:
           CANDIDATE_INDEX: ${{ inputs.candidate_index || 'auto' }}
           CLIP_COUNT: ${{ inputs.clip_count || '2' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_FREE_TIER_ENABLED: ${{ vars.GEMINI_FREE_TIER_ENABLED || 'false' }}
           AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
           AVALAI_BASE_URL: ${{ vars.AVALAI_BASE_URL || 'https://api.avalai.ir/v1' }}
           AVALAI_MODEL: ${{ vars.AVALAI_MODEL || 'auto' }}
