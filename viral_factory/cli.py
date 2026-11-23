@@ -305,11 +305,13 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
       "description":description,"tags":["shorts","creativecommons","education"]},
       ensure_ascii=False,indent=2),encoding="utf-8")
 
-def publish(out: Path,max_uploads: int) -> None:
+def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bool=False) -> None:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
+    if privacy not in {"private","public"}: raise ValueError("Privacy must be private or public.")
+    if privacy=="public" and not confirm_public: raise RuntimeError("Public upload blocked: explicit manual confirmation is required.")
     required=("YOUTUBE_CLIENT_ID","YOUTUBE_CLIENT_SECRET","YOUTUBE_REFRESH_TOKEN")
     missing=[name for name in required if not os.getenv(name)]
     if missing: raise RuntimeError("Missing YouTube OAuth secrets: "+", ".join(missing))
@@ -338,7 +340,7 @@ def publish(out: Path,max_uploads: int) -> None:
         srt=path.with_suffix(".fa.srt")
         quality=validate_viral_clip(path,srt)
         digest=hashlib.sha256(path.read_bytes()).hexdigest()
-        key="public:"+digest
+        key=privacy+":"+digest
         previous=ledger["uploads"].get(key)
         if previous:
             if previous.get("status")=="pending":
@@ -348,19 +350,19 @@ def publish(out: Path,max_uploads: int) -> None:
             uploaded.append(previous)
             print("Already uploaded; skipping duplicate:",previous.get("url"))
             continue
-        pending={"status":"pending","mode":"public","sha256":digest,"file":path.name,
+        pending={"status":"pending","mode":privacy,"sha256":digest,"file":path.name,
                  "source_page":attribution.get("source_page"),"license":attribution.get("license"),
                  "started_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"quality":quality}
         ledger["uploads"][key]=pending
         ledger_path.write_text(json.dumps(ledger,ensure_ascii=False,indent=2),encoding="utf-8")
         body={"snippet":{"title":(meta["title_prefix"][:75]+" #Shorts")[:100],
           "description":meta["description"],"tags":meta.get("tags",[]),"categoryId":"27","defaultLanguage":"en"},
-          "status":{"privacyStatus":"public","selfDeclaredMadeForKids":False,"containsSyntheticMedia":False}}
+          "status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False,"containsSyntheticMedia":False}}
         media=MediaFileUpload(str(path),mimetype="video/mp4",resumable=True)
         response=api.videos().insert(part="snippet,status",body=body,media_body=media,notifySubscribers=False).execute()
         video_id=response.get("id")
         if not video_id: raise RuntimeError("YouTube returned no video ID; pending ledger retained for reconciliation.")
-        result={"file":path.name,"video_id":video_id,"sha256":digest,"privacy":"public",
+        result={"file":path.name,"video_id":video_id,"sha256":digest,"privacy":privacy,
                 "source_page":attribution.get("source_page"),"license":attribution.get("license"),
                 "url":"https://www.youtube.com/watch?v="+str(video_id)}
         ledger["uploads"][key]={**pending,"status":"completed","video_id":video_id,"url":result["url"],
@@ -379,11 +381,11 @@ def main() -> None:
     p.add_argument("--limit",type=int,default=2); p.add_argument("--model",default="tiny")
     p.add_argument("--aspect",choices=("16:9","9:16","1:1"),default="16:9")
     p=sub.add_parser("publish"); p.add_argument("--output-dir",type=Path,default=Path("viral_factory/work"))
-    p.add_argument("--max-uploads",type=int,default=4)
+    p.add_argument("--max-uploads",type=int,default=4)\n    p.add_argument("--privacy",choices=("private","public"),default="private")\n    p.add_argument("--confirm-public",action="store_true")
     args=parser.parse_args()
     if args.command=="discover": discover(args.output_dir)
     elif args.command=="process": process(args.candidate_index,args.output_dir,max(1,min(args.limit,8)),args.model,args.aspect)
-    else: publish(args.output_dir,max(1,min(args.max_uploads,4)))
+    else: publish(args.output_dir,max(1,min(args.max_uploads,4)),args.privacy,args.confirm_public)
 
 if __name__=="__main__":
     try: main()
