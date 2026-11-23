@@ -41,7 +41,7 @@ on:
       minimum_duration_seconds:
         description: Minimum documentary duration (default 8 minutes)
         required: true
-        default: "480"
+        default: "600"
         type: string
       storyboard_plan:
         description: Optional AI storyboard plan JSON; when set, discover and download free Commons media automatically
@@ -244,6 +244,11 @@ jobs:
         env:
           MIN_DURATION: ${{ inputs.minimum_duration_seconds }}
         run: |
+          set -euo pipefail
+          if ! [[ "$MIN_DURATION" =~ ^[0-9]+$ ]] || (( MIN_DURATION < 600 || MIN_DURATION > 1800 )); then
+            echo "::error::minimum_duration_seconds must be between 600 and 1800"
+            exit 1
+          fi
           python scripts/validate_longform.py --input longform-output/documentary.mp4 --min-duration-seconds "$MIN_DURATION" --report longform-output/qa-report.json
       - name: Upload rendered video and QA report
         if: always()
