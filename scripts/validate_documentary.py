@@ -13,6 +13,10 @@ def parse_srt(path: Path):
         match=SRT_TIME.match(lines[1].strip())
         if not match: raise ValueError("Malformed SRT timestamp.")
         v=[int(x) for x in match.groups()]
+        # SRT hours may exceed 23, but minutes, seconds and milliseconds
+        # must stay within their clock ranges.
+        if any(v[index] > 59 for index in (1, 2, 5, 6)):
+            raise ValueError("SRT minutes and seconds must be between 00 and 59.")
         start=(((v[0]*60+v[1])*60+v[2])*1000+v[3]); end=(((v[4]*60+v[5])*60+v[6])*1000+v[7])
         caption=" ".join(lines[2:]).strip()
         if end<=start or start<previous_end or not caption: raise ValueError("SRT cues must be non-empty and ordered without overlap.")
