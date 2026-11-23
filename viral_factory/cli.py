@@ -322,8 +322,11 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
     clips=select(transcript,duration,limit)
     if not clips: raise RuntimeError("No complete 120–600 second transcript window ending at a sentence boundary was found.")
     (out/"selected_clips.json").write_text(json.dumps(clips,ensure_ascii=False,indent=2),encoding="utf-8")
-    if not os.getenv("GEMINI_API_KEY","").strip() and not os.getenv("AVALAI_API_KEY","").strip():
-        raise RuntimeError("Configure AVALAI_API_KEY (free models only) or the existing GEMINI_API_KEY fallback; no uncaptioned clip will be released.")
+    has_free_translation_route = any(os.getenv(name,"").strip() for name in (
+        "AVALAI_API_KEY","FREELLMAPI_API_KEY","OPENROUTER_API_KEY"
+    ))
+    if not has_free_translation_route and not os.getenv("GEMINI_API_KEY","").strip():
+        raise RuntimeError("No configured translation provider; install a local translator or configure an explicitly free provider. No uncaptioned clip will be released.")
     translator=Path(__file__).resolve().parents[1]/"scripts"/"translate_srt_to_persian.py"
     if not translator.is_file(): raise FileNotFoundError("Shared Persian SRT translator is missing.")
     quality=[]
