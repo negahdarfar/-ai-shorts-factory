@@ -5,7 +5,7 @@ Dedicated MoneyPrinterTurbo-based short-video engine. This map reflects the curr
 
 ## Runtime areas
 - Production workflow: `.github/workflows/moneyprinterturbo.yml`.
-- Orchestration workflow: `.github/workflows/daily-factory-orchestrator.yml`.
+- Branch-local orchestration workflow: `.github/workflows/daily-factory-orchestrator.yml` (not present on default branch `main`).
 - Provider setup and routing: `scripts/configure_moneyprinter.py`, `scripts/free_model_router.py`, `scripts/avalai_client.py`.
 - Content pipeline: `scripts/build_trending_batch.py`, `scripts/research_youtube_competitors.py`, `scripts/generate_seo_metadata.py`, `scripts/render_seo_thumbnails.py`.
 - Subtitle processing: `scripts/add_persian_subtitles.py` writes Persian SRT and English/Persian VTT sidecars; it does not modify the MP4.
@@ -21,7 +21,7 @@ Dedicated MoneyPrinterTurbo-based short-video engine. This map reflects the curr
 - Pending upload ledger entries are intentionally not retried blindly.
 
 ## Scheduling limitation
-GitHub Actions schedules run from the default branch. The active daily production path is the workflow file on `main`, not this specialist branch. This branch's safer workflow changes do not alter the main-branch public schedule.
+GitHub Actions schedules run from the default branch. No dispatcher for this specialist branch is present on `main`; this branch's cron is not active. The separate legacy MoneyPrinterTurbo workflow on `main` is scheduled daily and can queue staggered PUBLIC releases when its earlier steps succeed. This branch's safer workflow changes do not alter that main-branch workflow.
 
 ## Known limitations
 - Real MoneyPrinterTurbo rendering against the new 60–120 second gate remains untested.
