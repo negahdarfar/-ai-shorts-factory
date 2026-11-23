@@ -209,7 +209,7 @@ def burn_persian_subtitles(video: Path,srt: Path) -> None:
     subprocess.run(["ffmpeg","-y","-i",str(video),"-vf",vf,"-c:v","libx264","-preset","veryfast","-crf","21","-c:a","copy","-movflags","+faststart",str(temp)],check=True)
     temp.replace(video)
 
-def validate_viral_clip(video: Path,srt: Path) -> dict[str,Any]:
+def validate_viral_clip(video: Path,srt: Path,aspect: str="16:9") -> dict[str,Any]:
     result=subprocess.run(["ffprobe","-v","error","-show_streams","-show_format","-of","json",str(video)],capture_output=True,text=True,check=True)
     info=json.loads(result.stdout)
     streams=info.get("streams",[])
@@ -218,8 +218,11 @@ def validate_viral_clip(video: Path,srt: Path) -> dict[str,Any]:
     if not v or not a: raise ValueError(f"Missing video or audio stream: {video}")
     width,height=int(v.get("width",0)),int(v.get("height",0))
     duration=float(info.get("format",{}).get("duration",0))
-    if width<1280 or height<720 or abs(width/height-16/9)>0.025:
-        raise ValueError(f"Viral clip is not valid landscape 16:9 media: {width}x{height}")
+    dimensions={"16:9":(1920,1080),"9:16":(1080,1920),"1:1":(1080,1080)}
+    if aspect not in dimensions: raise ValueError("Unsupported output aspect ratio.")
+    expected_width,expected_height=dimensions[aspect]
+    if width<expected_width or height<expected_height or abs(width/height-expected_width/expected_height)>0.025:
+        raise ValueError(f"Viral clip does not match requested {aspect} output: {width}x{height}")
     if not 120<=duration<=600: raise ValueError(f"Viral clip duration must be 120-600 seconds, got {duration:.1f}.")
     if not srt.is_file() or not any(0x0600<=ord(ch)<=0x06ff for ch in srt.read_text(encoding="utf-8-sig")):
         raise ValueError("Persian SRT missing or invalid.")
@@ -288,6 +291,7 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
     transcript=transcribe(source,model)
     (out/"transcript.json").write_text(json.dumps(transcript,ensure_ascii=False,indent=2),encoding="utf-8")
     clips=select(transcript,duration,limit)
+    if not clips: raise RuntimeError("No complete 120–600 second transcript window ending at a sentence boundary was found.")
     (out/"selected_clips.json").write_text(json.dumps(clips,ensure_ascii=False,indent=2),encoding="utf-8")
     if not os.getenv("GEMINI_API_KEY","").strip() and not os.getenv("AVALAI_API_KEY","").strip():
         raise RuntimeError("Configure AVALAI_API_KEY (free models only) or the existing GEMINI_API_KEY fallback; no uncaptioned clip will be released.")
@@ -301,7 +305,7 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
         render(source,clip,target,aspect)
         cue_count=write_clip_srt(transcript,clip,en_srt)
         subprocess.run([sys.executable,str(translator),"--input",str(en_srt),"--output",str(fa_srt),"--model",os.getenv("SEO_GEMINI_MODEL","gemini-2.5-flash")],check=True)
-        quality.append(validate_viral_clip(target,fa_srt))
+        quality.append(validate_viral_clip(target,fa_srt,aspect))
         print(f"Rendered and validated Persian-subtitled clip {n}/{len(clips)} ({cue_count} cues):",target)
     (out/"viral_quality_report.json").write_text(json.dumps(quality,ensure_ascii=False,indent=2),encoding="utf-8")
     used.add(str(attribution.get("download_url","")))
@@ -320,7 +324,7 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
       "\nDownloaded at UTC: "+str(attribution.get("downloaded_at_utc",""))+"\n",encoding="utf-8")
     (out/"metadata.json").write_text(json.dumps({
       "engine":"viral-video-studio","title":attribution.get("title","Licensed source video"),
-      "language":"en","aspect_ratio":"16:9","clip_count":len(quality),
+      "language":"en","aspect_ratio":aspect,"clip_count":len(quality),
       "durations_seconds":[row["duration_seconds"] for row in quality],
       "persian_subtitles":"separate_srt_vtt","english_subtitles":"separate_srt_vtt",
       "human_review_required":True},ensure_ascii=False,indent=2),encoding="utf-8")
@@ -363,7 +367,7 @@ def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bo
     uploaded=[]
     for path in files:
         srt=path.with_suffix(".fa.srt")
-        quality=validate_viral_clip(path,srt)
+        quality=validate_viral_clip(path,srt,meta.get("aspect_ratio","16:9"))
         digest=hashlib.sha256(path.read_bytes()).hexdigest()
         key=privacy+":"+digest
         previous=ledger["uploads"].get(key)
@@ -380,7 +384,7 @@ def publish(out: Path,max_uploads: int,privacy: str="private",confirm_public: bo
                  "started_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"quality":quality}
         ledger["uploads"][key]=pending
         ledger_path.write_text(json.dumps(ledger,ensure_ascii=False,indent=2),encoding="utf-8")
-        body={"snippet":{"title":(meta["title_prefix"][:75]+" #Shorts")[:100],
+        body={"snippet":{"title":meta["title_prefix"][:100],
           "description":meta["description"],"tags":meta.get("tags",[]),"categoryId":"27","defaultLanguage":"en"},
           "status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False,"containsSyntheticMedia":False}}
         media=MediaFileUpload(str(path),mimetype="video/mp4",resumable=True)
