@@ -14,7 +14,7 @@ def validate_longform(path: str, min_duration: float = 480.0) -> dict:
         aspect="16:9",
         require_audio=True,
     )
-    if report["width"] < 1280 or report["height"] < 720:
+    if min_duration < 600:\n        raise QualityError("Long-form minimum duration must be at least 600 seconds (10 minutes).")\n    if report["width"] < 1280 or report["height"] < 720:
         raise QualityError("Long-form output must be at least 1280x720.")
     report["profile"] = "longform-16x9"
     report["quality_gate"] = "passed"
