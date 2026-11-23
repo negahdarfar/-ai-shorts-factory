@@ -5,6 +5,7 @@ Independent English-language YouTube short-video pipeline.
 ## Current implementation
 - MoneyPrinterTurbo v1.3.10 is installed from its upstream tag by the production workflow.
 - Topic discovery, competitor metadata research, SEO metadata, thumbnail drafts and output validation.
+- Active LLM routing is restricted to explicitly free FreeLLMAPI/OpenRouter models, a confirmed Gemini free tier, or an explicitly installed local model. Metered Cloudflare, cloud FreeLLMAPI and OmniRoute fallback paths were removed from the active workflow.
 - The workflow requests 4–10 videos per batch. The final media validator now requires 60–120 seconds and vertical 9:16 output (requires 1080×1920 vertical output).
 - English captions are supplied by the upstream render; Persian translation is saved as separate UTF-8 SRT and VTT sidecars. The subtitle script no longer burns Persian text into the MP4.
 - This specialist branch's scheduled step uploads PRIVATE QA items only. However, the active default-branch workflow on `main` still contains a daily schedule for staggered PUBLIC release. The observed 2026-11-22 run failed at SEO metadata generation before upload, but a later run could reach the public scheduling step. `main` was not modified pending your approval.
