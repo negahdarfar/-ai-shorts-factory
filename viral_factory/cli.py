@@ -310,7 +310,7 @@ def process(index: int | str,out: Path,limit: int,model: str,aspect: str="16:9")
     (out/"viral_quality_report.json").write_text(json.dumps(quality,ensure_ascii=False,indent=2),encoding="utf-8")
     used.add(str(attribution.get("download_url","")))
     used_path.write_text(json.dumps(sorted(used),ensure_ascii=False,indent=2),encoding="utf-8")
-    description=("Edited short from a Creative Commons-licensed source.\n\n"
+    description=("Edited excerpt from a Creative Commons-licensed source.\n\n"
       +"Source: "+attribution.get("source_page","")+"\n"
       +"Creator: "+(attribution.get("artist") or "Not stated")+"\n"
       +"Credit: "+(attribution.get("credit") or "See source page")+"\n"
