@@ -2,7 +2,7 @@ name: KOROUSH Viral Factory (standalone)
 
 on:
   schedule:
-    - cron: "30 15 * * *" # Daily automated run; publish only after license and media QA pass.
+    - cron: "30 15 * * *" # Discovery/render only; scheduled runs never upload to YouTube.
   workflow_dispatch:
     inputs:
       mode:
@@ -123,7 +123,7 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'auto' }}
         run: python scripts/evaluate_content_quality.py --input viral_factory/work/selected_clips.json --output viral_factory/work/content-quality-report.json
       - name: Upload publicly to YouTube after quality and license validation
-        if: ${{ ((github.event_name == 'schedule' && vars.VIRAL_PUBLIC_PUBLISH_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish_public == true)) && (github.event_name == 'schedule' || inputs.mode == 'process') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_public == true && inputs.mode == 'process' }}
         run: python viral_factory/cli.py publish --output-dir viral_factory/work --max-uploads 4
       - name: Persist processed-source history
         if: ${{ always() && hashFiles('viral_factory/work/used_sources.json') != '' }}
