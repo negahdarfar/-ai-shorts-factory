@@ -7,9 +7,10 @@ Research-led English documentary production and technical quality assurance.
 - AI-assisted chapter plan and English narration generation.
 - Wikimedia Commons media discovery with a rights ledger.
 - Mixed image/video storyboard assembly and FFmpeg 1920×1080 rendering.
-- Persian SRT translation and technical validation.
-- Persian subtitles are separate sidecar files by default; burn-in is optional and disabled in the render workflow by default.
-- Long-form QA enforces 16:9 HD media, audio and a 10–30 minute output window in the main render validator.
+- English and Persian SRT generation in the auto-narration path; Persian SRT validation for the manual assembly path.
+- Separate English/Persian WebVTT sidecars in the auto-narration path and a Persian VTT sidecar in the manual path.
+- Persian subtitles remain separate by default; burn-in is optional and disabled in the render workflow by default.
+- Long-form QA enforces 16:9 HD media, audio and a 10–30 minute output window.
 
 ## Workflow entry points
 - `.github/workflows/longform-render.yml` — research, planning, source discovery, narration, subtitles, rendering and QA.
