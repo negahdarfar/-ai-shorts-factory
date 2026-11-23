@@ -24,7 +24,7 @@ on:
         description: "Minimum final documentary length"
         required: true
         type: choice
-        options: ["5", "8", "10", "12", "15", "20"]
+        options: ["10", "12", "15", "20", "30"]
         default: "10"
       output_name:
         description: "Final MP4 filename"
