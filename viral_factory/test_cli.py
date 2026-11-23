@@ -37,21 +37,9 @@ class ViralFactoryTests(unittest.TestCase):
                     left["end"] <= right["start"] or right["end"] <= left["start"]
                 )
 
-    def test_fallback_clips_are_non_overlapping_and_in_range(self):
-        clips = select([], 360, 3)
-        self.assertEqual(len(clips), 3)
-        for left, right in zip(clips, clips[1:]):
-            self.assertLessEqual(left["end"], right["start"])
-        self.assertTrue(all(120 <= clip["duration"] <= 600 for clip in clips))
-        self.assertLessEqual(clips[-1]["end"], 360)
-
-    def test_fallback_clips_cover_uneven_source_without_overlap(self):
-        clips = select([], 600, 4)
-        self.assertEqual(len(clips), 4)
-        for left, right in zip(clips, clips[1:]):
-            self.assertLessEqual(left["end"], right["start"])
-        self.assertTrue(all(120 <= clip["duration"] <= 600 for clip in clips))
-        self.assertLessEqual(clips[-1]["end"], 600)
+    def test_does_not_create_arbitrary_fallback_windows(self):
+        self.assertEqual(select([], 360, 3), [])
+        self.assertEqual(select([], 600, 4), [])
 
     def test_short_sources_are_not_downgraded_to_short_shorts(self):
         self.assertEqual(select([], 119.9, 4), [])
