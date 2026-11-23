@@ -80,7 +80,7 @@ jobs:
           restore-keys: |
             viral-sources-${{ runner.os }}-
       - name: Validate existing YouTube OAuth secrets for public upload
-        if: ${{ (github.event_name == 'schedule' && vars.VIRAL_PUBLIC_PUBLISH_ENABLED == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish_public == true) }}
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.upload_private == true || inputs.publish_public == true) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -114,6 +114,7 @@ jobs:
             --candidate-index "$CANDIDATE_INDEX" \
             --limit "$CLIP_COUNT" \
             --model tiny \
+            --aspect 16:9 \
             --output-dir viral_factory/work
       - name: Evaluate selected clip transcripts with free AI providers
         if: ${{ github.event_name == 'schedule' || inputs.mode == 'process' }}
