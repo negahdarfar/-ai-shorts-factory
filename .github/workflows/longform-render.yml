@@ -36,7 +36,7 @@ on:
       burn_subtitles:
         description: Burn Persian subtitles into the video (off by default; SRT remains a separate file)
         required: true
-        default: true
+        default: false
         type: boolean
       minimum_duration_seconds:
         description: Minimum documentary duration (10–30 minutes)
