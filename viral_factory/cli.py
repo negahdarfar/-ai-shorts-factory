@@ -220,9 +220,11 @@ def select(segments: list[dict[str,Any]],duration: float,limit: int) -> list[dic
             chosen.append(candidate)
         if len(chosen)>=limit: break
     if not chosen and duration>=20:
-        count=min(limit,int(duration//20)); step=max(20,duration/max(count,1))
+        count=min(limit,int(duration//20))
+        step=duration/count
+        length=min(35.0,step)
         for i in range(count):
-            start=min(i*step,max(0,duration-20)); length=min(35,duration-start)
+            start=i*step
             chosen.append({"start":round(start,2),"end":round(start+length,2),
               "duration":round(length,2),"text":"","score":0,"selection":"evenly-spaced fallback"})
     return chosen
