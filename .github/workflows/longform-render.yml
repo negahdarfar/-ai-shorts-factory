@@ -207,6 +207,8 @@ jobs:
           python -m pip install --disable-pip-version-check edge-tts
           python scripts/generate_narration_audio.py --plan "$PLAN_PATH" --audio longform-output/narration.mp3 --srt longform-output/narration.en.srt
           python scripts/translate_subtitles_free.py --input longform-output/narration.en.srt --output longform-output/narration.fa.srt
+          python scripts/srt_to_vtt.py --input longform-output/narration.en.srt --output longform-output/narration.en.vtt
+          python scripts/srt_to_vtt.py --input longform-output/narration.fa.srt --output longform-output/narration.fa.vtt
           echo "audio=longform-output/narration.mp3" >> "$GITHUB_OUTPUT"
           echo "srt=longform-output/narration.fa.srt" >> "$GITHUB_OUTPUT"
       - name: Download openly licensed Commons visuals for AI storyboard
@@ -240,6 +242,14 @@ jobs:
           if [[ "$BURN" == "true" && -n "$SUBTITLES" ]]; then args+=(--burn-subtitles); fi
           mkdir -p longform-output
           python scripts/assemble_storyboard.py "${args[@]}"
+      - name: Convert selected Persian SRT to a separate WebVTT sidecar
+        env:
+          SUBTITLES: ${{ steps.narration.outputs.srt || inputs.subtitles_srt }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$SUBTITLES" ]]; then
+            python scripts/srt_to_vtt.py --input "$SUBTITLES" --output longform-output/subtitles.fa.vtt
+          fi
       - name: Run long-form media quality gate
         env:
           MIN_DURATION: ${{ inputs.minimum_duration_seconds }}
