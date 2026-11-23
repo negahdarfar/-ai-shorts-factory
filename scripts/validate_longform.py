@@ -24,7 +24,7 @@ def validate_longform(path: str, min_duration: float = 480.0) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
-    parser.add_argument("--min-duration-seconds", type=float, default=480.0)
+    parser.add_argument("--min-duration-seconds", type=float, default=600.0)
     parser.add_argument("--report", default="longform-qa-report.json")
     args = parser.parse_args()
     try:
