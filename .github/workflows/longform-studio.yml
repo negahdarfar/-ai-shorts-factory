@@ -92,6 +92,10 @@ jobs:
           OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
           python scripts/assemble_documentary.py --clips "$CLIPS_MANIFEST" --voiceover "$VOICEOVER" --subtitles "$PERSIAN_SRT" --output "$OUTPUT_NAME"
+      - name: Create separate Persian WebVTT sidecar
+        env:
+          PERSIAN_SRT: ${{ inputs.persian_srt_path }}
+        run: python scripts/srt_to_vtt.py --input "$PERSIAN_SRT" --output documentary.fa.vtt
       - name: Enforce longform technical quality gate
         env:
           OUTPUT_NAME: ${{ inputs.output_name }}
