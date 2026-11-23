@@ -7,7 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
-SRT_BLOCK = re.compile(r"(?ms)^\\s*(\\d+)\\s*\\n(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*-->\\s*(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*\\n(.*?)(?=\\n\\s*\\n|\\Z)")
+SRT_BLOCK = re.compile(r"(?ms)^\s*(\d+)\s*\n(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})\s*\n(.*?)(?=\n\s*\n|\Z)")
 
 
 def validate_srt(path: Path, duration: float, require_persian: bool = False) -> int:
