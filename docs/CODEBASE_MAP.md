@@ -1,31 +1,29 @@
 # Short Video Studio — Codebase Map
 
 ## Scope
-This branch is the dedicated short-form production engine. This document maps the current repository layout; it does not change runtime behavior.
+Dedicated MoneyPrinterTurbo-based short-video engine. This map reflects the current branch state after the subtitle and duration-gate changes.
 
 ## Runtime areas
-- Root pipeline: `main.py`, `transcribe.py`, `clip_selector.py`, `viral_selector.py`, `video_editor.py`, `download_video.py`, `source_discovery.py`.
-- Production orchestration: `.github/workflows/moneyprinterturbo.yml`, `.github/workflows/daily-factory-orchestrator.yml`.
-- AI/provider integration: `scripts/free_model_router.py`, `scripts/configure_moneyprinter.py`, `scripts/avalai_client.py`, `scripts/api_intelligence.py`.
-- Content pipeline: `scripts/build_trending_batch.py`, `scripts/research_youtube_competitors.py`, `scripts/generate_seo_metadata.py`, `scripts/apply_youtube_seo_metadata.py`, `scripts/render_seo_thumbnails.py`.
-- Persian subtitles: `scripts/add_persian_subtitles.py`, `scripts/translate_srt_to_persian.py`, `scripts/translate_subtitles_free.py`.
-- Quality and state: `scripts/evaluate_content_quality.py`, `scripts/validate_mpt_outputs.py`, `scripts/validate_seo_metadata.py`, `scripts/validate_visual_uniqueness.py`, `scripts/topic_history.py`, `scripts/upload_history.py`, `data/factory_state/`.
-- Analytics: `scripts/youtube_analytics_report.py`, `scripts/build_factory_dashboard.py`, `scripts/weekly_optimization.py`.
-- Tests: `tests/`; shared quality helpers: `koroush_core/`.
-- Isolated licensed-media engine: `viral_factory/` (kept separate from the Shorts/MoneyPrinterTurbo pipeline).
+- Production workflow: `.github/workflows/moneyprinterturbo.yml`.
+- Orchestration workflow: `.github/workflows/daily-factory-orchestrator.yml`.
+- Provider setup and routing: `scripts/configure_moneyprinter.py`, `scripts/free_model_router.py`, `scripts/avalai_client.py`.
+- Content pipeline: `scripts/build_trending_batch.py`, `scripts/research_youtube_competitors.py`, `scripts/generate_seo_metadata.py`, `scripts/render_seo_thumbnails.py`.
+- Subtitle processing: `scripts/add_persian_subtitles.py` writes Persian SRT and English/Persian VTT sidecars; it does not modify the MP4.
+- Media validation: `scripts/validate_mpt_outputs.py` requires 60–120 seconds, vertical media, audio, Persian SRT and black/silence checks.
+- Upload state: `scripts/upload_history.py`, `scripts/upload_four_private_youtube_tests.py`, `data/factory_state/`.
+- Tests: `tests/`.
+- Separate licensed-media engine: `viral_factory/`; it is not the MoneyPrinterTurbo short pipeline.
 
-## Safe operating rules
-1. Do not move or rename runtime files until every Python import, workflow path, cache path, artifact path, and documented command has been mapped.
-2. Do not edit provider credentials or GitHub Secrets from code changes.
-3. Keep public upload opt-in for manual runs and require explicit validation gates.
-4. Preserve generated state files and upload history.
-5. Run compile, unit tests, workflow syntax checks, and a dry-run before any runtime refactor.
+## Publication safety
+- Scheduled upload step is private-only.
+- Manual public upload still requires `workflow_dispatch` with `publish_four_public=true`.
+- No public upload was performed in this work.
+- Pending upload ledger entries are intentionally not retried blindly.
 
-## Known path/trigger inconsistencies to resolve in a separate approved fix
-- `koroush-ci.yml` watches the legacy `shorts-factory` branch name, not this branch name.
-- `daily-factory-orchestrator.yml` dispatches Viral Factory using the legacy `viral-video-factory` ref.
-- `moneyprinterturbo.yml` has a pull-request trigger scoped to `shorts-factory`.
-These are recorded here only; workflow files have not been modified.
+## Scheduling limitation
+GitHub Actions schedules are evaluated from the repository default branch. The default branch is `main`, not this branch. Therefore this branch's cron declarations do not by themselves prove a daily scheduled run. A default-branch dispatcher change is required and was not made because `main` is protected by the user's explicit instruction.
 
-## Refactor boundary
-This pass is documentation-only. No Python source, workflow, dependency, secret, or production-state file is changed.
+## Known limitations
+- Real MoneyPrinterTurbo rendering against the new 60–120 second gate remains untested.
+- YouTube caption-track upload and processing confirmation are not implemented/verified.
+- CI and unit tests are not equivalent to a complete generation, upload or caption end-to-end test.
