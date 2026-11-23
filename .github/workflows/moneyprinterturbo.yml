@@ -234,7 +234,7 @@ jobs:
         working-directory: vendor/MoneyPrinterTurbo
         run: |
           python "$GITHUB_WORKSPACE/scripts/run_mpt_batch_with_retry.py" --batch-file "$GITHUB_WORKSPACE/trending_batch.json" --video-source ${{ steps.configure.outputs.video_source }} --max-attempts 3 --retry-delay-seconds 20
-      - name: Translate and burn Persian subtitles
+      - name: Translate and write separate Persian SRT and VTT sidecars
         if: ${{ steps.configure.outputs.ready == 'true' }}
         env:
           EXPECTED_COUNT: ${{ env.EXPECTED_COUNT }}
