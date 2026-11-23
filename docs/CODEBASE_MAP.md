@@ -1,39 +1,32 @@
 # Viral Video Studio — Codebase Map
 
 ## Scope
-This branch owns the standalone, license-aware viral-media discovery and Shorts rendering engine.
+Standalone licensed-media video engine; current target output is 120–600 seconds in 16:9 landscape.
 
 ## Runtime areas
-- Main implementation: `viral_factory/cli.py`.
-- Engine dependencies: `viral_factory/requirements.txt`.
-- Engine tests: `viral_factory/test_cli.py`.
-- User guide: `viral_factory/README.md`.
+- CLI: `viral_factory/cli.py`.
+- Dependencies: `viral_factory/requirements.txt`.
+- Tests: `viral_factory/test_cli.py`.
 - Workflow: `.github/workflows/viral-factory.yml`.
-- Shared content-quality gate: `scripts/evaluate_content_quality.py`.
-- Shared YouTube upload/history and SEO helpers: `scripts/upload_history.py`, `scripts/upload_youtube_thumbnails.py`, `scripts/generate_seo_metadata.py`.
-- Optional model/provider clients and routing: `scripts/free_model_router.py`, `scripts/avalai_client.py`.
-- Persistent candidate/topic data: `data/`.
+- Shared quality gate: `scripts/evaluate_content_quality.py`.
+- Translation helper: `scripts/translate_srt_to_persian.py`.
 
-## Current documented pipeline
-1. Discover video media on Wikimedia Commons.
-2. Filter by supported reuse-license metadata and retain source attribution.
-3. Optionally collect YouTube most-popular metadata (metadata research only).
-4. Download a selected eligible Commons asset.
-5. Transcribe English audio with Faster-Whisper.
-6. Score transcript windows and render vertical clips with FFmpeg.
-7. Run content-quality checks and optionally upload through YouTube OAuth.
+## Current pipeline
+1. Discover eligible Wikimedia Commons video files.
+2. Filter to CC0, CC BY and public domain; reject NC, ND, unknown and ShareAlike.
+3. Optionally collect YouTube popular-video metadata as research only.
+4. Download the selected Commons source and retain its attribution record.
+5. Transcribe English speech with Faster-Whisper.
+6. Select non-overlapping 120–600 second transcript windows.
+7. Render 16:9 by default with FFmpeg.
+8. Write English and Persian SRT sidecars and run technical validation.
+9. Public publishing is available only on an explicit manual dispatch; scheduled runs do not publish.
 
-## Important configuration mismatch
-- The workflow input `publish_public` currently defaults to `true`.
-- The engine README describes public publishing as opt-in and false by default.
-- Scheduled workflow execution also follows a separate publishing condition.
-Treat public publishing as a risk until the workflow and README are reconciled. This pass intentionally does not change either.
+## Rights limitations
+The current source record preserves source page, download URL, creator, credit and license label/URL. Per-file SHA-256 and download timestamp are not yet persisted in the rights record. Commons metadata does not independently prove legal rights. ShareAlike is rejected until obligations can be implemented and reviewed.
 
-## Safety and license boundary
-- Never treat YouTube trend metadata as permission to download or republish a YouTube video.
-- Preserve source page, license URL, creator attribution, and asset history.
-- Fail closed for unclear, non-commercial, or no-derivatives licenses.
-- Keep upload disabled during tests and require explicit authorization before public release.
+## Scheduling limitation
+Cron workflows must exist on the default branch (`main`) to run on schedule. This branch alone cannot activate its cron. No main-branch changes were made.
 
-## Refactor boundary
-This pass is documentation-only. The CLI, workflow, dependencies, upload behavior, and source/license checks are unchanged.
+## Not yet verified
+Real 4-minute rendering, full license audit, private YouTube upload, separate YouTube caption-track upload, caption processing, and end-to-end provider failover.
