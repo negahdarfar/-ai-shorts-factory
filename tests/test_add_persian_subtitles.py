@@ -13,12 +13,12 @@ class ExpectedSubtitleBatchTests(unittest.TestCase):
             source = Path(directory) / "captions.fa.srt"
             target = Path(directory) / "captions.fa.vtt"
             source.write_text(
-                "1\\n00:00:00,000 --> 00:00:01,000\\nسلام\\n",
+                "1\n00:00:00,000 --> 00:00:01,000\nسلام\n",
                 encoding="utf-8",
             )
             write_vtt(source, target)
             rendered = target.read_text(encoding="utf-8")
-            self.assertTrue(rendered.startswith("WEBVTT\\n"))
+            self.assertTrue(rendered.startswith("WEBVTT\n"))
             self.assertIn("00:00:00.000 --> 00:00:01.000", rendered)
             self.assertIn("سلام", rendered)
             self.assertIn("00:00:00,000", source.read_text(encoding="utf-8"))
