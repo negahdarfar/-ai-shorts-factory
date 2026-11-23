@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed validation for rendered long-form documentary videos."""
+"""Fail-closed validation for rendered 10–30 minute documentary videos."""
 import argparse
 import json
 from pathlib import Path
@@ -7,14 +7,17 @@ from pathlib import Path
 from koroush_core.quality import QualityError, validate_media
 
 
-def validate_longform(path: str, min_duration: float = 480.0) -> dict:
+def validate_longform(path: str, min_duration: float = 600.0) -> dict:
+    if not 600 <= min_duration <= 1800:
+        raise QualityError("Long-form minimum duration must be between 600 and 1800 seconds.")
     report = validate_media(
         path,
         min_duration=min_duration,
+        max_duration=1800,
         aspect="16:9",
         require_audio=True,
     )
-    if min_duration < 600:\n        raise QualityError("Long-form minimum duration must be at least 600 seconds (10 minutes).")\n    if report["width"] < 1280 or report["height"] < 720:
+    if report["width"] < 1280 or report["height"] < 720:
         raise QualityError("Long-form output must be at least 1280x720.")
     report["profile"] = "longform-16x9"
     report["quality_gate"] = "passed"
