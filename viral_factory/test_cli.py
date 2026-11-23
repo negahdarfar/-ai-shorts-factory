@@ -1,6 +1,12 @@
 import unittest
+import os
+import sys
+from unittest.mock import patch
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from translate_srt_to_persian import is_gemini_free_tier_enabled
 
 from cli import allowed_license, score, select, srt_to_vtt, validate_subtitle_file, write_clip_srt
 
@@ -116,3 +122,21 @@ class ViralFactoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GeminiFreeTierOptInTests(unittest.TestCase):
+    def test_missing_flag_disables_gemini_fallback(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(is_gemini_free_tier_enabled())
+
+    def test_false_flag_disables_gemini_fallback(self):
+        with patch.dict(os.environ, {"GEMINI_FREE_TIER_ENABLED": "false"}):
+            self.assertFalse(is_gemini_free_tier_enabled())
+
+    def test_true_flag_explicitly_enables_free_tier_fallback(self):
+        with patch.dict(os.environ, {"GEMINI_FREE_TIER_ENABLED": "true"}):
+            self.assertTrue(is_gemini_free_tier_enabled())
+
+    def test_flag_is_case_insensitive_and_trimmed(self):
+        with patch.dict(os.environ, {"GEMINI_FREE_TIER_ENABLED": " TRUE "}):
+            self.assertTrue(is_gemini_free_tier_enabled())
