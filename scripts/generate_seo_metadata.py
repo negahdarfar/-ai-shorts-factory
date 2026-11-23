@@ -311,41 +311,19 @@ def main():
     generated_source = "local_template_fallback"
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     gemini_free_tier_enabled = os.getenv("GEMINI_FREE_TIER_ENABLED", "false").strip().lower() == "true"
-    allow_nonfree_fallback = os.getenv("ALLOW_NONFREE_LLM_FALLBACK", "false").strip().lower() == "true"
-    cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
-    cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
-    cloudflare_model = os.getenv("CLOUDFLARE_MODEL", "@cf/zai-org/glm-4.7-flash").strip()
     gateways = []
     # Local Ollama is opt-in: hosted GitHub runners must not wait on localhost.
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "").strip()
     ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip()
     if ollama_base_url and ollama_model:
         gateways.append(("Ollama", ollama_base_url, "", ollama_model))
-    if cloudflare_account_id and cloudflare_api_token and cloudflare_model == "@cf/zai-org/glm-4.7-flash":
-        gateways.append((
-            "Cloudflare",
-            f"https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1",
-            cloudflare_api_token,
-            cloudflare_model,
-        ))
-    elif cloudflare_account_id or cloudflare_api_token:
-        print("CLOUDFLARE_CONFIGURATION_INCOMPLETE_OR_MODEL_NOT_ALLOWLISTED; refusing unknown-price routing.", file=sys.stderr)
-    # Optional always-on hosted FreeLLMAPI endpoint (not the phone/Tailscale gateway).
-    freellmapi_cloud_url = os.getenv("FREELLMAPI_CLOUD_BASE_URL", "").strip()
-    if freellmapi_cloud_url:
-        gateways.append((
-            "FreeLLMAPI",
-            freellmapi_cloud_url,
-            os.getenv("FREELLMAPI_API_KEY", "").strip(),
-            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
-        ))
-    else:
-        gateways.append((
-            "FreeLLMAPI",
-            os.getenv("FREELLMAPI_BASE_URL", "").strip(),
-            os.getenv("FREELLMAPI_API_KEY", "").strip(),
-            os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
-        ))
+    # Only the configured local gateway and providers with explicit free model discovery are eligible.
+    gateways.append((
+        "FreeLLMAPI",
+        os.getenv("FREELLMAPI_BASE_URL", "").strip(),
+        os.getenv("FREELLMAPI_API_KEY", "").strip(),
+        os.getenv("FREELLMAPI_MODEL", "auto").strip() or "auto",
+    ))
     # AvalAI participates only when its live catalogue explicitly marks a model free or zero-priced.
     avalai_key = os.getenv("AVALAI_API_KEY", "").strip()
     if avalai_key:
@@ -359,15 +337,6 @@ def main():
             openrouter_key,
             os.getenv("OPENROUTER_MODEL", "auto").strip() or "auto",
         ))
-    if allow_nonfree_fallback:
-        gateways.append((
-            "OmniRoute",
-            os.getenv("OMNIROUTE_BASE_URL", "").strip(),
-            os.getenv("OMNIROUTE_API_KEY", "").strip(),
-            os.getenv("OMNIROUTE_MODEL", "auto").strip() or "auto",
-        ))
-    elif os.getenv("OMNIROUTE_API_KEY", "").strip():
-        print("NON_FREE_LLM_FALLBACK_DISABLED; OmniRoute will not be called.", flush=True)
     # Run each topic as its own request: free models often truncate four-item batches.
     provider_routes = []
     for provider, base_url, api_key, api_model in gateways:
@@ -387,8 +356,7 @@ def main():
         for selected_model in candidate_models:
             provider_routes.append((provider, base_url, api_key, selected_model))
 
-    # Prefer the private FreeLLMAPI gateway when configured; Cloudflare remains the
-    # unattended fallback if the phone/Tailscale gateway cannot be reached.
+    # Prefer the local FreeLLMAPI gateway when configured; only verified-free model routes are used.
     provider_routes.sort(key=lambda route: 0 if route[0] == "FreeLLMAPI" else 1)
     gemini_free_model = os.getenv("SEO_GEMINI_MODEL", args.model).strip()
     for topic_index, topic in enumerate(topics, 1):
