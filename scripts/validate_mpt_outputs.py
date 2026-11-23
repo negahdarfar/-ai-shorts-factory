@@ -7,6 +7,35 @@ import re
 import subprocess
 from pathlib import Path
 
+SRT_BLOCK = re.compile(r"(?ms)^\\s*(\\d+)\\s*\\n(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*-->\\s*(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*\\n(.*?)(?=\\n\\s*\\n|\\Z)")
+
+
+def validate_srt(path: Path, duration: float, require_persian: bool = False) -> int:
+    raw = path.read_text(encoding="utf-8-sig")
+    cues = list(SRT_BLOCK.finditer(raw))
+    if not cues:
+        raise SystemExit(f"No valid SRT cues in {path}.")
+    previous_end = -1
+    for index, match in enumerate(cues, 1):
+        def to_ms(value: str) -> int:
+            hh, mm, ss_ms = value.split(":")
+            ss, ms = ss_ms.split(",")
+            if int(mm) > 59 or int(ss) > 59:
+                raise SystemExit(f"Invalid minute/second in {path}, cue {index}.")
+            return ((int(hh) * 60 + int(mm)) * 60 + int(ss)) * 1000 + int(ms)
+        start, end = to_ms(match.group(2)), to_ms(match.group(3))
+        if end <= start or start < previous_end:
+            raise SystemExit(f"Invalid or overlapping subtitle timing in {path}, cue {index}.")
+        if end > duration * 1000 + 50:
+            raise SystemExit(f"Subtitle cue exceeds video duration in {path}, cue {index}.")
+        if not match.group(4).strip():
+            raise SystemExit(f"Empty subtitle cue in {path}, cue {index}.")
+        previous_end = end
+    if require_persian and not any(0x0600 <= ord(ch) <= 0x06ff for ch in raw):
+        raise SystemExit(f"Persian subtitle file contains no Persian-script text: {path}")
+    return len(cues)
+
+
 home = Path(os.environ["MPT_HOME"])
 expected = int(os.environ.get("EXPECTED_COUNT", "4"))
 if not 4 <= expected <= 10:
@@ -95,9 +124,8 @@ for path, topic, task_index in files_with_topics:
     subtitles = path.parent / "subtitle.fa.srt"
     if not subtitles.is_file() or subtitles.stat().st_size < 20:
         raise SystemExit(f"Missing or empty Persian subtitle file: {subtitles}")
-    subtitle_text = subtitles.read_text(encoding="utf-8-sig").strip()
-    if "-->" not in subtitle_text or not any(0x0600 <= ord(char) <= 0x06ff for char in subtitle_text):
-        raise SystemExit(f"Persian subtitle file has no valid timing or Persian-script text: {subtitles}")
+    english_cues = validate_srt(english_srt, duration, require_persian=False)
+    persian_cues = validate_srt(subtitles, duration, require_persian=True)
 
     scan = subprocess.run(
         [
@@ -145,7 +173,7 @@ for path, topic, task_index in files_with_topics:
         "audio_codec": audio_stream.get("codec_name"),
         "audio_sample_rate": audio_stream.get("sample_rate"),
         "size_mb": round(path.stat().st_size / 1_000_000, 2),
-        "persian_subtitles": str(subtitles.relative_to(tasks_root)),
+        "english_subtitles": str(english_srt.relative_to(tasks_root)),\n        "persian_subtitles": str(subtitles.relative_to(tasks_root)),\n        "english_subtitle_cues": english_cues,\n        "persian_subtitle_cues": persian_cues,
         "detected_black_seconds": round(black_total, 2),
         "detected_silence_seconds": round(silence_total, 2),
         "quality_score": score,
