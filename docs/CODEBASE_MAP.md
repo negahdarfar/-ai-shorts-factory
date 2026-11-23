@@ -20,7 +20,7 @@ Standalone licensed-media video engine; current target output is 120–600 secon
 6. Select non-overlapping 120–600 second transcript windows.
 7. Render 16:9 by default with FFmpeg.
 8. Write English and Persian SRT sidecars and run technical validation.
-9. Public publishing is available only on an explicit manual dispatch; scheduled runs do not publish.
+9. Manual private QA upload is available through `upload_private=true`; public publishing requires explicit manual `publish_public=true`. Scheduled runs do not upload.
 
 ## Rights limitations
 The current source record preserves source page, download URL, creator, credit and license label/URL. Per-file SHA-256 and download timestamp are not yet persisted in the rights record. Commons metadata does not independently prove legal rights. ShareAlike is rejected until obligations can be implemented and reviewed.
@@ -29,4 +29,4 @@ The current source record preserves source page, download URL, creator, credit a
 Cron workflows must exist on the default branch (`main`) to run on schedule. This branch alone cannot activate its cron. No main-branch changes were made.
 
 ## Not yet verified
-Real 4-minute rendering, full license audit, private YouTube upload, separate YouTube caption-track upload, caption processing, and end-to-end provider failover.
+Real 4-minute rendering, full legal license review, actual private YouTube upload, separate YouTube caption-track upload, caption processing, and end-to-end provider failover.
