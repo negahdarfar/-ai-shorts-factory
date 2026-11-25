@@ -183,7 +183,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
     else:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": output_token_budget()}
         }
         request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
         request_headers = {"Content-Type": "application/json"}
