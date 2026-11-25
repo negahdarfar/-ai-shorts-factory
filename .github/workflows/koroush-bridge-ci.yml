@@ -19,15 +19,7 @@ jobs:
           python-version: "3.12"
       - name: Compile bridge
         run: python -m py_compile scripts/koroush_central_bridge.py
-      - name: Validate CLI and evidence contract without network access
-        run: |
-          python scripts/koroush_central_bridge.py --help
-          python - <<'PY'
-          import importlib.util
-          spec = importlib.util.spec_from_file_location("central_bridge", "scripts/koroush_central_bridge.py")
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          evidence = module.load_evidence(None, '[{"source_id":"ci-smoke","text":"synthetic local smoke test"}]')
-          assert len(evidence) == 1 and evidence[0]["source_id"] == "ci-smoke"
-          print("Bridge CLI and evidence validation passed; no network request or secret was used.")
-          PY
+      - name: Run offline contract and discovery tests
+        run: python -m unittest discover -s tests -p 'test_koroush_central_bridge.py' -v
+      - name: Validate CLI without network access
+        run: python scripts/koroush_central_bridge.py --help
