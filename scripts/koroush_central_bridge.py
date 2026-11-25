@@ -162,12 +162,18 @@ def main() -> int:
     if parsed_status.scheme or parsed_status.netloc or not parsed_status.path.startswith("/api/jobs/") or ".." in parsed_status.path.split("/"):
         raise RuntimeError("Central API returned an unsafe job status reference")
 
-    active_providers = [x.get("id") for x in manifest.get("providers", []) if isinstance(x, dict) and x.get("status") == "available"]
-    listed_sources = [x.get("id") for x in manifest.get("source_connectors", []) if isinstance(x, dict)]
+    provider_states = [
+        f"{x.get('id')}:{x.get('status')}" for x in manifest.get("providers", [])
+        if isinstance(x, dict) and x.get("id")
+    ]
+    source_states = [
+        f"{x.get('id')}:{x.get('status')}" for x in manifest.get("source_connectors", [])
+        if isinstance(x, dict) and x.get("id")
+    ]
     print(f"Central integration: {profile.get('id', args.integration_id)}")
     print("Central agent catalog synchronized: research-brief, classifier, summarizer" + (", translator" if args.target_language else ""))
-    print(f"Central available providers: {', '.join(active_providers) if active_providers else 'none marked available'}")
-    print(f"Central source connector catalog entries: {len(listed_sources)} (discovery metadata only)")
+    print(f"Central provider catalog: {', '.join(provider_states) if provider_states else 'empty'}")
+    print(f"Central source connector catalog: {', '.join(source_states) if source_states else 'empty'} (metadata discovery only)")
     print(f"Central job accepted: {job_id} ({submitted.get('status', 'unknown')})")
     deadline = time.monotonic() + args.wait_seconds
     while time.monotonic() < deadline:
