@@ -11,6 +11,17 @@ bridge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bridge)
 
 
+def manifest():
+    return {
+        "agents": [{"id": x} for x in (
+            "koroush.research-brief", "koroush.text-classifier",
+            "koroush.text-summarizer", "koroush.text-translator",
+        )],
+        "providers": [{"id": "avalai", "status": "limited"}],
+        "source_connectors": [{"id": "github", "status": "limited"}],
+    }
+
+
 class EvidenceContractTests(unittest.TestCase):
     def test_accepts_valid_evidence_array(self):
         rows = bridge.load_evidence(None, '[{"source_id":"s1","text":"source text"}]')
@@ -40,32 +51,33 @@ class EvidenceContractTests(unittest.TestCase):
 
 class DiscoveryTests(unittest.TestCase):
     @patch.object(bridge, "request_json")
-    def test_resolves_builtin_youtube_profile(self, request):
+    def test_resolves_builtin_youtube_profile_and_syncs_agents(self, request):
         request.side_effect = [
-            {"version": 1},
+            manifest(),
             {"integrations": [{"id": "koroush.youtube", "status": "enabled-research"}], "registered_connectors": []},
         ]
-        route, profile = bridge.resolve_integration("https://central.example", {}, "youtube")
+        route, profile, catalog = bridge.resolve_integration("https://central.example", {}, "youtube")
         self.assertEqual(route, "youtube")
         self.assertEqual(profile["id"], "koroush.youtube")
+        self.assertEqual(len(catalog["agents"]), 4)
 
     @patch.object(bridge, "request_json")
     def test_discovers_new_registered_connector_without_code_change(self, request):
         request.side_effect = [
-            {"version": 1},
+            manifest(),
             {"integrations": [], "registered_connectors": [{
                 "id": "koroush.video-research", "status": "active",
                 "domains": ["general"], "capabilities": ["research.workflow.v1"],
             }]},
         ]
-        route, profile = bridge.resolve_integration("https://central.example", {}, "koroush.video-research")
+        route, profile, _ = bridge.resolve_integration("https://central.example", {}, "koroush.video-research")
         self.assertEqual(route, "koroush.video-research")
         self.assertEqual(profile["status"], "active")
 
     @patch.object(bridge, "request_json")
     def test_rejects_inactive_or_incompatible_connector(self, request):
         request.side_effect = [
-            {"version": 1},
+            manifest(),
             {"integrations": [], "registered_connectors": [{
                 "id": "koroush.video-research", "status": "inactive",
                 "domains": ["general"], "capabilities": ["research.workflow.v1"],
@@ -73,6 +85,14 @@ class DiscoveryTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(RuntimeError, "not active/compatible"):
             bridge.resolve_integration("https://central.example", {}, "koroush.video-research")
+
+    @patch.object(bridge, "request_json")
+    def test_fails_closed_when_core_agent_is_missing(self, request):
+        broken = manifest()
+        broken["agents"] = [x for x in broken["agents"] if x["id"] != "koroush.research-brief"]
+        request.return_value = broken
+        with self.assertRaisesRegex(RuntimeError, "missing required agents"):
+            bridge.resolve_integration("https://central.example", {}, "youtube")
 
 
 if __name__ == "__main__":
