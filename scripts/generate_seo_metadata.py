@@ -109,6 +109,20 @@ def normalize_item(item, topic):
     return {"metadata": metadata, "video_script": script, "video_terms": terms}
 
 
+
+def output_token_budget():
+    """Reserve enough output space for four full scripts and SEO records.
+
+    Clamp the override so a misconfigured workflow cannot request an unbounded
+    response. The default is intentionally above the old 2,400-token ceiling,
+    which truncated multi-topic responses before all narration could be emitted.
+    """
+    try:
+        requested = int(os.getenv("SEO_MAX_OUTPUT_TOKENS", "6000"))
+    except (TypeError, ValueError):
+        requested = 6000
+    return max(4096, min(requested, 8192))
+
 def generate_batch(topics, language, model, key, research=None, api_base_url=None, api_key=None, api_model="auto", api_provider="FreeLLMAPI", max_attempts=3, repair_missing=True):
     topic_text = "\\n".join(f"{i}. {topic}" for i, topic in enumerate(topics, 1))
     research_by_topic = {}
@@ -157,7 +171,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.25,
-            "max_tokens": 2400,
+            "max_tokens": output_token_budget(),
             "response_format": {"type": "json_object"},
         }
         request_url = api_base_url.rstrip("/") + "/chat/completions"
@@ -169,7 +183,7 @@ Exactly one indexed item per input topic. Each script MUST contain 130-140 spoke
     else:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
+            "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": output_token_budget()}
         }
         request_url = f"{API_ROOT}/{model}:generateContent?key={key}"
         request_headers = {"Content-Type": "application/json"}
