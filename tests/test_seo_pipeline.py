@@ -156,5 +156,25 @@ class SeoPipelineTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             module.validate_distinct_visual_terms(batch)
 
+
+    def test_output_token_budget_is_large_and_bounded(self):
+        import importlib.util
+        import os
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location(
+            "seo_generator_budget", ROOT / "scripts/generate_seo_metadata.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(module.output_token_budget(), 6000)
+        with patch.dict(os.environ, {"SEO_MAX_OUTPUT_TOKENS": "3000"}):
+            self.assertEqual(module.output_token_budget(), 4096)
+        with patch.dict(os.environ, {"SEO_MAX_OUTPUT_TOKENS": "12000"}):
+            self.assertEqual(module.output_token_budget(), 8192)
+        with patch.dict(os.environ, {"SEO_MAX_OUTPUT_TOKENS": "invalid"}):
+            self.assertEqual(module.output_token_budget(), 6000)
+
+
 if __name__ == "__main__":
     unittest.main()
