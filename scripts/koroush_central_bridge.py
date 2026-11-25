@@ -78,9 +78,23 @@ def load_evidence(path: str | None, inline_json: str | None) -> list[dict]:
     return normalized
 
 
-def resolve_integration(base_url: str, headers: dict[str, str], integration_id: str) -> tuple[str, dict]:
-    """Resolve a built-in YouTube profile or an active registered connector."""
-    request_json(base_url + "/api/platform/manifest", method="GET", headers=headers)
+def resolve_integration(
+    base_url: str, headers: dict[str, str], integration_id: str, *, require_translation: bool = True
+) -> tuple[str, dict, dict]:
+    """Sync the public core manifest and resolve a built-in or registered connector."""
+    manifest = request_json(base_url + "/api/platform/manifest", method="GET", headers=headers)
+    agents = manifest.get("agents", [])
+    providers = manifest.get("providers", [])
+    source_connectors = manifest.get("source_connectors", [])
+    if not isinstance(agents, list) or not isinstance(providers, list) or not isinstance(source_connectors, list):
+        raise RuntimeError("Central manifest has an unsupported schema; refusing to use a stale local catalog")
+    agent_ids = {item.get("id") for item in agents if isinstance(item, dict)}
+    required_agents = {"koroush.research-brief", "koroush.text-classifier", "koroush.text-summarizer"}
+    if require_translation:
+        required_agents.add("koroush.text-translator")
+    missing = sorted(required_agents - agent_ids)
+    if missing:
+        raise RuntimeError("Central manifest is missing required agents: " + ", ".join(missing))
     catalog = request_json(base_url + "/api/integrations", method="GET", headers=headers)
     profiles = catalog.get("integrations", [])
     connectors = catalog.get("registered_connectors", [])
@@ -91,7 +105,7 @@ def resolve_integration(base_url: str, headers: dict[str, str], integration_id: 
         match = next((x for x in profiles if isinstance(x, dict) and x.get("id") == "koroush.youtube"), None)
         if not match:
             raise RuntimeError("Central core does not advertise the built-in YouTube research profile")
-        return "youtube", match
+        return "youtube", match, manifest
 
     if not re.fullmatch(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+){1,7}", integration_id) or len(integration_id) > 100:
         raise ValueError("integration-id must be 'youtube' or a registered connector ID")
@@ -103,7 +117,7 @@ def resolve_integration(base_url: str, headers: dict[str, str], integration_id: 
     ), None)
     if not match:
         raise RuntimeError(f"Connector '{integration_id}' is not active/compatible in the central catalog")
-    return integration_id, match
+    return integration_id, match, manifest
 
 
 def main() -> int:
@@ -128,7 +142,9 @@ def main() -> int:
     evidence = load_evidence(args.evidence_file, args.evidence_json)
 
     headers = {"X-Tenant-Key": tenant_key, "Content-Type": "application/json", "Accept": "application/json"}
-    route, profile = resolve_integration(base_url, headers, args.integration_id)
+    route, profile, manifest = resolve_integration(
+        base_url, headers, args.integration_id, require_translation=bool(args.target_language)
+    )
     body = {
         "repository": repository,
         "idempotency_key": args.idempotency_key,
@@ -146,7 +162,12 @@ def main() -> int:
     if parsed_status.scheme or parsed_status.netloc or not parsed_status.path.startswith("/api/jobs/") or ".." in parsed_status.path.split("/"):
         raise RuntimeError("Central API returned an unsafe job status reference")
 
+    active_providers = [x.get("id") for x in manifest.get("providers", []) if isinstance(x, dict) and x.get("status") == "available"]
+    listed_sources = [x.get("id") for x in manifest.get("source_connectors", []) if isinstance(x, dict)]
     print(f"Central integration: {profile.get('id', args.integration_id)}")
+    print("Central agent catalog synchronized: research-brief, classifier, summarizer" + (", translator" if args.target_language else ""))
+    print(f"Central available providers: {', '.join(active_providers) if active_providers else 'none marked available'}")
+    print(f"Central source connector catalog entries: {len(listed_sources)} (discovery metadata only)")
     print(f"Central job accepted: {job_id} ({submitted.get('status', 'unknown')})")
     deadline = time.monotonic() + args.wait_seconds
     while time.monotonic() < deadline:
